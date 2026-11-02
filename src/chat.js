@@ -5,7 +5,6 @@ const Chat = (() => {
   const prompt = document.getElementById("prompt");
   const input = document.getElementById("prompt-input");
   const toast = document.getElementById("toast");
-  const history = [];
   let busy = false;
 
   /** "[happy]\ntesto\n---EN---\ntext" → { emotion, it, en } */
@@ -27,11 +26,17 @@ const Chat = (() => {
     toastTimer = setTimeout(() => toast.classList.remove("on"), 5000);
   }
 
+  /** Testo da mostrare secondo la lingua scelta (solo IT / IT+EN / solo EN). */
+  function displayText(reply) {
+    const lang = window.appConfig?.language || "it";
+    if (lang === "it_en" && reply.en) return `${reply.it}\n\n${reply.en}`;
+    return reply.it || reply.en || "…";
+  }
+
   async function ask(text, image = null) {
     text = text.trim();
     if (!text || busy) return;
     busy = true;
-    history.push({ role: "user", content: text, image });
     State.setMode("thinking");
     Dialog.pending();
 
@@ -40,17 +45,14 @@ const Chat = (() => {
       if (ev.kind === "fallback") notify(`${ev.from} non risponde (${ev.reason}) → provo il successivo`);
     };
     try {
-      const res = await invoke("chat", { messages: history.map(({ role, content, image }) => ({ role, content, image })), onEvent: events });
-      history.push({ role: "assistant", content: res.text });
-      // le immagini pesano: non le rimandiamo nei turni successivi
-      history.forEach((m) => { m.image = null; });
+      // contesto e memoria li gestisce il backend
+      const res = await invoke("chat", { text, image, onEvent: events });
       const reply = parseReply(res.text);
       State.setEmotion(reply.emotion);
       State.setMode("speaking");
       busy = false;
-      await Dialog.say(reply.it || "…");
+      await Dialog.say(displayText(reply));
     } catch (err) {
-      history.pop(); // la domanda non ha avuto risposta: non tenerla nel contesto
       busy = false;
       State.setEmotion("error");
       State.setMode("speaking");
@@ -58,6 +60,34 @@ const Chat = (() => {
       await Dialog.say(`Ah… scusa${name ? ", " + name : ""}, non riesco a collegarmi. Sono solo un programma, ma ce la sto mettendo tutta…\n\n(${err})`);
     }
     State.settle();
+  }
+
+  // ---------- push-to-talk (la registrazione la fa il backend) ----------
+  function onStt(ev) {
+    switch (ev.state) {
+      case "recording":
+        if (busy) return;
+        State.setMode("listening");
+        Dialog.pending("🎙 Ti ascolto");
+        break;
+      case "transcribing":
+        State.setMode("thinking");
+        Dialog.pending("✎ Trascrivo");
+        break;
+      case "done":
+        notify(`Hai detto: “${ev.text}”`);
+        ask(ev.text);
+        break;
+      case "empty":
+        State.settle();
+        Dialog.say("Ehm… non ho sentito niente. Tieni premuto il tasto mentre parli.");
+        break;
+      case "error":
+        State.setEmotion("worried");
+        State.setMode("speaking");
+        Dialog.say(`Non riesco a sentirti… (${ev.message})`).then(() => State.settle());
+        break;
+    }
   }
 
   function openInput() {
@@ -88,5 +118,5 @@ const Chat = (() => {
   });
   input.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== input) closeInput(); }, 150));
 
-  return { ask, openInput, closeInput, parseReply, history, notify };
+  return { ask, openInput, closeInput, parseReply, notify, onStt };
 })();

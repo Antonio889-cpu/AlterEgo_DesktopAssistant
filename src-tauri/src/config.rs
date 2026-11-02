@@ -96,6 +96,45 @@ impl AiConfig {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
+pub struct Personality {
+    /// 0 = timida, 1 = sicura.
+    pub confidence: f64,
+    /// 0 = formale, 1 = affettuosa.
+    pub warmth: f64,
+    /// Modalità imitazione: nome della persona da imitare (vuoto = spenta).
+    pub imitate: String,
+}
+
+impl Default for Personality {
+    fn default() -> Self {
+        Self { confidence: 0.3, warmth: 0.7, imitate: String::new() }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
+pub struct SttConfig {
+    /// "groq", "local" o "off".
+    pub provider: String,
+    pub model: String,
+    /// Server Whisper locale compatibile OpenAI (solo provider "local").
+    pub base_url: String,
+    pub language: String,
+}
+
+impl Default for SttConfig {
+    fn default() -> Self {
+        Self {
+            provider: "groq".into(),
+            model: "whisper-large-v3-turbo".into(),
+            base_url: "http://localhost:8000/v1".into(),
+            language: "it".into(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct Config {
     /// Opacità della finestra, 0.2–1.0.
     pub opacity: f64,
@@ -115,6 +154,12 @@ pub struct Config {
     /// Flicker e rumore animati (spegnili per CPU minima).
     pub effects: bool,
     pub ai: AiConfig,
+    /// Lingua risposte: "it", "it_en" (italiano + traduzione) o "en".
+    pub language: String,
+    pub personality: Personality,
+    /// Memoria persistente (SQLite). Spenta = si ricorda solo la sessione corrente.
+    pub memory_enabled: bool,
+    pub stt: SttConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -134,8 +179,26 @@ impl Default for Config {
             dialog_style: "chiaro".into(),
             effects: true,
             ai: AiConfig::default(),
+            language: "it".into(),
+            personality: Personality::default(),
+            memory_enabled: true,
+            stt: SttConfig::default(),
             last_monitor: None,
             geometry: HashMap::new(),
+        }
+    }
+}
+
+impl Config {
+    pub fn normalize_voice(&mut self) {
+        if !["it", "it_en", "en"].contains(&self.language.as_str()) {
+            self.language = "it".into();
+        }
+        self.personality.confidence = self.personality.confidence.clamp(0.0, 1.0);
+        self.personality.warmth = self.personality.warmth.clamp(0.0, 1.0);
+        self.personality.imitate = self.personality.imitate.trim().chars().take(60).collect();
+        if !["groq", "local", "off"].contains(&self.stt.provider.as_str()) {
+            self.stt.provider = "groq".into();
         }
     }
 }
@@ -154,6 +217,7 @@ pub fn load(path: &Path) -> Config {
             cfg.opacity = cfg.opacity.clamp(0.2, 1.0);
             cfg.bg_intensity = cfg.bg_intensity.clamp(0.0, 1.0);
             cfg.ai.normalize();
+            cfg.normalize_voice();
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {
                 cfg.background = "both".into();
             }

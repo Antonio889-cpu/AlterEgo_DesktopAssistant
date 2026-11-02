@@ -95,7 +95,7 @@ listen("config", (e) => applyConfig(e.payload));
 listen("click-through", (e) => applyClickThrough(e.payload));
 listen("handle-hover", (e) => document.body.classList.toggle("handle-hover", e.payload));
 listen("demo", () => demo());
-listen("ptt", (e) => { if (e.payload) Dialog.say("Ti ascolto... (push-to-talk arriva in fase 6)"); });
+listen("stt", (e) => Chat.onStt(e.payload));
 listen("text-input", () => Chat.openInput());
 
 Dialog.on("talk", (on) => Face.setTalking(on));
@@ -108,6 +108,6 @@ window.addEventListener("contextmenu", (e) => e.preventDefault());
   const name = config.user_name.trim();
   State.setEmotion("happy");
   State.setMode("speaking");
-  await Dialog.say(`Ciao${name ? ", " + name : ""}! Premi Ctrl+Alt+T, oppure "Scrivi ad Alter Ego…" dalla tray, per parlare con me.`);
+  await Dialog.say(`Ciao${name ? ", " + name : ""}! Scrivimi con Ctrl+Alt+T, oppure tieni premuto Ctrl+Alt+Spazio e parla.`);
   State.settle();
 })();

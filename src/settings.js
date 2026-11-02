@@ -126,8 +126,109 @@ $("save-general").onclick = () => invoke("set_general", { userName: $("user-name
 $("temperature").oninput = (e) => { ai.temperature = +e.target.value; $("temperature-val").textContent = ai.temperature.toFixed(2); saveAi(); };
 $("max-history").onchange = (e) => { ai.max_history = Math.max(2, Math.min(50, +e.target.value || 12)); saveAi(); };
 
+// ---------- personalità e lingua ----------
+let persona = null;
+function savePersona() {
+  clearTimeout(personaTimer);
+  personaTimer = setTimeout(() => invoke("set_persona_options", persona), 300);
+}
+let personaTimer = null;
+function fillPersona(cfg) {
+  persona = { language: cfg.language, personality: structuredClone(cfg.personality), memoryEnabled: cfg.memory_enabled };
+  $("language").value = cfg.language;
+  $("confidence").value = cfg.personality.confidence;
+  $("warmth").value = cfg.personality.warmth;
+  $("imitate").value = cfg.personality.imitate;
+  $("memory-enabled").checked = cfg.memory_enabled;
+}
+$("language").onchange = (e) => { persona.language = e.target.value; savePersona(); };
+$("confidence").oninput = (e) => { persona.personality.confidence = +e.target.value; savePersona(); };
+$("warmth").oninput = (e) => { persona.personality.warmth = +e.target.value; savePersona(); };
+$("imitate").oninput = (e) => { persona.personality.imitate = e.target.value; savePersona(); };
+$("memory-enabled").onchange = (e) => { persona.memoryEnabled = e.target.checked; savePersona(); };
+$("open-data").onclick = () => invoke("open_data_dir").catch((e) => alert(e));
+
+// ---------- memoria ----------
+const fmtDate = (ts) => new Date(ts * 1000).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
+function listItems(ul, items, onDelete) {
+  ul.innerHTML = "";
+  if (!items.length) { ul.innerHTML = '<li class="empty">nessuno</li>'; return; }
+  for (const it of items) {
+    const li = document.createElement("li");
+    const span = document.createElement("span");
+    span.textContent = it.content;
+    const small = document.createElement("small");
+    small.textContent = fmtDate(it.ts);
+    li.append(span, small);
+    if (onDelete) {
+      const del = document.createElement("button");
+      del.textContent = "✕";
+      del.title = "Dimentica questo fatto";
+      del.onclick = () => onDelete(it);
+      li.append(del);
+    }
+    ul.append(li);
+  }
+}
+function memResult(text, cls = "") { const r = $("memory-result"); r.textContent = text; r.className = "result " + cls; }
+async function refreshMemory() {
+  try {
+    const o = await invoke("memory_overview");
+    $("memory-stats").textContent = `${o.messages} messaggi salvati · file: ${o.db_path}`;
+    listItems($("facts"), o.facts, async (it) => { await invoke("memory_delete_fact", { id: it.id }); refreshMemory(); });
+    listItems($("summaries"), o.summaries);
+  } catch (e) { $("memory-stats").textContent = String(e); }
+}
+$("refresh-memory").onclick = refreshMemory;
+$("add-fact").onclick = async () => {
+  const v = $("new-fact").value.trim();
+  if (!v) return;
+  await invoke("memory_add_fact", { content: v });
+  $("new-fact").value = "";
+  refreshMemory();
+};
+$("export-memory").onclick = async () => {
+  try { memResult("Esportata in " + (await invoke("memory_export")), "ok"); }
+  catch (e) { memResult(String(e), "bad"); }
+};
+$("forget-all").onclick = async () => {
+  if (!confirm("Cancellare TUTTA la memoria di Alter Ego (conversazioni, riassunti, fatti)? Non si può annullare.")) return;
+  try { await invoke("memory_forget_all"); memResult("Memoria cancellata.", "ok"); refreshMemory(); }
+  catch (e) { memResult(String(e), "bad"); }
+};
+
+// ---------- voce ----------
+let sttCfg = null;
+let sttTimer = null;
+function saveStt() { clearTimeout(sttTimer); sttTimer = setTimeout(() => invoke("set_stt", { stt: sttCfg }), 300); }
+function fillStt(cfg) {
+  sttCfg = structuredClone(cfg.stt);
+  $("stt-provider").value = sttCfg.provider;
+  $("stt-model").value = sttCfg.model;
+  $("stt-url").value = sttCfg.base_url;
+  $("stt-language").value = sttCfg.language;
+  $("stt-url-row").style.display = sttCfg.provider === "local" ? "" : "none";
+}
+$("stt-provider").onchange = (e) => { sttCfg.provider = e.target.value; $("stt-url-row").style.display = sttCfg.provider === "local" ? "" : "none"; saveStt(); };
+$("stt-model").oninput = (e) => { sttCfg.model = e.target.value.trim(); saveStt(); };
+$("stt-url").oninput = (e) => { sttCfg.base_url = e.target.value.trim(); saveStt(); };
+$("stt-language").oninput = (e) => { sttCfg.language = e.target.value.trim(); saveStt(); };
+$("stt-test").onclick = async (ev) => {
+  const r = $("stt-result");
+  ev.target.disabled = true;
+  clearTimeout(sttTimer);
+  await invoke("set_stt", { stt: sttCfg });
+  r.className = "result"; r.textContent = "🎙 parla adesso… (4 secondi)";
+  try { r.textContent = "Ho capito: " + (await invoke("stt_test")); r.className = "result ok"; }
+  catch (e) { r.textContent = String(e); r.className = "result bad"; }
+  ev.target.disabled = false;
+};
+
 (async () => {
   const cfg = await invoke("get_config");
+  fillPersona(cfg);
+  fillStt(cfg);
+  refreshMemory();
   ai = structuredClone(cfg.ai);
   fillGeneral(cfg);
   $("temperature").value = ai.temperature;

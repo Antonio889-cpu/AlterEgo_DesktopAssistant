@@ -39,3 +39,15 @@ ol { list-style: none; padding: 0; margin: 0; }
 .result { color: var(--muted); }
 .result.ok { color: var(--accent); }
 .result.bad { color: var(--bad); }
+h3 { font: 14px "DotGothic16", monospace; color: var(--muted); margin: 12px 0 4px; }
+select { background: #061206; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font: inherit; }
+code { color: var(--accent); }
+.facts { list-style: none; padding: 0; margin: 0 0 6px; max-height: 220px; overflow: auto; }
+.facts li { display: flex; gap: 8px; align-items: flex-start; padding: 4px 6px; border-bottom: 1px solid #1d3d1f; }
+.facts li span { flex: 1; white-space: pre-wrap; }
+.facts li small { color: var(--muted); white-space: nowrap; }
+.facts li button { padding: 0 6px; font-size: 12px; }
+.facts .empty { color: var(--muted); font-style: italic; border: none; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+button.danger { border-color: #7a2a22; background: #3a1410; }
+button.danger:hover { border-color: var(--bad); }

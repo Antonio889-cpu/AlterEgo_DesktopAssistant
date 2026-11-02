@@ -9,10 +9,10 @@ Stack: Tauri 2 (Rust) + HTML/CSS/JS vanilla. Uso personale, non commerciale.
 |---|---|---|
 | 1 | Scheletro: finestra, drag, resize, tray, hotkey, posizione | ✅ |
 | 2 | Look CRT, sfondi, box dialogo | ✅ |
-| 3 | Sprite e stati | ✅ da testare |
-| 4 | Backend AI multi-provider | ✅ da testare |
-| 5 | Personalità e memoria | – |
-| 6 | Input testo e push-to-talk | – |
+| 3 | Sprite e stati | ✅ |
+| 4 | Backend AI multi-provider | ✅ |
+| 5 | Personalità e memoria | ✅ da testare |
+| 6 | Input testo e push-to-talk | 🟡 STT fatto, da testare; rifinitura input in fase 6 |
 | 7 | Azioni PC e permessi | – |
 | 8 | Audio e TTS | – |
 | 9 | Rifinitura e build finale | – |
@@ -25,7 +25,8 @@ Stack: Tauri 2 (Rust) + HTML/CSS/JS vanilla. Uso personale, non commerciale.
 - **Aspetto** (tray): sfondo (scanline / circuiti / entrambi), intensità sfondo, box dialogo (chiaro come lo screenshot / scuro), effetti animati.
 - **Box dialogo**: clic sul box o Invio/Spazio completa la pagina, poi passa alla successiva. Il testo lungo va in pagine da 2 righe.
 - **Scrivere ad Alter Ego**: `Ctrl+Alt+T` (o tray → *Scrivi ad Alter Ego…*), scrivi, Invio. Esc chiude.
-- **Impostazioni** (tray → *Impostazioni…*): nome, tag, provider AI, chiavi, modelli, ordine di fallback, temperatura.
+- **Parlare ad Alter Ego**: tieni premuto `Ctrl+Alt+Spazio`, parla, rilascia. Il testo trascritto parte come messaggio.
+- **Impostazioni** (tray → *Impostazioni…*): nome, tag, provider AI, chiavi, modelli, ordine di fallback, temperatura, personalità, lingua, memoria, voce.
 - **Alt+F4** nasconde la finestra. Per uscire usa *Esci* dalla tray.
 - **Click-through**: il mouse passa attraverso la finestra. Per disattivarlo passa sul lucchetto in alto a destra e cliccalo, oppure usa la tray o la hotkey.
 
@@ -53,6 +54,8 @@ Campi modificabili a mano finché non c'è la schermata impostazioni:
 | `name_tag` | Tag nome nel box dialogo | `Alter Ego` |
 | `effects` | Flicker e rumore animati (`false` = CPU minima) | `true` |
 
+Il resto (AI, personalità, memoria, voce) si imposta dalla finestra *Impostazioni*.
+
 Al riavvio la finestra torna sull'ultimo monitor usato. Se quel monitor non c'è più, va sul monitor principale.
 
 ## Intelligenza artificiale
@@ -71,6 +74,37 @@ Ogni tentativo ha timeout e 2 retry con attesa crescente per 429 ed errori 5xx.
 Se nessun provider risponde, Alter Ego lo dice in personaggio con lo sprite `error`.
 
 Le chiamate partono dal backend Rust: il frontend non vede mai le chiavi.
+
+## Personalità
+
+La scheda del personaggio è `%APPDATA%\AlterEgo\persona\alter_ego.md`, creata al primo avvio da `persona/alter_ego.md`.
+Modificala come vuoi: vale dal messaggio successivo. Le righe che iniziano con `>` sono note e non vengono inviate al modello.
+
+Nelle impostazioni:
+
+- **Lingua**: solo italiano, italiano + traduzione inglese (pagine successive del box), solo inglese.
+- **Timida ↔ sicura**, **formale ↔ affettuosa**.
+- **Modalità imitazione**: scrivi chi imitare (vuoto = spenta).
+
+## Memoria
+
+SQLite in `%APPDATA%\AlterEgo\memory.db`: cronologia, riassunti, fatti sull'utente, promemoria (tabella pronta per la fase 7).
+
+- Contesto inviato: ultimi N messaggi + ultimo riassunto + fatti.
+- Ogni 16 messaggi usciti dalla finestra di contesto, Alter Ego li riassume in background ed estrae fatti duraturi su di te.
+- Nelle impostazioni: vedi fatti e riassunti, aggiungi o cancella fatti, esporta in JSON (cartella Documenti), dimentica tutto.
+- Memoria spenta: si ricorda solo la sessione in corso.
+
+## Voce (speech-to-text)
+
+Tieni premuto `Ctrl+Alt+Spazio`: l'app registra dal microfono predefinito (max 60 s), poi trascrive.
+
+- **Groq Whisper** (default): usa la chiave Groq salvata nella sezione AI. Modello `whisper-large-v3-turbo`.
+- **Server locale**: qualunque server Whisper con endpoint compatibile OpenAI `/v1/audio/transcriptions`
+  (per esempio faster-whisper-server/speaches, o whisper.cpp server in modalità OpenAI). Ollama non trascrive audio.
+- *Prova microfono* nelle impostazioni registra 4 secondi e mostra il testo.
+
+Se non sente nulla: Impostazioni di Windows → Privacy e sicurezza → Microfono → attiva "Consenti alle app desktop di accedere al microfono".
 
 ## Sprite
 
@@ -128,7 +162,8 @@ Con il target GNU, `WebView2Loader.dll` deve stare accanto a `alter-ego.exe`. L'
 ## Struttura
 
 ```
-src-tauri/src/   main.rs, config.rs, window.rs, hotkeys.rs, tray.rs, keys.rs
+src-tauri/src/   main.rs, config.rs, window.rs, hotkeys.rs, tray.rs, keys.rs, assistant.rs, stt.rs
+src-tauri/src/memory/      mod.rs (SQLite), summarize.rs
 src-tauri/src/providers/   mod.rs (fallback), openai_compat.rs (adapter), prompt.rs
 src/             index.html, style.css, app.js, dialog.js, face.js, state.js, chat.js, sprites.js
 src/             settings.html, settings.css, settings.js
@@ -136,6 +171,7 @@ src/assets/      font, immagini e sprite usati a runtime (sprite esclusi da git)
 assets/          sorgenti originali (sprite raw, ecc.), esclusi da git
 tools/           process_sprites.py, mock_openai.py, make_icon.py, build-windows.sh
 docs/            SOURCES.md, MANCANTI.md
+persona/         alter_ego.md (scheda predefinita)
 ```
 
 ## Licenze di terze parti

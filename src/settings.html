@@ -27,6 +27,55 @@
       <p class="note privacy"><b>Cosa esce dal PC:</b> solo il prompt di sistema e gli ultimi messaggi della conversazione,
         inviati al provider che risponde. Con Ollama tutto resta sul tuo computer.</p>
     </section>
+    <section>
+      <h2>Personalità e lingua</h2>
+      <label>Lingua delle risposte
+        <select id="language">
+          <option value="it">Solo italiano</option>
+          <option value="it_en">Italiano + traduzione inglese</option>
+          <option value="en">Solo inglese</option>
+        </select>
+      </label>
+      <label>Timida <input id="confidence" type="range" min="0" max="1" step="0.05" /> Sicura</label>
+      <label>Formale <input id="warmth" type="range" min="0" max="1" step="0.05" /> Affettuosa</label>
+      <label>Modalità imitazione <input id="imitate" maxlength="60" placeholder="vuoto = spenta (es. Mondo Owada)" /></label>
+      <p class="note">La scheda del personaggio è il file <code>persona\alter_ego.md</code> nella cartella dati: modificalo liberamente,
+        vale dal messaggio successivo.</p>
+      <button id="open-data">Apri cartella dati</button>
+    </section>
+
+    <section>
+      <h2>Memoria</h2>
+      <label class="inline"><input type="checkbox" id="memory-enabled" /> Ricorda le conversazioni tra un avvio e l'altro (SQLite, solo su questo PC)</label>
+      <p class="note" id="memory-stats"></p>
+      <h3>Cose che Alter Ego sa di te</h3>
+      <ul id="facts" class="facts"></ul>
+      <label><input id="new-fact" maxlength="200" placeholder="aggiungi un fatto (es. Preferisco risposte brevi)" /> <button id="add-fact">Aggiungi</button></label>
+      <h3>Riassunti</h3>
+      <ul id="summaries" class="facts"></ul>
+      <div class="actions">
+        <button id="refresh-memory">Aggiorna</button>
+        <button id="export-memory">Esporta (JSON)</button>
+        <button id="forget-all" class="danger">Dimentica tutto</button>
+        <span id="memory-result" class="result"></span>
+      </div>
+    </section>
+
+    <section>
+      <h2>Voce (riconoscimento vocale)</h2>
+      <p class="note">Tieni premuto <b>Ctrl+Alt+Spazio</b> mentre parli, poi rilascia. L'audio va solo al servizio scelto qui.</p>
+      <label>Servizio
+        <select id="stt-provider">
+          <option value="groq">Groq Whisper (usa la chiave Groq)</option>
+          <option value="local">Server Whisper locale (compatibile OpenAI)</option>
+          <option value="off">Disattivato</option>
+        </select>
+      </label>
+      <label>Modello <input id="stt-model" placeholder="whisper-large-v3-turbo" /></label>
+      <label id="stt-url-row">URL server locale <input id="stt-url" placeholder="http://localhost:8000/v1" /></label>
+      <label>Lingua <input id="stt-language" maxlength="5" placeholder="it" style="max-width:80px;min-width:0" /></label>
+      <div class="actions"><button id="stt-test">Prova microfono (4 secondi)</button> <span id="stt-result" class="result"></span></div>
+    </section>
   </main>
 
   <template id="provider-tpl">

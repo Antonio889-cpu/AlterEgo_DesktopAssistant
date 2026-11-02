@@ -1,10 +1,13 @@
 // Niente console in release su Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod assistant;
 mod config;
 mod hotkeys;
 mod keys;
+mod memory;
 mod providers;
+mod stt;
 mod tray;
 mod window;
 
@@ -57,6 +60,10 @@ pub struct FrontConfig {
     dialog_style: String,
     effects: bool,
     ai: config::AiConfig,
+    language: String,
+    personality: config::Personality,
+    memory_enabled: bool,
+    stt: config::SttConfig,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -75,6 +82,10 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         dialog_style: cfg.dialog_style.clone(),
         effects: cfg.effects,
         ai: cfg.ai.clone(),
+        language: cfg.language.clone(),
+        personality: cfg.personality.clone(),
+        memory_enabled: cfg.memory_enabled,
+        stt: cfg.stt.clone(),
     }
 }
 
@@ -205,22 +216,6 @@ async fn test_provider(app: AppHandle, provider: String) -> Result<String, Strin
     providers::test(&state.ai, &cfg, &provider).await
 }
 
-#[tauri::command]
-async fn chat(
-    app: AppHandle,
-    messages: Vec<providers::ChatMessage>,
-    on_event: tauri::ipc::Channel<providers::StreamEvent>,
-) -> Result<providers::ChatResult, String> {
-    let state = app.state::<AppState>();
-    let (ai, system) = {
-        let cfg = state.cfg.lock().unwrap();
-        (cfg.ai.clone(), providers::prompt::system(&cfg))
-    };
-    let keep = ai.max_history;
-    let start = messages.len().saturating_sub(keep);
-    providers::chat(&state.ai, ai, system, messages[start..].to_vec(), on_event).await
-}
-
 fn main() {
     tauri::Builder::default()
         // Seconda istanza: mostra quella già aperta ed esce.
@@ -232,6 +227,8 @@ fn main() {
         .plugin(hotkeys::plugin())
         .setup(|app| {
             let cfg_path = config::config_path(&app.path().config_dir()?);
+            let data_dir = cfg_path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+            app.manage(assistant::Conversation::new(data_dir));
             let cfg = config::load(&cfg_path);
             let hk = cfg.hotkeys.clone();
             app.manage(AppState {
@@ -281,7 +278,16 @@ fn main() {
             set_api_key,
             list_models,
             test_provider,
-            chat
+            assistant::chat,
+            assistant::set_persona_options,
+            assistant::set_stt,
+            assistant::memory_overview,
+            assistant::memory_add_fact,
+            assistant::memory_delete_fact,
+            assistant::memory_forget_all,
+            assistant::memory_export,
+            assistant::open_data_dir,
+            assistant::stt_test
         ])
         .run(tauri::generate_context!())
         .expect("errore all'avvio di Alter Ego");

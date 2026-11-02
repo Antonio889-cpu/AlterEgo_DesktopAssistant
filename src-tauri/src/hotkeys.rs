@@ -28,9 +28,7 @@ fn handle(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
     let pressed = event.state() == ShortcutState::Pressed;
     match action {
         // Push-to-talk usa pressione E rilascio; il resto solo la pressione.
-        Action::PushToTalk => {
-            let _ = app.emit("ptt", pressed);
-        }
+        Action::PushToTalk => crate::assistant::ptt(app, pressed),
         _ if !pressed => {}
         Action::ToggleVisibility => window::toggle_visibility(app),
         Action::TextInput => {

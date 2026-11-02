@@ -1,5 +1,5 @@
-"""Server finto compatibile OpenAI per i test: /ok, /fail500, /flaky (429 poi ok), /badkey (401). Porta 18080."""
-import json, time
+"""Server finto compatibile OpenAI per i test: /ok, /fail500, /flaky (429 poi ok), /badkey (401), /audio/transcriptions. Porta 18080."""
+import json, os, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 calls = {"flaky": 0}
 class H(BaseHTTPRequestHandler):
@@ -12,7 +12,12 @@ class H(BaseHTTPRequestHandler):
             self._json(200, {"data": [{"id": "mock-b"}, {"id": "mock-a"}]})
         else: self._json(404, {})
     def do_POST(self):
-        n = int(self.headers.get("Content-Length", 0)); body = json.loads(self.rfile.read(n))
+        n = int(self.headers.get("Content-Length", 0)); raw = self.rfile.read(n)
+        if self.path.endswith("/audio/transcriptions"):
+            ok = b'name="file"' in raw and b"RIFF" in raw and b'name="language"' in raw
+            return self._json(200 if ok else 400, {"text": " Ciao Alter Ego "} if ok else {"error": "multipart non valido"})
+        body = json.loads(raw)
+        with open(os.environ.get("MOCK_LAST", "/tmp/mock_last.json"), "w") as f: json.dump(body, f, ensure_ascii=False, indent=1)
         mode = self.path.split("/")[1]
         if mode == "fail500": return self._json(500, {"error": {"message": "boom"}})
         if mode == "badkey": return self._json(401, {"error": {"message": "invalid key " + self.headers.get("Authorization", "")}})

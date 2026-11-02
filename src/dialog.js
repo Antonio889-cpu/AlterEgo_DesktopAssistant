@@ -122,11 +122,12 @@ const Dialog = (() => {
   }
 
   /** Box con "…" animati mentre Alter Ego pensa. Non si chiude col clic. */
-  function pending() {
+  function pending(label = "") {
     stopTyping();
+    if (resolveCurrent) { const r = resolveCurrent; resolveCurrent = null; r(); }
     box.classList.remove("hidden", "waiting");
     box.classList.add("pending");
-    textEl.textContent = "";
+    textEl.textContent = label;
     pages = [""];
     page = 0;
   }
