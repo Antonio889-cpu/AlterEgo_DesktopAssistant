@@ -95,7 +95,7 @@ const Dialog = (() => {
 
   /** Clic/Invio: completa la pagina, poi passa alla successiva, poi chiude. */
   function advance() {
-    if (box.classList.contains("hidden")) return;
+    if (box.classList.contains("hidden") || box.classList.contains("pending")) return;
     if (timer) {
       stopTyping();
       shown = pages[page].length;
@@ -111,6 +111,7 @@ const Dialog = (() => {
   /** Mostra un messaggio. Un nuovo messaggio interrompe quello in corso. */
   function say(text) {
     stopTyping();
+    box.classList.remove("pending");
     if (resolveCurrent) resolveCurrent();
     box.classList.remove("hidden");
     pages = paginate(String(text));
@@ -120,12 +121,23 @@ const Dialog = (() => {
     });
   }
 
+  /** Box con "…" animati mentre Alter Ego pensa. Non si chiude col clic. */
+  function pending() {
+    stopTyping();
+    box.classList.remove("hidden", "waiting");
+    box.classList.add("pending");
+    textEl.textContent = "";
+    pages = [""];
+    page = 0;
+  }
+
   function setName(name) { tagEl.textContent = name; }
 
   box.addEventListener("click", advance);
 
   return {
     say,
+    pending,
     advance,
     setName,
     isOpen: () => !box.classList.contains("hidden"),

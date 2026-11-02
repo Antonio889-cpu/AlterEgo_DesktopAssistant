@@ -148,19 +148,31 @@ body.fx #screen::after {
 #face {
   position: absolute;
   left: 50%;
-  top: 4%;
-  height: 78%;
+  top: 5%;
+  height: 74%;
+  aspect-ratio: 612 / 483;
   transform: translateX(-50%);
   z-index: 2;
   pointer-events: none;
+  /* sfuma il taglio in basso (collo) come nei riferimenti */
+  -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
 }
 #face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  display: block;
-  /* bordi sfumati: lo sprite provvisorio ha ancora lo sfondo verde */
-  -webkit-mask-image: radial-gradient(ellipse 50% 52% at 50% 46%, #000 62%, transparent 100%);
-  mask-image: radial-gradient(ellipse 50% 52% at 50% 46%, #000 62%, transparent 100%);
+  display: none;
+  /* tinta: gli sprite sono già verdi; regola qui se vuoi (es. hue-rotate) */
+  filter: var(--face-filter, none);
 }
+#face img.on { display: block; }
+#face.talking img.on { animation: talk-bob .26s steps(2) infinite; }
+@keyframes talk-bob { 50% { transform: translateY(-0.6%); } }
+body[data-mode="sleep"] #face { opacity: .55; }
+body[data-mode="sleep"] #face img.on { animation: breathe 4s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: translateY(0.8%); } }
 
 /* ---------- logo ---------- */
 #logo {
@@ -257,8 +269,61 @@ body.fx #screen::after {
   vertical-align: .12em;
   visibility: hidden;
 }
+#dialog.pending { cursor: default; }
+#dialog.pending #dialog-text::after {
+  content: "…";
+  display: inline-block;
+  animation: dots 1.2s steps(3) infinite;
+  width: 0;
+  overflow: visible;
+}
+@keyframes dots {
+  0% { content: "."; }
+  33% { content: ".."; }
+  66% { content: "…"; }
+}
+
 #dialog.waiting #dialog-next { visibility: visible; animation: blink .9s steps(1) infinite; }
 @keyframes blink { 50% { visibility: hidden; } }
+
+/* input di testo: stesso box del dialogo */
+#prompt {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 3.2%;
+  height: 14%;
+  z-index: 7;
+}
+#prompt .inner { align-items: center; padding: 0 3.4vh; }
+#prompt .tag { margin-top: 0; }
+#prompt input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: 4.4vh "DotGothic16", monospace;
+  color: var(--dlg-text);
+  caret-color: var(--dlg-text);
+}
+#prompt input::placeholder { color: var(--dlg-text); opacity: .45; }
+#prompt.hidden { display: none; }
+
+#toast {
+  position: absolute;
+  left: 18%;
+  right: 4%;
+  top: 3%;
+  z-index: 8;
+  font: 2.6vh "DotGothic16", monospace;
+  color: #eaffc8;
+  text-align: right;
+  text-shadow: 0 0 .5vh #000, 0 0 .2vh #000;
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+}
+#toast.on { opacity: 1; }
 
 /* punta del fumetto in basso al centro */
 .tail {

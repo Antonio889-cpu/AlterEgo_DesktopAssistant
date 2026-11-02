@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Alter Ego – Impostazioni</title>
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <header><h1>ALTER EGO · Impostazioni</h1></header>
+  <main>
+    <section>
+      <h2>Generale</h2>
+      <label>Il tuo nome <input id="user-name" maxlength="40" placeholder="es. Makoto" /></label>
+      <label>Tag nome nel dialogo <input id="name-tag" maxlength="24" placeholder="Alter Ego" /></label>
+      <button id="save-general">Salva</button>
+    </section>
+
+    <section>
+      <h2>Intelligenza artificiale</h2>
+      <p class="note">I provider vengono provati dall'alto in basso: se uno fallisce o va in rate limit si passa al successivo.
+        Le chiavi sono salvate nel <b>Credential Manager di Windows</b>, mai in file.</p>
+      <div class="row">
+        <label>Temperatura <input id="temperature" type="range" min="0" max="1.5" step="0.05" /> <output id="temperature-val"></output></label>
+        <label>Messaggi di contesto <input id="max-history" type="number" min="2" max="50" /></label>
+      </div>
+      <ol id="providers"></ol>
+      <p class="note privacy"><b>Cosa esce dal PC:</b> solo il prompt di sistema e gli ultimi messaggi della conversazione,
+        inviati al provider che risponde. Con Ollama tutto resta sul tuo computer.</p>
+    </section>
+  </main>
+
+  <template id="provider-tpl">
+    <li class="provider">
+      <div class="head">
+        <label class="enable"><input type="checkbox" class="enabled" /> <span class="label"></span></label>
+        <span class="badge"></span>
+        <span class="move">
+          <button class="up" title="Su">▲</button><button class="down" title="Giù">▼</button>
+        </span>
+      </div>
+      <div class="body">
+        <label class="key-row">Chiave API
+          <input type="password" class="key" autocomplete="off" placeholder="incolla la chiave" />
+          <button class="save-key">Salva chiave</button><button class="del-key">Elimina</button>
+        </label>
+        <label>Modello
+          <input class="model" list="" placeholder="" />
+          <button class="load-models">Carica modelli</button>
+          <datalist></datalist>
+        </label>
+        <label>URL base <input class="base" placeholder="" /></label>
+        <label class="inline"><input type="checkbox" class="vision" /> Il modello supporta immagini (visione)</label>
+        <div class="actions"><button class="test">Prova connessione</button> <span class="result"></span></div>
+      </div>
+    </li>
+  </template>
+
+  <script src="settings.js"></script>
+</body>
+</html>

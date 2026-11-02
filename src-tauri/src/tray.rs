@@ -53,6 +53,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 
     let show = MenuItem::with_id(app, "toggle", "Mostra / nascondi", true, None::<&str>)?;
     let demo = MenuItem::with_id(app, "demo", "Messaggio di prova", true, None::<&str>)?;
+    let talk = MenuItem::with_id(app, "talk", "Scrivi ad Alter Ego…", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", "Impostazioni…", true, None::<&str>)?;
     let click = CheckMenuItem::with_id(app, "click", "Click-through", true, false, None::<&str>)?;
 
     let opacity = Radio::new(app, "op", &[("100", "100%"), ("90", "90%"), ("75", "75%"), ("60", "60%"), ("45", "45%")], &pct(cfg.opacity))?;
@@ -78,7 +80,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[&show, &demo, &sep, &click, &opacity.submenu(app, "Opacità")?, &look, &reset, &sep2, &quit],
+        &[&show, &talk, &settings, &demo, &sep, &click, &opacity.submenu(app, "Opacità")?, &look, &reset, &sep2, &quit],
     )?;
 
     *state.tray_click_item.lock().unwrap() = Some(click);
@@ -92,6 +94,12 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             let id = event.id().as_ref();
             match id {
                 "toggle" => window::toggle_visibility(app),
+                "settings" => {
+                    let _ = window::open_settings(app);
+                }
+                "talk" => {
+                    let _ = app.emit("text-input", ());
+                }
                 "demo" => {
                     let _ = app.emit("demo", ());
                 }

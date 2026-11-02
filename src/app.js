@@ -10,6 +10,7 @@ let config = null;
 // ---------- aspetto ----------
 function applyConfig(cfg) {
   config = cfg;
+  window.appConfig = cfg;
   root.style.opacity = cfg.opacity;
   document.documentElement.style.setProperty("--intensity", cfg.bg_intensity);
   const body = document.body;
@@ -31,6 +32,10 @@ function applyClickThrough(on) {
 // ---------- messaggio di prova ----------
 async function demo() {
   const name = config?.user_name?.trim();
+  for (const e of ["happy", "embarrassed", "thinking", "worried", "surprised", "sad", "error", "idle"]) {
+    State.setEmotion(e);
+    await new Promise((r) => setTimeout(r, 450));
+  }
   await Dialog.say(`Ciao${name ? ", " + name : ""}! Sono Alter Ego... sono solo un programma di intelligenza artificiale, però farò del mio meglio.`);
   await Dialog.say("Questo è un messaggio lungo per provare le pagine del box dialogo. Quando il testo non entra in due righe continua nella pagina successiva: clicca qui sopra, oppure premi Invio, per andare avanti.");
   await Dialog.say("あなたは何者？");
@@ -38,7 +43,8 @@ async function demo() {
 
 // ---------- spostamento ----------
 $("screen").addEventListener("mousedown", (e) => {
-  if (e.button !== 0 || e.target.closest("#dialog")) return;
+  State.touch();
+  if (e.button !== 0 || e.target.closest("#dialog, #prompt")) return;
   appWindow.startDragging();
 });
 
@@ -74,6 +80,7 @@ window.addEventListener("wheel", async (e) => {
 
 // ---------- tastiera ----------
 window.addEventListener("keydown", (e) => {
+  State.touch();
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
     Dialog.advance();
@@ -89,7 +96,7 @@ listen("click-through", (e) => applyClickThrough(e.payload));
 listen("handle-hover", (e) => document.body.classList.toggle("handle-hover", e.payload));
 listen("demo", () => demo());
 listen("ptt", (e) => { if (e.payload) Dialog.say("Ti ascolto... (push-to-talk arriva in fase 6)"); });
-listen("text-input", () => Dialog.say("L'input di testo arriva in fase 6."));
+listen("text-input", () => Chat.openInput());
 
 Dialog.on("talk", (on) => Face.setTalking(on));
 
@@ -98,5 +105,9 @@ window.addEventListener("contextmenu", (e) => e.preventDefault());
 (async () => {
   applyConfig(await invoke("get_config"));
   await document.fonts.load('5vh "DotGothic16"');
-  demo();
+  const name = config.user_name.trim();
+  State.setEmotion("happy");
+  State.setMode("speaking");
+  await Dialog.say(`Ciao${name ? ", " + name : ""}! Premi Ctrl+Alt+T, oppure "Scrivi ad Alter Ego…" dalla tray, per parlare con me.`);
+  State.settle();
 })();

@@ -40,6 +40,21 @@ fn monitor_name(m: &Monitor) -> String {
     m.name().cloned().unwrap_or_else(|| "sconosciuto".into())
 }
 
+pub fn open_settings(app: &AppHandle) -> tauri::Result<()> {
+    if let Some(w) = app.get_webview_window("settings") {
+        w.show()?;
+        w.unminimize()?;
+        return w.set_focus();
+    }
+    WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("settings.html".into()))
+        .title("Alter Ego – Impostazioni")
+        .inner_size(760.0, 720.0)
+        .min_inner_size(560.0, 480.0)
+        .center()
+        .build()?;
+    Ok(())
+}
+
 /// Geometria predefinita: 30% della larghezza del monitor, in basso a destra.
 fn default_geometry(m: &Monitor) -> Geometry {
     let area = m.work_area();

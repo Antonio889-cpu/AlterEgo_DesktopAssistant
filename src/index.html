@@ -36,8 +36,8 @@
         </g>
       </svg>
 
-      <!-- volto (fase 3: macchina a stati sprite) -->
-      <div id="face"><img id="face-img" src="assets/sprites/placeholder.png" alt="" draggable="false" /></div>
+      <!-- volto: gli sprite li aggiunge face.js -->
+      <div id="face"></div>
 
       <!-- logo -->
       <div id="logo" aria-label="Alter Ego">
@@ -79,6 +79,18 @@
         </div>
       </div>
 
+      <!-- input di testo (Ctrl+Alt+T) -->
+      <div id="prompt" class="hidden">
+        <div class="box">
+          <div class="inner">
+            <div class="tag">Tu</div>
+            <input id="prompt-input" type="text" maxlength="2000" autocomplete="off" spellcheck="true" placeholder="Scrivi ad Alter Ego… (Invio invia, Esc chiude)" />
+          </div>
+        </div>
+      </div>
+
+      <div id="toast" role="status"></div>
+
       <!-- overlay CRT -->
       <div id="scanlines"></div>
       <div id="noise"></div>
@@ -89,8 +101,11 @@
     <div id="ct-handle" title="Disattiva click-through">🔒</div>
     <div id="errors"></div>
   </div>
+  <script src="sprites.js"></script>
   <script src="dialog.js"></script>
   <script src="face.js"></script>
+  <script src="state.js"></script>
+  <script src="chat.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

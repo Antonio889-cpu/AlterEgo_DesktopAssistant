@@ -2,7 +2,7 @@
 //! Nessun segreto qui dentro: le chiavi API andranno nel Credential Manager (fase 4).
 
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::{Path, PathBuf}};
+use std::{collections::{BTreeMap, HashMap}, fs, path::{Path, PathBuf}};
 
 /// Geometria della finestra in pixel fisici.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
@@ -33,6 +33,67 @@ impl Default for Hotkeys {
     }
 }
 
+/// Impostazioni di un provider AI. La chiave NON sta qui (Credential Manager).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(default)]
+pub struct ProviderCfg {
+    pub enabled: bool,
+    /// Vuoto = default (Ollama: primo modello installato).
+    pub model: String,
+    /// Vuoto = URL predefinito del provider.
+    pub base_url: String,
+    /// Il modello accetta immagini (screenshot).
+    pub vision: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
+pub struct AiConfig {
+    /// Ordine di fallback: il primo attivo è il provider principale.
+    pub order: Vec<String>,
+    pub providers: BTreeMap<String, ProviderCfg>,
+    pub temperature: f64,
+    /// Messaggi recenti inviati come contesto.
+    pub max_history: usize,
+}
+
+impl Default for AiConfig {
+    fn default() -> Self {
+        let model = |id: &str, m: &str, enabled: bool| {
+            (id.to_string(), ProviderCfg { enabled, model: m.into(), ..Default::default() })
+        };
+        Self {
+            order: ["gemini", "openrouter", "groq", "deepseek", "ollama"].map(String::from).to_vec(),
+            providers: BTreeMap::from([
+                model("gemini", "gemini-2.5-flash", false),
+                model("openrouter", "openrouter/auto", false),
+                model("groq", "llama-3.3-70b-versatile", false),
+                model("deepseek", "deepseek-chat", false),
+                model("ollama", "", true),
+            ]),
+            temperature: 0.7,
+            max_history: 12,
+        }
+    }
+}
+
+impl AiConfig {
+    /// Ripara config incomplete o modificate a mano.
+    pub fn normalize(&mut self) {
+        let all = ["gemini", "openrouter", "groq", "deepseek", "ollama"];
+        self.order.retain(|id| all.contains(&id.as_str()));
+        self.order.dedup();
+        for id in all {
+            if !self.order.iter().any(|o| o == id) {
+                self.order.push(id.into());
+            }
+            self.providers.entry(id.into()).or_default();
+        }
+        self.temperature = self.temperature.clamp(0.0, 2.0);
+        self.max_history = self.max_history.clamp(2, 50);
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct Config {
@@ -53,6 +114,7 @@ pub struct Config {
     pub dialog_style: String,
     /// Flicker e rumore animati (spegnili per CPU minima).
     pub effects: bool,
+    pub ai: AiConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -71,6 +133,7 @@ impl Default for Config {
             bg_intensity: 0.6,
             dialog_style: "chiaro".into(),
             effects: true,
+            ai: AiConfig::default(),
             last_monitor: None,
             geometry: HashMap::new(),
         }
@@ -90,6 +153,7 @@ pub fn load(path: &Path) -> Config {
         Ok(mut cfg) => {
             cfg.opacity = cfg.opacity.clamp(0.2, 1.0);
             cfg.bg_intensity = cfg.bg_intensity.clamp(0.0, 1.0);
+            cfg.ai.normalize();
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {
                 cfg.background = "both".into();
             }

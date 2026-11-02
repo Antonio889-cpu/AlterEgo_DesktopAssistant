@@ -3,6 +3,8 @@
 
 mod config;
 mod hotkeys;
+mod keys;
+mod providers;
 mod tray;
 mod window;
 
@@ -26,6 +28,7 @@ pub struct AppState {
     pub tray_click_item: Mutex<Option<CheckMenuItem<Wry>>>,
     pub hotkey_map: Mutex<HashMap<u32, hotkeys::Action>>,
     pub hotkey_errors: Mutex<Vec<String>>,
+    pub ai: providers::Ai,
 }
 
 pub fn flush_config(app: &AppHandle) {
@@ -53,6 +56,7 @@ pub struct FrontConfig {
     bg_intensity: f64,
     dialog_style: String,
     effects: bool,
+    ai: config::AiConfig,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -70,6 +74,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         bg_intensity: cfg.bg_intensity,
         dialog_style: cfg.dialog_style.clone(),
         effects: cfg.effects,
+        ai: cfg.ai.clone(),
     }
 }
 
@@ -111,6 +116,111 @@ fn set_hotkeys(app: AppHandle, state: State<AppState>, hotkeys: config::Hotkeys)
     errors
 }
 
+// ---------- impostazioni ----------
+
+#[tauri::command]
+fn set_general(app: AppHandle, user_name: String, name_tag: String) {
+    update_config(&app, |c| {
+        c.user_name = user_name.trim().chars().take(40).collect();
+        let tag = name_tag.trim();
+        c.name_tag = if tag.is_empty() { "Alter Ego".into() } else { tag.chars().take(24).collect() };
+    });
+}
+
+#[tauri::command]
+fn set_ai_config(app: AppHandle, mut ai: config::AiConfig) {
+    ai.normalize();
+    update_config(&app, |c| c.ai = ai);
+}
+
+#[tauri::command]
+fn open_settings(app: AppHandle) -> Result<(), String> {
+    window::open_settings(&app).map_err(|e| e.to_string())
+}
+
+/// Dà il focus alla finestra principale (serve per scrivere nell'input di testo).
+#[tauri::command]
+fn focus_main(app: AppHandle) {
+    if let Some(w) = app.get_webview_window(window::MAIN) {
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+// ---------- AI ----------
+
+#[derive(Serialize)]
+struct ProviderView {
+    id: &'static str,
+    label: &'static str,
+    default_base: &'static str,
+    needs_key: bool,
+    has_key: bool,
+}
+
+#[tauri::command]
+fn providers_info() -> Vec<ProviderView> {
+    providers::PROVIDERS
+        .iter()
+        .map(|p| ProviderView {
+            id: p.id,
+            label: p.label,
+            default_base: p.default_base,
+            needs_key: p.needs_key,
+            has_key: p.needs_key && keys::has(p.id),
+        })
+        .collect()
+}
+
+/// Stato delle chiavi: solo sì/no, la chiave non esce mai dal backend.
+#[tauri::command]
+fn key_status() -> HashMap<String, bool> {
+    providers::PROVIDERS
+        .iter()
+        .filter(|p| p.needs_key)
+        .map(|p| (p.id.to_string(), keys::has(p.id)))
+        .collect()
+}
+
+/// Salva la chiave nel Credential Manager. Stringa vuota = cancella.
+#[tauri::command]
+fn set_api_key(provider: String, key: String) -> Result<(), String> {
+    if providers::info(&provider).map(|p| p.needs_key) != Some(true) {
+        return Err("provider senza chiave".into());
+    }
+    keys::set(&provider, &key)
+}
+
+#[tauri::command]
+async fn list_models(app: AppHandle, provider: String) -> Result<Vec<String>, String> {
+    let state = app.state::<AppState>();
+    let cfg = state.cfg.lock().unwrap().ai.clone();
+    providers::list_models(&state.ai, &cfg, &provider).await
+}
+
+#[tauri::command]
+async fn test_provider(app: AppHandle, provider: String) -> Result<String, String> {
+    let state = app.state::<AppState>();
+    let cfg = state.cfg.lock().unwrap().ai.clone();
+    providers::test(&state.ai, &cfg, &provider).await
+}
+
+#[tauri::command]
+async fn chat(
+    app: AppHandle,
+    messages: Vec<providers::ChatMessage>,
+    on_event: tauri::ipc::Channel<providers::StreamEvent>,
+) -> Result<providers::ChatResult, String> {
+    let state = app.state::<AppState>();
+    let (ai, system) = {
+        let cfg = state.cfg.lock().unwrap();
+        (cfg.ai.clone(), providers::prompt::system(&cfg))
+    };
+    let keep = ai.max_history;
+    let start = messages.len().saturating_sub(keep);
+    providers::chat(&state.ai, ai, system, messages[start..].to_vec(), on_event).await
+}
+
 fn main() {
     tauri::Builder::default()
         // Seconda istanza: mostra quella già aperta ed esce.
@@ -133,6 +243,7 @@ fn main() {
                 tray_click_item: Mutex::new(None),
                 hotkey_map: Mutex::new(HashMap::new()),
                 hotkey_errors: Mutex::new(Vec::new()),
+                ai: providers::Ai::new(),
             });
             let handle = app.handle().clone();
             window::create_main(&handle)?;
@@ -145,9 +256,11 @@ fn main() {
             Ok(())
         })
         .on_window_event(|win, event| match event {
-            WindowEvent::Moved(_) | WindowEvent::Resized(_) => window::record_geometry(win),
+            WindowEvent::Moved(_) | WindowEvent::Resized(_) if win.label() == window::MAIN => {
+                window::record_geometry(win)
+            }
             // Alt+F4 nasconde invece di chiudere: si esce solo dalla tray.
-            WindowEvent::CloseRequested { api, .. } => {
+            WindowEvent::CloseRequested { api, .. } if win.label() == window::MAIN => {
                 api.prevent_close();
                 let _ = win.hide();
             }
@@ -158,7 +271,17 @@ fn main() {
             resize_window,
             set_click_through,
             set_opacity,
-            set_hotkeys
+            set_hotkeys,
+            set_general,
+            set_ai_config,
+            open_settings,
+            focus_main,
+            key_status,
+            providers_info,
+            set_api_key,
+            list_models,
+            test_provider,
+            chat
         ])
         .run(tauri::generate_context!())
         .expect("errore all'avvio di Alter Ego");
