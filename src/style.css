@@ -1,61 +1,329 @@
-/* Fase 1: stile provvisorio. Il look CRT completo arriva in fase 2. */
-:root {
-  --green: #9cff3a;
-  --green-dark: #0c3a12;
-  --frame: #f4fff0;
+/* Alter Ego – look CRT. Le misure usano vh: la finestra è sempre 16:9, quindi tutto scala insieme. */
+
+@font-face {
+  font-family: "DotGothic16";
+  src: url("assets/fonts/DotGothic16-Regular.ttf") format("truetype");
+  font-display: block;
 }
+
+:root {
+  /* colori campionati dagli screenshot di riferimento */
+  --bg-center: #4fae1a;
+  --bg-edge: #164804;
+  --circuit: #6fd02c;
+  --scan-dark: rgba(16, 60, 0, .55);
+  --frame: #f6fff2;
+  --glow: rgba(110, 255, 60, .85);
+  --logo: #8dff45;
+
+  /* box dialogo "chiaro" (screenshot) */
+  --dlg-border: #0b2200;
+  --dlg-fill-top: #9fe655;
+  --dlg-fill-bottom: #6cc22f;
+  --dlg-text: #0b1d00;
+  --dlg-shadow: rgba(20, 70, 0, .45);
+
+  --intensity: .6;   /* impostata da app.js */
+  --px: .5vh;         /* "pixel" dei bordi del box */
+}
+
+body.dialog-scuro {
+  --dlg-border: #c9ff8e;
+  --dlg-fill-top: #12481a;
+  --dlg-fill-bottom: #0a3010;
+  --dlg-text: #d8ffb0;
+  --dlg-shadow: rgba(0, 0, 0, .55);
+}
+
 html, body {
   margin: 0;
   height: 100%;
-  background: transparent; /* finestra trasparente */
+  background: transparent;
   overflow: hidden;
   user-select: none;
-  font-family: "Segoe UI", sans-serif;
+  -webkit-user-select: none;
 }
+
 #root {
   position: fixed;
-  inset: 4px;
+  inset: 1.6vh;               /* spazio per il glow esterno */
   transition: opacity .15s;
 }
+
+/* ---------- schermo e cornice ---------- */
 #screen {
   position: absolute;
   inset: 0;
-  border: 3px solid var(--frame);
-  border-radius: 14px;
-  background: var(--green-dark);
-  box-shadow: 0 0 8px 2px rgba(120, 255, 80, .6), inset 0 0 18px rgba(120, 255, 80, .35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
+  border: .55vh solid var(--frame);
+  border-radius: 1.4vh;
+  box-shadow:
+    0 0 .6vh .1vh var(--glow),
+    0 0 1.6vh 0 rgba(110, 255, 60, .4),
+    inset 0 0 1.6vh rgba(110, 255, 60, .6);
+  background: var(--bg-edge);
   cursor: grab;
+  isolation: isolate;
 }
-#placeholder { text-align: center; color: var(--green); pointer-events: none; }
-.title { font-size: 9vh; font-weight: 800; letter-spacing: .1em; }
-.sub { font-size: 4.5vh; opacity: .8; }
-#status { margin-top: 3vh; font-size: 3.6vh; padding: 0 4vw; }
-#errors { margin-top: 1vh; font-size: 3.2vh; color: #ffd36b; }
 
+#bg-base {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 75% 70% at 50% 42%, var(--bg-center) 0%, #3b8f12 45%, var(--bg-edge) 100%);
+}
+
+#bg-circuit {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: var(--circuit);
+  opacity: calc(var(--intensity) * .45);
+  mix-blend-mode: screen;
+}
+
+#scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* periodo ~1.3vh (≈5 px su 391 px dello screenshot): 3 chiari, 2 scuri */
+  background: repeating-linear-gradient(to bottom,
+    transparent 0, transparent .78vh,
+    var(--scan-dark) .78vh, var(--scan-dark) 1.3vh);
+  opacity: var(--intensity);
+  z-index: 10;
+}
+
+body.bg-scanline #bg-circuit { display: none; }
+body.bg-circuit #scanlines { display: none; }
+
+#noise {
+  position: absolute;
+  inset: -64px;
+  pointer-events: none;
+  background: url("assets/img/noise.png");
+  opacity: calc(var(--intensity) * .5);
+  mix-blend-mode: overlay;
+  z-index: 11;
+  display: none;
+}
+
+#vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 90% 85% at 50% 50%, transparent 55%, rgba(0, 25, 0, .55) 100%);
+  z-index: 12;
+}
+
+/* Effetti animati: solo transform/opacity (gestiti dal compositor, CPU minima).
+   Spegnibili da tray → Aspetto → Effetti animati. */
+body.fx #noise { display: block; animation: noise-shift .5s steps(4) infinite; }
+body.fx #screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #d6ff9a;
+  pointer-events: none;
+  z-index: 13;
+  opacity: 0;
+  animation: flicker 7s steps(1) infinite;
+}
+@keyframes noise-shift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-31px, 17px); }
+  50% { transform: translate(23px, -41px); }
+  75% { transform: translate(-13px, 37px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes flicker {
+  0%, 100% { opacity: 0; }
+  91% { opacity: .05; }
+  92% { opacity: 0; }
+  94% { opacity: .035; }
+  95% { opacity: 0; }
+}
+
+/* ---------- volto ---------- */
+#face {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  height: 78%;
+  transform: translateX(-50%);
+  z-index: 2;
+  pointer-events: none;
+}
+#face img {
+  height: 100%;
+  display: block;
+  /* bordi sfumati: lo sprite provvisorio ha ancora lo sfondo verde */
+  -webkit-mask-image: radial-gradient(ellipse 50% 52% at 50% 46%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 52% at 50% 46%, #000 62%, transparent 100%);
+}
+
+/* ---------- logo ---------- */
+#logo {
+  position: absolute;
+  left: 3.4%;
+  top: 2.6%;
+  width: 11.5%;
+  color: var(--logo);
+  filter: drop-shadow(0 0 .35vh rgba(140, 255, 70, .95)) drop-shadow(0 0 1vh rgba(120, 255, 60, .6));
+  z-index: 5;
+  pointer-events: none;
+}
+#logo svg { display: block; width: 100%; }
+.logo-text {
+  font-family: "DotGothic16", monospace;
+  font-size: 3.3vh;
+  letter-spacing: .3em;
+  text-indent: .3em;
+  text-align: center;
+  margin-top: .4vh;
+  white-space: nowrap;
+}
+
+/* ---------- box dialogo ---------- */
+#dialog {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 3.2%;
+  height: 23%;
+  z-index: 6;
+  cursor: pointer;
+  transition: opacity .18s;
+}
+#dialog.hidden { opacity: 0; pointer-events: none; }
+
+/* angoli a gradini: 2 "pixel" per angolo */
+.box, .box .inner {
+  --s: var(--px);
+  clip-path: polygon(
+    calc(2 * var(--s)) 0, calc(100% - 2 * var(--s)) 0,
+    calc(100% - 2 * var(--s)) var(--s), calc(100% - var(--s)) var(--s),
+    calc(100% - var(--s)) calc(2 * var(--s)), 100% calc(2 * var(--s)),
+    100% calc(100% - 2 * var(--s)), calc(100% - var(--s)) calc(100% - 2 * var(--s)),
+    calc(100% - var(--s)) calc(100% - var(--s)), calc(100% - 2 * var(--s)) calc(100% - var(--s)),
+    calc(100% - 2 * var(--s)) 100%, calc(2 * var(--s)) 100%,
+    calc(2 * var(--s)) calc(100% - var(--s)), var(--s) calc(100% - var(--s)),
+    var(--s) calc(100% - 2 * var(--s)), 0 calc(100% - 2 * var(--s)),
+    0 calc(2 * var(--s)), var(--s) calc(2 * var(--s)),
+    var(--s) var(--s), calc(2 * var(--s)) var(--s));
+}
+.box {
+  position: absolute;
+  inset: 0;
+  background: var(--dlg-border);
+}
+.box .inner {
+  position: absolute;
+  inset: var(--px);
+  background: linear-gradient(to bottom, var(--dlg-fill-top), var(--dlg-fill-bottom));
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  column-gap: 2.6vh;
+  padding: 3.6vh 3.4vh 2vh 3.4vh;
+  box-sizing: border-box;
+  font-family: "DotGothic16", monospace;
+  color: var(--dlg-text);
+}
+.tag {
+  font-size: 3vh;
+  line-height: 1;
+  padding: .6vh 2.4vh .5vh;
+  border: .42vh solid var(--dlg-border);
+  margin-top: .6vh;
+  white-space: nowrap;
+  text-shadow: .25vh .25vh 0 var(--dlg-shadow);
+  box-shadow: .3vh .3vh 0 var(--dlg-shadow);
+}
+.tag:empty { visibility: hidden; }
+.text {
+  font-size: 5vh;
+  line-height: 1.38;
+  max-height: calc(2 * 1.38em);   /* 2 righe per pagina */
+  overflow: hidden;
+  word-break: break-word;
+  white-space: pre-wrap;
+  text-shadow: .3vh .3vh 0 var(--dlg-shadow);
+}
+.next {
+  display: inline-block;
+  font-size: .62em;
+  margin-left: .35em;
+  vertical-align: .12em;
+  visibility: hidden;
+}
+#dialog.waiting #dialog-next { visibility: visible; animation: blink .9s steps(1) infinite; }
+@keyframes blink { 50% { visibility: hidden; } }
+
+/* punta del fumetto in basso al centro */
+.tail {
+  position: absolute;
+  left: 50%;
+  bottom: calc(-1 * 2.4vh + var(--px));
+  width: 3.4vh;
+  height: 2.4vh;
+  transform: translateX(-50%);
+  background: var(--dlg-border);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.tail::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--px) * 1.6);
+  right: calc(var(--px) * 1.6);
+  top: 0;
+  height: calc(100% - var(--px) * 2.2);
+  background: var(--dlg-fill-bottom);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.measure {
+  visibility: hidden;
+  pointer-events: none;
+}
+.measure .text { max-height: none; }
+
+/* ---------- maniglie ---------- */
 #resize-handle {
-  position: absolute; right: 0; bottom: 0;
+  position: absolute; right: -.4vh; bottom: -.4vh;
   width: 18px; height: 18px;
   cursor: nwse-resize;
-  background: linear-gradient(135deg, transparent 50%, var(--frame) 50%);
-  border-bottom-right-radius: 12px;
-  opacity: .6;
+  background: linear-gradient(135deg, transparent 52%, var(--frame) 52%);
+  border-bottom-right-radius: 1.4vh;
+  opacity: 0;
+  transition: opacity .2s;
+  z-index: 20;
 }
-#resize-handle:hover { opacity: 1; }
+#root:hover #resize-handle { opacity: .55; }
+#resize-handle:hover { opacity: 1 !important; }
 
-/* Maniglia click-through: deve stare nei 34 px logici in alto a destra (vedi window.rs). */
+/* Maniglia click-through: deve stare nei 34 px logici in alto a destra della finestra (window.rs). */
 #ct-handle {
-  position: absolute; top: 0; right: 0;
-  width: 26px; height: 26px; line-height: 26px;
-  text-align: center; font-size: 14px;
+  position: fixed; top: 2px; right: 2px;
+  width: 26px; height: 26px; line-height: 24px;
+  text-align: center; font-size: 13px;
   border-radius: 50%;
-  background: rgba(12, 58, 18, .85);
-  border: 2px solid var(--green);
+  background: rgba(12, 58, 18, .9);
+  border: 2px solid var(--logo);
   display: none;
   cursor: pointer;
+  z-index: 30;
 }
 body.click-through #ct-handle { display: block; opacity: .35; }
-body.click-through.handle-hover #ct-handle { opacity: 1; box-shadow: 0 0 8px var(--green); }
-body.click-through #screen { cursor: default; }
+body.click-through.handle-hover #ct-handle { opacity: 1; box-shadow: 0 0 8px var(--logo); }
+body.click-through #screen, body.click-through #dialog { cursor: default; }
+
+#errors {
+  position: absolute; left: 4%; right: 4%; top: 1.5vh;
+  font: 2.4vh "DotGothic16", monospace;
+  color: #ffe27a;
+  text-shadow: 0 0 .4vh #000;
+  text-align: right;
+  z-index: 25;
+  pointer-events: none;
+}

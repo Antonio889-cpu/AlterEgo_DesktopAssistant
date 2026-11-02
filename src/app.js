@@ -1,26 +1,48 @@
-// Fase 1: drag, resize 16:9, opacità, click-through, eventi hotkey.
+// Avvio: finestra (drag, resize 16:9, click-through), aspetto da config, eventi backend.
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 const appWindow = window.__TAURI__.window.getCurrentWindow();
 
 const $ = (id) => document.getElementById(id);
 const root = $("root");
-const statusEl = $("status");
+let config = null;
 
-function setStatus(text) { statusEl.textContent = text; }
-function applyOpacity(v) { root.style.opacity = v; }
+// ---------- aspetto ----------
+function applyConfig(cfg) {
+  config = cfg;
+  root.style.opacity = cfg.opacity;
+  document.documentElement.style.setProperty("--intensity", cfg.bg_intensity);
+  const body = document.body;
+  body.classList.remove("bg-scanline", "bg-circuit", "bg-both", "dialog-chiaro", "dialog-scuro");
+  body.classList.add(`bg-${cfg.background}`, `dialog-${cfg.dialog_style}`);
+  body.classList.toggle("fx", cfg.effects);
+  body.classList.toggle("click-through", cfg.click_through);
+  Dialog.setName(cfg.name_tag);
+  $("errors").textContent = cfg.hotkey_errors.length
+    ? "Hotkey non registrate: " + cfg.hotkey_errors.join("; ")
+    : "";
+}
+
 function applyClickThrough(on) {
   document.body.classList.toggle("click-through", on);
   if (!on) document.body.classList.remove("handle-hover");
-  setStatus(on ? "Click-through attivo – passa sul lucchetto ↗ per disattivarlo" : "Click-through disattivato");
 }
 
-// --- spostamento ---
+// ---------- messaggio di prova ----------
+async function demo() {
+  const name = config?.user_name?.trim();
+  await Dialog.say(`Ciao${name ? ", " + name : ""}! Sono Alter Ego... sono solo un programma di intelligenza artificiale, però farò del mio meglio.`);
+  await Dialog.say("Questo è un messaggio lungo per provare le pagine del box dialogo. Quando il testo non entra in due righe continua nella pagina successiva: clicca qui sopra, oppure premi Invio, per andare avanti.");
+  await Dialog.say("あなたは何者？");
+}
+
+// ---------- spostamento ----------
 $("screen").addEventListener("mousedown", (e) => {
-  if (e.button === 0) appWindow.startDragging();
+  if (e.button !== 0 || e.target.closest("#dialog")) return;
+  appWindow.startDragging();
 });
 
-// --- ridimensionamento con maniglia (16:9 garantito da Rust) ---
+// ---------- ridimensionamento (16:9 garantito da Rust) ----------
 const handle = $("resize-handle");
 let resize = null;
 let pendingWidth = null;
@@ -32,9 +54,8 @@ handle.addEventListener("pointerdown", async (e) => {
 });
 handle.addEventListener("pointermove", (e) => {
   if (!resize) return;
-  const dx = (e.screenX - resize.startX) * window.devicePixelRatio;
   const first = pendingWidth === null;
-  pendingWidth = resize.startW + dx;
+  pendingWidth = resize.startW + (e.screenX - resize.startX) * window.devicePixelRatio;
   if (first) requestAnimationFrame(() => {
     invoke("resize_window", { width: pendingWidth });
     pendingWidth = null;
@@ -44,7 +65,6 @@ const endResize = () => { resize = null; };
 handle.addEventListener("pointerup", endResize);
 handle.addEventListener("pointercancel", endResize);
 
-// --- Ctrl + rotella ---
 window.addEventListener("wheel", async (e) => {
   if (!e.ctrlKey) return;
   e.preventDefault();
@@ -52,24 +72,31 @@ window.addEventListener("wheel", async (e) => {
   invoke("resize_window", { width: size.width * (e.deltaY < 0 ? 1.06 : 1 / 1.06) });
 }, { passive: false });
 
-// --- maniglia click-through ---
+// ---------- tastiera ----------
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    Dialog.advance();
+  }
+});
+
+// ---------- click-through ----------
 $("ct-handle").addEventListener("click", () => invoke("set_click_through", { on: false }));
 
-// --- eventi dal backend ---
-listen("opacity", (e) => applyOpacity(e.payload));
+// ---------- eventi dal backend ----------
+listen("config", (e) => applyConfig(e.payload));
 listen("click-through", (e) => applyClickThrough(e.payload));
 listen("handle-hover", (e) => document.body.classList.toggle("handle-hover", e.payload));
-listen("ptt", (e) => setStatus(e.payload ? "🎙 Parla… (push-to-talk premuto)" : "Push-to-talk rilasciato"));
-listen("text-input", () => setStatus("⌨ Input testo richiesto (arriva in fase 6)"));
+listen("demo", () => demo());
+listen("ptt", (e) => { if (e.payload) Dialog.say("Ti ascolto... (push-to-talk arriva in fase 6)"); });
+listen("text-input", () => Dialog.say("L'input di testo arriva in fase 6."));
 
-// Blocca il menu contestuale del browser.
+Dialog.on("talk", (on) => Face.setTalking(on));
+
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 (async () => {
-  const cfg = await invoke("get_config");
-  applyOpacity(cfg.opacity);
-  document.body.classList.toggle("click-through", cfg.click_through);
-  if (cfg.hotkey_errors.length) {
-    $("errors").textContent = "Hotkey non registrate: " + cfg.hotkey_errors.join("; ");
-  }
+  applyConfig(await invoke("get_config"));
+  await document.fonts.load('5vh "DotGothic16"');
+  demo();
 })();

@@ -7,3 +7,4 @@ assets/sfx/dr_*
 *.log
 .env
 dist/
+src/assets/sprites/

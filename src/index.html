@@ -5,19 +5,92 @@
   <title>Alter Ego</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="dialog-chiaro bg-both fx">
   <div id="root">
     <div id="screen">
-      <div id="placeholder">
-        <div class="title">ALTER EGO</div>
-        <div class="sub">Fase 1 – scheletro</div>
-        <div id="status">Trascina per spostare · Ctrl+rotella o angolo ↘ per ridimensionare</div>
-        <div id="errors"></div>
+      <!-- sfondo -->
+      <div id="bg-base"></div>
+      <svg id="bg-circuit" viewBox="0 0 1000 563" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5" /></filter>
+        </defs>
+        <g filter="url(#soft)" fill="none" stroke="currentColor" stroke-linecap="square">
+          <!-- anello sinistro spezzato -->
+          <circle cx="215" cy="150" r="118" stroke-width="44" stroke-dasharray="190 26 120 26 260 50" />
+          <circle cx="215" cy="150" r="52" fill="currentColor" stroke="none" />
+          <circle cx="215" cy="150" r="170" stroke-width="6" stroke-dasharray="40 30" opacity=".6" />
+          <!-- linee circuitali -->
+          <path d="M-20 330 L120 330 L190 400 L190 600" stroke-width="22" />
+          <path d="M330 -20 L330 60 L420 150 L420 210" stroke-width="18" />
+          <path d="M560 -20 L560 40 L700 180 L1020 180" stroke-width="26" />
+          <path d="M780 -20 L780 60 L860 140" stroke-width="14" />
+          <path d="M870 260 L1020 260" stroke-width="10" />
+          <path d="M-20 470 L60 470" stroke-width="10" />
+          <!-- anello in basso a destra -->
+          <circle cx="815" cy="470" r="130" stroke-width="30" stroke-dasharray="300 40 180 40" />
+          <circle cx="815" cy="470" r="80" stroke-width="8" />
+          <!-- nodi -->
+          <circle cx="190" cy="600" r="14" fill="currentColor" stroke="none" />
+          <circle cx="420" cy="214" r="12" fill="currentColor" stroke="none" />
+          <circle cx="860" cy="140" r="10" fill="currentColor" stroke="none" />
+        </g>
+      </svg>
+
+      <!-- volto (fase 3: macchina a stati sprite) -->
+      <div id="face"><img id="face-img" src="assets/sprites/placeholder.png" alt="" draggable="false" /></div>
+
+      <!-- logo -->
+      <div id="logo" aria-label="Alter Ego">
+        <svg viewBox="0 0 64 48" shape-rendering="crispEdges" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="2">
+            <!-- schermo doppio bordo -->
+            <rect x="12" y="2" width="40" height="27" />
+            <rect x="15" y="5" width="34" height="21" />
+            <!-- faccina: ciuffo e capelli -->
+            <path d="M24 17 L23 13 L25 10 L28 8 L32 7 L36 8 L39 10 L41 13 L40 17" />
+            <path d="M23 17 L21 19 L24 19 M41 17 L43 19 L40 19" />
+            <path d="M27 11 L26 15 M31 9 L30 13 M34 9 L35 13 M37 11 L38 15" />
+            <path d="M27 19 L29 18 M35 18 L37 19" />
+            <path d="M30 22 L32 23 L34 22" />
+            <!-- tastiera -->
+            <path d="M12 31 L52 31 L60 41 L4 41 Z" />
+            <path d="M13 34 L51 34 M10 37 L54 37" stroke-dasharray="5 1.5" />
+            <rect x="3" y="43" width="58" height="3" />
+          </g>
+        </svg>
+        <div class="logo-text">ALTER EGO</div>
       </div>
+
+      <!-- box dialogo -->
+      <div id="dialog" class="hidden" role="status" aria-live="polite">
+        <div class="box">
+          <div class="inner">
+            <div id="dialog-tag" class="tag">Alter Ego</div>
+            <div class="text"><span id="dialog-text"></span><span id="dialog-next" class="next">▼</span></div>
+          </div>
+        </div>
+        <div class="tail"></div>
+        <!-- clone invisibile usato per spezzare il testo in pagine -->
+        <div class="box measure" aria-hidden="true">
+          <div class="inner">
+            <div class="tag"></div>
+            <div class="text"><span id="dialog-measure"></span><span class="next">▼</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- overlay CRT -->
+      <div id="scanlines"></div>
+      <div id="noise"></div>
+      <div id="vignette"></div>
     </div>
+
     <div id="resize-handle" title="Ridimensiona (16:9)"></div>
     <div id="ct-handle" title="Disattiva click-through">🔒</div>
+    <div id="errors"></div>
   </div>
+  <script src="dialog.js"></script>
+  <script src="face.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

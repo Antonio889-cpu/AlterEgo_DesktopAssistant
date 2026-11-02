@@ -41,23 +41,49 @@ pub fn flush_config(app: &AppHandle) {
 
 // ---------- comandi per il frontend ----------
 
-#[derive(Serialize)]
-struct FrontConfig {
+#[derive(Serialize, Clone)]
+pub struct FrontConfig {
     opacity: f64,
     click_through: bool,
     hotkeys: config::Hotkeys,
     hotkey_errors: Vec<String>,
+    user_name: String,
+    name_tag: String,
+    background: String,
+    bg_intensity: f64,
+    dialog_style: String,
+    effects: bool,
 }
 
-#[tauri::command]
-fn get_config(state: State<AppState>) -> FrontConfig {
+pub fn front_config(app: &AppHandle) -> FrontConfig {
+    let state = app.state::<AppState>();
+    let hotkey_errors = state.hotkey_errors.lock().unwrap().clone();
     let cfg = state.cfg.lock().unwrap();
     FrontConfig {
+        hotkey_errors,
         opacity: cfg.opacity,
         click_through: state.click_through.load(Ordering::Relaxed),
         hotkeys: cfg.hotkeys.clone(),
-        hotkey_errors: state.hotkey_errors.lock().unwrap().clone(),
+        user_name: cfg.user_name.clone(),
+        name_tag: cfg.name_tag.clone(),
+        background: cfg.background.clone(),
+        bg_intensity: cfg.bg_intensity,
+        dialog_style: cfg.dialog_style.clone(),
+        effects: cfg.effects,
     }
+}
+
+/// Modifica la config, la segna da salvare e notifica il frontend.
+pub fn update_config(app: &AppHandle, f: impl FnOnce(&mut config::Config)) {
+    let state = app.state::<AppState>();
+    f(&mut state.cfg.lock().unwrap());
+    state.dirty.store(true, Ordering::Relaxed);
+    let _ = app.emit("config", front_config(app));
+}
+
+#[tauri::command]
+fn get_config(app: AppHandle) -> FrontConfig {
+    front_config(&app)
 }
 
 #[tauri::command]
@@ -72,11 +98,8 @@ fn set_click_through(app: AppHandle, on: bool) {
 }
 
 #[tauri::command]
-fn set_opacity(app: AppHandle, state: State<AppState>, value: f64) {
-    let v = value.clamp(0.2, 1.0);
-    state.cfg.lock().unwrap().opacity = v;
-    state.dirty.store(true, Ordering::Relaxed);
-    let _ = app.emit("opacity", v);
+fn set_opacity(app: AppHandle, value: f64) {
+    update_config(&app, |c| c.opacity = value.clamp(0.2, 1.0));
 }
 
 /// Cambia le hotkey senza riavvio. Se una non si registra, restituisce gli errori.

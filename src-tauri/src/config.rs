@@ -41,6 +41,18 @@ pub struct Config {
     pub hotkeys: Hotkeys,
     /// Avvio con Windows: disattivato di default (non ancora implementato).
     pub autostart: bool,
+    /// Nome dell'utente, usato da Alter Ego nelle risposte.
+    pub user_name: String,
+    /// Tag nome mostrato nel box dialogo.
+    pub name_tag: String,
+    /// Sfondo: "scanline", "circuit" o "both".
+    pub background: String,
+    /// Intensità degli effetti di sfondo, 0.0–1.0.
+    pub bg_intensity: f64,
+    /// Stile box dialogo: "chiaro" (come lo screenshot) o "scuro".
+    pub dialog_style: String,
+    /// Flicker e rumore animati (spegnili per CPU minima).
+    pub effects: bool,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -53,6 +65,12 @@ impl Default for Config {
             opacity: 1.0,
             hotkeys: Hotkeys::default(),
             autostart: false,
+            user_name: String::new(),
+            name_tag: "Alter Ego".into(),
+            background: "both".into(),
+            bg_intensity: 0.6,
+            dialog_style: "chiaro".into(),
+            effects: true,
             last_monitor: None,
             geometry: HashMap::new(),
         }
@@ -71,6 +89,13 @@ pub fn load(path: &Path) -> Config {
     match serde_json::from_str::<Config>(&text) {
         Ok(mut cfg) => {
             cfg.opacity = cfg.opacity.clamp(0.2, 1.0);
+            cfg.bg_intensity = cfg.bg_intensity.clamp(0.0, 1.0);
+            if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {
+                cfg.background = "both".into();
+            }
+            if !["chiaro", "scuro"].contains(&cfg.dialog_style.as_str()) {
+                cfg.dialog_style = "chiaro".into();
+            }
             cfg
         }
         Err(e) => {
