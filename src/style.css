@@ -1,0 +1,61 @@
+/* Fase 1: stile provvisorio. Il look CRT completo arriva in fase 2. */
+:root {
+  --green: #9cff3a;
+  --green-dark: #0c3a12;
+  --frame: #f4fff0;
+}
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent; /* finestra trasparente */
+  overflow: hidden;
+  user-select: none;
+  font-family: "Segoe UI", sans-serif;
+}
+#root {
+  position: fixed;
+  inset: 4px;
+  transition: opacity .15s;
+}
+#screen {
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--frame);
+  border-radius: 14px;
+  background: var(--green-dark);
+  box-shadow: 0 0 8px 2px rgba(120, 255, 80, .6), inset 0 0 18px rgba(120, 255, 80, .35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+}
+#placeholder { text-align: center; color: var(--green); pointer-events: none; }
+.title { font-size: 9vh; font-weight: 800; letter-spacing: .1em; }
+.sub { font-size: 4.5vh; opacity: .8; }
+#status { margin-top: 3vh; font-size: 3.6vh; padding: 0 4vw; }
+#errors { margin-top: 1vh; font-size: 3.2vh; color: #ffd36b; }
+
+#resize-handle {
+  position: absolute; right: 0; bottom: 0;
+  width: 18px; height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--frame) 50%);
+  border-bottom-right-radius: 12px;
+  opacity: .6;
+}
+#resize-handle:hover { opacity: 1; }
+
+/* Maniglia click-through: deve stare nei 34 px logici in alto a destra (vedi window.rs). */
+#ct-handle {
+  position: absolute; top: 0; right: 0;
+  width: 26px; height: 26px; line-height: 26px;
+  text-align: center; font-size: 14px;
+  border-radius: 50%;
+  background: rgba(12, 58, 18, .85);
+  border: 2px solid var(--green);
+  display: none;
+  cursor: pointer;
+}
+body.click-through #ct-handle { display: block; opacity: .35; }
+body.click-through.handle-hover #ct-handle { opacity: 1; box-shadow: 0 0 8px var(--green); }
+body.click-through #screen { cursor: default; }

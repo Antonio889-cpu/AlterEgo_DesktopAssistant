@@ -1,0 +1,9 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+# Asset © Spike Chunsoft: mai in un repo pubblico
+assets/sprites/
+assets/sfx/dr_*
+*.log
+.env
+dist/
