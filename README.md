@@ -1,3 +1,7 @@
+> ⚠ **Branch `con-sprite` – solo per repo privata.** Questa è la versione 1.0.0 con gli sprite originali di Alter Ego
+> (© Spike Chunsoft) inclusi nella repo e nell'exe. Non rendere pubblica la repo finché esiste questo branch
+> e non distribuire le build. La versione pubblica, senza sprite, è sul branch `main`.
+
 # Alter Ego Assistant
 
 Assistente desktop personale per Windows 10/11, ispirato ad Alter Ego (Danganronpa).

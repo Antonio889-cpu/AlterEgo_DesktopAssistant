@@ -1,10 +1,8 @@
 node_modules/
 src-tauri/target/
 src-tauri/gen/
-# Asset © Spike Chunsoft: mai in un repo pubblico
-assets/sprites/
+# Branch con-sprite: gli sprite SONO inclusi. Solo per repo privata.
 assets/sfx/dr_*
 *.log
 .env
 dist/
-src/assets/sprites/
