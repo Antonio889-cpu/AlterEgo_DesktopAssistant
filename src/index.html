@@ -91,6 +91,22 @@
 
       <div id="toast" role="status"></div>
 
+      <!-- conferma azioni PC -->
+      <div id="confirm" class="hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-text">
+        <div class="box">
+          <div class="inner">
+            <div class="tag">Permesso</div>
+            <div class="confirm-body">
+              <div id="confirm-text"></div>
+              <div class="confirm-buttons">
+                <button id="confirm-yes" type="button">Consenti</button>
+                <button id="confirm-no" type="button">Nega</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- overlay CRT -->
       <div id="scanlines"></div>
       <div id="noise"></div>
@@ -105,6 +121,7 @@
   <script src="dialog.js"></script>
   <script src="face.js"></script>
   <script src="state.js"></script>
+  <script src="audio.js"></script>
   <script src="chat.js"></script>
   <script src="app.js"></script>
 </body>

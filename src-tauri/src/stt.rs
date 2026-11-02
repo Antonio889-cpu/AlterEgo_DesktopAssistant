@@ -21,6 +21,8 @@ pub enum SttEvent {
     Recording,
     Transcribing,
     Done { text: String },
+    /// Frase della clip riconosciuta ed eseguita (senza modello).
+    Clip { ok: bool, message: String },
     Empty,
     Error { message: String },
 }
@@ -164,43 +166,53 @@ pub fn to_wav(samples: &[f32]) -> Result<Vec<u8>, String> {
 }
 
 /// Invia il WAV all'endpoint `/audio/transcriptions` (formato OpenAI).
-pub async fn transcribe(http: &reqwest::Client, cfg: &SttConfig, wav: Vec<u8>) -> Result<String, String> {
-    let (base, key) = match cfg.provider.as_str() {
-        "groq" => (
-            "https://api.groq.com/openai/v1".to_string(),
-            Some(keys::get("groq").ok_or("serve la chiave Groq (Impostazioni → AI → Groq)")?),
-        ),
-        "local" => (cfg.base_url.trim().trim_end_matches('/').to_string(), None),
+/// `groq_keys`: chiavi Groq in ordine; se una fallisce (401/403/429) prova la successiva.
+pub async fn transcribe(http: &reqwest::Client, cfg: &SttConfig, wav: Vec<u8>, groq_keys: Vec<String>) -> Result<String, String> {
+    let (base, keys_list) = match cfg.provider.as_str() {
+        "groq" => {
+            if groq_keys.is_empty() {
+                return Err("serve una chiave Groq (Impostazioni → AI → Groq)".into());
+            }
+            ("https://api.groq.com/openai/v1".to_string(), groq_keys.into_iter().map(Some).collect::<Vec<_>>())
+        }
+        "local" => (cfg.base_url.trim().trim_end_matches('/').to_string(), vec![None]),
         _ => return Err("riconoscimento vocale disattivato nelle impostazioni".into()),
     };
     let model = if cfg.model.trim().is_empty() { "whisper-large-v3-turbo" } else { cfg.model.trim() };
-    let part = reqwest::multipart::Part::bytes(wav)
-        .file_name("voce.wav")
-        .mime_str("audio/wav")
-        .map_err(|e| e.to_string())?;
-    let mut form = reqwest::multipart::Form::new()
-        .part("file", part)
-        .text("model", model.to_string())
-        .text("response_format", "json")
-        .text("temperature", "0");
-    if !cfg.language.trim().is_empty() {
-        form = form.text("language", cfg.language.trim().to_string());
-    }
-    let mut req = http.post(format!("{base}/audio/transcriptions")).multipart(form).timeout(Duration::from_secs(60));
-    if let Some(k) = &key {
-        req = req.bearer_auth(k);
-    }
-    let resp = req.send().await.map_err(|e| {
-        if e.is_connect() { "server di trascrizione non raggiungibile".to_string() } else { format!("errore di rete: {e}") }
-    })?;
-    let status = resp.status();
-    let body = resp.text().await.unwrap_or_default();
-    if !status.is_success() {
+    let mut last = String::new();
+    for key in keys_list {
+        let part = reqwest::multipart::Part::bytes(wav.clone())
+            .file_name("voce.wav")
+            .mime_str("audio/wav")
+            .map_err(|e| e.to_string())?;
+        let mut form = reqwest::multipart::Form::new()
+            .part("file", part)
+            .text("model", model.to_string())
+            .text("response_format", "json")
+            .text("temperature", "0");
+        if !cfg.language.trim().is_empty() {
+            form = form.text("language", cfg.language.trim().to_string());
+        }
+        let mut req = http.post(format!("{base}/audio/transcriptions")).multipart(form).timeout(Duration::from_secs(60));
+        if let Some(k) = &key {
+            req = req.bearer_auth(k);
+        }
+        let resp = req.send().await.map_err(|e| {
+            if e.is_connect() { "server di trascrizione non raggiungibile".to_string() } else { format!("errore di rete: {e}") }
+        })?;
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        if status.is_success() {
+            let v: serde_json::Value = serde_json::from_str(&body).map_err(|_| "risposta di trascrizione non valida".to_string())?;
+            return Ok(v.get("text").and_then(|t| t.as_str()).unwrap_or("").trim().to_string());
+        }
         let detail: String = body.chars().take(200).collect();
-        return Err(keys::redact(&format!("trascrizione fallita (HTTP {}): {detail}", status.as_u16()), key.as_deref()));
+        last = keys::redact(&format!("trascrizione fallita (HTTP {}): {detail}", status.as_u16()), key.as_deref());
+        if !matches!(status.as_u16(), 401 | 402 | 403 | 429) {
+            break; // errore non legato alla chiave: inutile provare le altre
+        }
     }
-    let v: serde_json::Value = serde_json::from_str(&body).map_err(|_| "risposta di trascrizione non valida".to_string())?;
-    Ok(v.get("text").and_then(|t| t.as_str()).unwrap_or("").trim().to_string())
+    Err(last)
 }
 
 #[cfg(test)]
@@ -222,9 +234,9 @@ mod tests {
     async fn transcribe_local_mock() {
         let cfg = SttConfig { provider: "local".into(), base_url: "http://127.0.0.1:18080/ok/v1/".into(), ..Default::default() };
         let wav = to_wav(&vec![0.0; 8000]).unwrap();
-        let text = transcribe(&reqwest::Client::new(), &cfg, wav).await.unwrap();
+        let text = transcribe(&reqwest::Client::new(), &cfg, wav, vec![]).await.unwrap();
         assert_eq!(text, "Ciao Alter Ego");
         let off = SttConfig { provider: "off".into(), ..Default::default() };
-        assert!(transcribe(&reqwest::Client::new(), &off, vec![]).await.is_err());
+        assert!(transcribe(&reqwest::Client::new(), &off, vec![], vec![]).await.is_err());
     }
 }

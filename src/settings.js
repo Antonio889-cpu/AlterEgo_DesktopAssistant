@@ -32,8 +32,9 @@ function renderProviders() {
     li.querySelector(".label").textContent = `${idx + 1}. ${info.label}`;
 
     const badge = li.querySelector(".badge");
+    const nKeys = (pc.keys || []).length;
     if (!info.needs_key) { badge.textContent = "locale, senza chiave"; badge.className = "badge ok"; }
-    else if (info.has_key) { badge.textContent = "chiave salvata ✓"; badge.className = "badge ok"; }
+    else if (nKeys) { badge.textContent = nKeys === 1 ? "1 chiave ✓" : `${nKeys} chiavi ✓`; badge.className = "badge ok"; }
     else { badge.textContent = "chiave mancante"; badge.className = "badge missing"; }
 
     const enabled = li.querySelector(".enabled");
@@ -46,19 +47,39 @@ function renderProviders() {
     const keyRow = li.querySelector(".key-row");
     if (!info.needs_key) keyRow.remove();
     else {
-      const keyInput = li.querySelector(".key");
-      keyInput.placeholder = info.has_key ? "•••••••• (salvata: incollane una nuova per sostituirla)" : "incolla la chiave";
-      li.querySelector(".save-key").onclick = async () => {
+      const ul = li.querySelector(".keys");
+      if (!nKeys) ul.innerHTML = '<li class="empty">nessuna chiave salvata</li>';
+      (pc.keys || []).forEach((k, i) => {
+        const row = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = `${i + 1}. ${k.label} (salvata ✓)`;
+        const up = Object.assign(document.createElement("button"), { textContent: "▲", title: "Prova prima" });
+        const down = Object.assign(document.createElement("button"), { textContent: "▼", title: "Prova dopo" });
+        const del = Object.assign(document.createElement("button"), { textContent: "Elimina" });
+        up.disabled = i === 0;
+        down.disabled = i === nKeys - 1;
+        up.onclick = async () => { await invoke("move_api_key", { provider: id, id: k.id, delta: -1 }); await syncKeys(); };
+        down.onclick = async () => { await invoke("move_api_key", { provider: id, id: k.id, delta: 1 }); await syncKeys(); };
+        del.onclick = async () => {
+          if (!confirm(`Eliminare la chiave "${k.label}" di ${info.label}?`)) return;
+          try { await invoke("delete_api_key", { provider: id, id: k.id }); } catch (e) { setResult(li, String(e), "bad"); }
+          await syncKeys();
+        };
+        row.append(label, up, down, del);
+        ul.append(row);
+      });
+      li.querySelector(".add-key").onclick = async () => {
+        const keyInput = li.querySelector(".key");
+        const labelInput = li.querySelector(".key-label");
+        if (!keyInput.value.trim()) return;
         try {
-          await invoke("set_api_key", { provider: id, key: keyInput.value });
+          clearTimeout(saveTimer);
+          await invoke("set_ai_config", { ai });
+          await invoke("add_api_key", { provider: id, label: labelInput.value, key: keyInput.value });
           keyInput.value = "";
-          await reloadInfos();
+          labelInput.value = "";
+          await syncKeys();
         } catch (e) { setResult(li, String(e), "bad"); }
-      };
-      li.querySelector(".del-key").onclick = async () => {
-        if (!confirm(`Eliminare la chiave di ${info.label}?`)) return;
-        await invoke("set_api_key", { provider: id, key: "" });
-        await reloadInfos();
       };
     }
 
@@ -113,6 +134,15 @@ function move(idx, delta) {
 
 async function reloadInfos() {
   infos = await invoke("providers_info");
+  renderProviders();
+}
+
+/** Dopo aggiunta/eliminazione/spostamento: riprende l'elenco chiavi dalla config. */
+async function syncKeys() {
+  const cfg = await invoke("get_config");
+  for (const [id, pc] of Object.entries(cfg.ai.providers)) {
+    if (ai.providers[id]) ai.providers[id].keys = pc.keys;
+  }
   renderProviders();
 }
 
@@ -224,8 +254,280 @@ $("stt-test").onclick = async (ev) => {
   ev.target.disabled = false;
 };
 
+
+// ---------- schede ----------
+function showTab(name) {
+  document.querySelectorAll("nav#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
+  document.querySelectorAll("main section").forEach((sec) => { sec.hidden = sec.dataset.tab !== name; });
+  try { localStorage.setItem("tab", name); } catch {}
+  if (name === "log") refreshLog();
+  if (name === "memory") refreshMemory();
+}
+document.querySelectorAll("nav#tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+
+// ---------- aspetto e avvio ----------
+let lookTimer = null;
+function saveLook() {
+  clearTimeout(lookTimer);
+  lookTimer = setTimeout(() => invoke("set_look", {
+    opacity: +$("look-opacity").value, background: $("look-bg").value, bgIntensity: +$("look-int").value,
+    dialogStyle: $("look-dlg").value, effects: $("look-fx").checked,
+  }), 200);
+}
+function fillLook(cfg) {
+  $("look-opacity").value = cfg.opacity;
+  $("look-bg").value = cfg.background;
+  $("look-int").value = cfg.bg_intensity;
+  $("look-dlg").value = cfg.dialog_style;
+  $("look-fx").checked = cfg.effects;
+  $("autostart").checked = cfg.autostart;
+}
+["look-opacity", "look-int"].forEach((id) => ($(id).oninput = saveLook));
+["look-bg", "look-dlg", "look-fx"].forEach((id) => ($(id).onchange = saveLook));
+$("autostart").onchange = async (e) => {
+  const r = $("autostart-result");
+  try { await invoke("set_autostart", { on: e.target.checked }); r.textContent = e.target.checked ? "attivo" : "disattivato"; r.className = "result ok"; }
+  catch (err) { r.textContent = String(err); r.className = "result bad"; e.target.checked = !e.target.checked; }
+};
+
+// ---------- audio ----------
+let audio = null;
+let audioTimer = null;
+function saveAudio() { clearTimeout(audioTimer); audioTimer = setTimeout(() => invoke("set_audio", { audio }), 250); }
+function fillVoices() {
+  const sel = $("tts-voice");
+  const voices = window.speechSynthesis?.getVoices() || [];
+  sel.innerHTML = '<option value="">Automatica (italiana se presente)</option>' +
+    voices.map((v) => `<option value="${v.name.replace(/"/g, "&quot;")}">${v.name} (${v.lang})</option>`).join("");
+  if (audio) sel.value = audio.tts_voice;
+}
+window.speechSynthesis?.addEventListener?.("voiceschanged", fillVoices);
+function ttsRows() {
+  $("tts-voice-row").style.display = audio.tts === "windows" ? "" : "none";
+  $("tts-voice-note").style.display = audio.tts === "windows" ? "" : "none";
+  $("tts-openai").style.display = audio.tts === "openai" ? "" : "none";
+}
+function fillAudio(cfg) {
+  audio = structuredClone(cfg.audio);
+  $("blips").value = audio.blips;
+  $("blip-volume").value = audio.blip_volume;
+  $("tts").value = audio.tts;
+  $("tts-url").value = audio.tts_url;
+  $("tts-model").value = audio.tts_model;
+  $("tts-remote-voice").value = audio.tts === "openai" ? audio.tts_voice : "";
+  $("tts-rate").value = audio.tts_rate;
+  $("tts-volume").value = audio.tts_volume;
+  $("mute-blips").checked = audio.mute_blips_with_tts;
+  fillVoices();
+  ttsRows();
+}
+$("blips").onchange = (e) => { audio.blips = e.target.value; saveAudio(); };
+$("blip-volume").oninput = (e) => { audio.blip_volume = +e.target.value; saveAudio(); };
+$("tts").onchange = (e) => { audio.tts = e.target.value; audio.tts_voice = ""; ttsRows(); fillVoices(); saveAudio(); };
+$("tts-voice").onchange = (e) => { audio.tts_voice = e.target.value; saveAudio(); };
+$("tts-remote-voice").oninput = (e) => { audio.tts_voice = e.target.value.trim(); saveAudio(); };
+$("tts-url").oninput = (e) => { audio.tts_url = e.target.value.trim(); saveAudio(); };
+$("tts-model").oninput = (e) => { audio.tts_model = e.target.value.trim(); saveAudio(); };
+$("tts-rate").oninput = (e) => { audio.tts_rate = +e.target.value; saveAudio(); };
+$("tts-volume").oninput = (e) => { audio.tts_volume = +e.target.value; saveAudio(); };
+$("mute-blips").onchange = (e) => { audio.mute_blips_with_tts = e.target.checked; saveAudio(); };
+$("tts-key-save").onclick = async () => {
+  try { await invoke("set_tts_key", { key: $("tts-key").value }); $("tts-key").value = ""; $("tts-result").textContent = "chiave salvata"; $("tts-result").className = "result ok"; }
+  catch (e) { $("tts-result").textContent = String(e); $("tts-result").className = "result bad"; }
+};
+$("tts-test").onclick = async () => {
+  const r = $("tts-result");
+  const text = "Ciao! Sono Alter Ego. Così suona la mia voce.";
+  clearTimeout(audioTimer);
+  await invoke("set_audio", { audio });
+  r.className = "result"; r.textContent = "";
+  if (audio.tts === "windows") {
+    const u = new SpeechSynthesisUtterance(text);
+    const vs = speechSynthesis.getVoices();
+    u.voice = vs.find((v) => v.name === audio.tts_voice) || vs.find((v) => v.lang?.startsWith("it")) || null;
+    u.lang = u.voice?.lang || "it-IT"; u.rate = audio.tts_rate; u.volume = audio.tts_volume;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+    if (!u.voice) { r.textContent = "nessuna voce italiana installata: uso quella predefinita"; r.className = "result bad"; }
+  } else if (audio.tts === "openai") {
+    try {
+      const b64 = await invoke("tts_speak", { text });
+      const el = new Audio("data:audio/mpeg;base64," + b64); el.volume = audio.tts_volume; await el.play();
+    } catch (e) { r.textContent = String(e); r.className = "result bad"; }
+  } else { r.textContent = "la voce è spenta"; }
+};
+
+// ---------- tasti ----------
+let hotkeys = null;
+const CODE_NAMES = { Space: "Space", Enter: "Enter", Tab: "Tab", Escape: "Escape", ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+  PageUp: "PageUp", PageDown: "PageDown", Home: "Home", End: "End", Insert: "Insert", Pause: "Pause", PrintScreen: "PrintScreen" };
+function comboFromEvent(e) {
+  const code = e.code;
+  if (["ControlLeft", "ControlRight", "AltLeft", "AltRight", "ShiftLeft", "ShiftRight", "MetaLeft", "MetaRight"].includes(code)) return null;
+  let key = CODE_NAMES[code];
+  if (!key && /^Key[A-Z]$/.test(code)) key = code.slice(3);
+  if (!key && /^Digit\d$/.test(code)) key = code.slice(5);
+  if (!key && /^F\d{1,2}$/.test(code)) key = code;
+  if (!key && /^Numpad\d$/.test(code)) key = code;
+  if (!key) key = code;
+  const mods = [];
+  if (e.ctrlKey) mods.push("Ctrl");
+  if (e.altKey) mods.push("Alt");
+  if (e.shiftKey) mods.push("Shift");
+  if (e.metaKey) mods.push("Super");
+  return [...mods, key].join("+");
+}
+/** Campo che registra una combinazione di tasti (e, se allowMouse, un tasto del mouse). */
+function captureInput(input, onSet, allowMouse) {
+  input.onfocus = () => { input.classList.add("capturing"); input.dataset.old = input.value; input.value = "premi i tasti…"; };
+  input.onblur = () => { input.classList.remove("capturing"); if (input.value === "premi i tasti…") input.value = input.dataset.old || ""; };
+  input.onkeydown = (e) => {
+    e.preventDefault();
+    if (e.key === "Delete" || e.key === "Backspace") { input.value = ""; onSet(""); input.blur(); return; }
+    if (e.key === "Escape" && !e.ctrlKey && !e.altKey) { input.blur(); return; }
+    const c = comboFromEvent(e);
+    if (c) { input.value = c; onSet(c); input.blur(); }
+  };
+  input.onmousedown = (e) => {
+    if (!allowMouse || document.activeElement !== input) return;
+    const name = { 1: "MouseMiddle", 3: "Mouse4", 4: "Mouse5" }[e.button];
+    if (name) { e.preventDefault(); input.value = name; onSet(name); input.blur(); }
+  };
+  input.onauxclick = (e) => e.preventDefault();
+}
+function fillHotkeys(cfg) {
+  hotkeys = structuredClone(cfg.hotkeys);
+  document.querySelectorAll("input.hotkey[data-key]").forEach((inp) => {
+    inp.value = hotkeys[inp.dataset.key] || "";
+    captureInput(inp, (v) => { hotkeys[inp.dataset.key] = v; }, !!inp.dataset.mouse);
+  });
+  const r = $("hotkey-result");
+  if (cfg.hotkey_errors?.length) { r.textContent = cfg.hotkey_errors.join("; "); r.className = "result bad"; }
+}
+$("save-hotkeys").onclick = async () => {
+  const errors = await invoke("set_hotkeys", { hotkeys });
+  const r = $("hotkey-result");
+  r.textContent = errors.length ? errors.join("; ") : "tasti salvati ✓";
+  r.className = "result " + (errors.length ? "bad" : "ok");
+};
+
+// ---------- clip ----------
+let clip = null;
+let clipTimer = null;
+function saveClip() { clearTimeout(clipTimer); clipTimer = setTimeout(() => invoke("set_clip", { clip }), 300); }
+function renderClipTargets() {
+  const box = $("clip-targets");
+  box.innerHTML = "";
+  clip.targets.forEach((t, i) => {
+    const row = document.createElement("div");
+    row.className = "clip-target";
+    const en = Object.assign(document.createElement("input"), { type: "checkbox", checked: t.enabled });
+    const name = Object.assign(document.createElement("input"), { className: "name", value: t.name });
+    const hk = Object.assign(document.createElement("input"), { className: "hotkey", value: t.hotkey, readOnly: true });
+    const del = Object.assign(document.createElement("button"), { textContent: "✕", title: "Rimuovi" });
+    en.onchange = () => { t.enabled = en.checked; saveClip(); };
+    name.oninput = () => { t.name = name.value; saveClip(); };
+    captureInput(hk, (v) => { t.hotkey = v; saveClip(); }, false);
+    del.onclick = () => { clip.targets.splice(i, 1); renderClipTargets(); saveClip(); };
+    row.append(en, name, hk, del);
+    box.append(row);
+  });
+  const add = Object.assign(document.createElement("button"), { textContent: "+ Aggiungi programma" });
+  add.onclick = () => { clip.targets.push({ name: "Altro programma", hotkey: "", enabled: true }); renderClipTargets(); saveClip(); };
+  box.append(add);
+}
+function fillClip(cfg) {
+  clip = structuredClone(cfg.clip);
+  $("clip-enabled").checked = clip.enabled;
+  $("clip-phrases").value = clip.phrases.join("\n");
+  $("clip-reply").value = clip.reply;
+  renderClipTargets();
+}
+$("clip-enabled").onchange = (e) => { clip.enabled = e.target.checked; saveClip(); };
+$("clip-phrases").oninput = (e) => { clip.phrases = e.target.value.split("\n").map((x) => x.trim()).filter(Boolean); saveClip(); };
+$("clip-reply").oninput = (e) => { clip.reply = e.target.value; saveClip(); };
+$("clip-test").onclick = async (ev) => {
+  const r = $("clip-result");
+  ev.target.disabled = true;
+  clearTimeout(clipTimer);
+  await invoke("set_clip", { clip });
+  for (let i = 3; i > 0; i--) { r.textContent = `torna al gioco… ${i}`; r.className = "result"; await new Promise((ok) => setTimeout(ok, 1000)); }
+  try { r.textContent = await invoke("test_clip"); r.className = "result ok"; }
+  catch (e) { r.textContent = String(e); r.className = "result bad"; }
+  ev.target.disabled = false;
+};
+
+// ---------- permessi ----------
+let perms = null;
+let permsTimer = null;
+function savePerms() { clearTimeout(permsTimer); permsTimer = setTimeout(() => invoke("set_permissions", { permissions: perms }), 300); }
+function renderList(div) {
+  const key = div.dataset.list;
+  const cols = div.dataset.cols.split("|");
+  const items = perms[key];
+  div.innerHTML = "";
+  items.forEach((item, i) => {
+    const row = document.createElement("div");
+    row.className = "row";
+    if (cols.length === 1) {
+      const inp = Object.assign(document.createElement("input"), { value: item, placeholder: cols[0] });
+      inp.oninput = () => { items[i] = inp.value.trim(); savePerms(); };
+      row.append(inp);
+    } else {
+      const n = Object.assign(document.createElement("input"), { value: item.name, placeholder: cols[0] });
+      const t = Object.assign(document.createElement("input"), { value: item.target, placeholder: cols[1] });
+      n.style.flex = "1"; t.style.flex = "2";
+      n.oninput = () => { item.name = n.value.trim(); savePerms(); };
+      t.oninput = () => { item.target = t.value.trim(); savePerms(); };
+      row.append(n, t);
+    }
+    const del = Object.assign(document.createElement("button"), { textContent: "✕" });
+    del.onclick = () => { items.splice(i, 1); renderList(div); savePerms(); };
+    row.append(del);
+    div.append(row);
+  });
+  const add = Object.assign(document.createElement("button"), { textContent: "+ Aggiungi" });
+  add.onclick = () => { items.push(cols.length === 1 ? "" : { name: "", target: "" }); renderList(div); savePerms(); };
+  div.append(add);
+}
+function fillPerms(cfg) {
+  perms = structuredClone(cfg.permissions);
+  document.querySelectorAll("input[data-perm]").forEach((c) => {
+    c.checked = !!perms[c.dataset.perm];
+    c.onchange = () => { perms[c.dataset.perm] = c.checked; savePerms(); };
+  });
+  document.querySelectorAll(".list[data-list]").forEach(renderList);
+}
+
+// ---------- registro ----------
+async function refreshLog() {
+  const rows = await invoke("actions_log");
+  const tb = document.querySelector("#log-table tbody");
+  tb.innerHTML = "";
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="4" class="note">nessuna azione registrata</td></tr>'; return; }
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    [fmtDate(r.ts), r.azione, r.dettaglio, r.esito].forEach((v, i) => {
+      const td = document.createElement("td");
+      td.textContent = v ?? "";
+      if (i === 3) td.className = v === "ok" || v === "notificato" ? "ok" : "bad";
+      tr.append(td);
+    });
+    tb.append(tr);
+  }
+}
+$("log-refresh").onclick = refreshLog;
+$("log-clear").onclick = async () => { if (confirm("Svuotare il registro delle azioni?")) { await invoke("clear_actions_log"); refreshLog(); } };
+
 (async () => {
   const cfg = await invoke("get_config");
+  fillLook(cfg);
+  fillAudio(cfg);
+  fillHotkeys(cfg);
+  fillClip(cfg);
+  fillPerms(cfg);
+  let tab = "general";
+  try { tab = localStorage.getItem("tab") || "general"; } catch {}
+  showTab(tab);
   fillPersona(cfg);
   fillStt(cfg);
   refreshMemory();
@@ -236,5 +538,9 @@ $("stt-test").onclick = async (ev) => {
   $("max-history").value = ai.max_history;
   await reloadInfos();
   // aggiornamenti da altre parti dell'app (non sovrascrive ciò che si sta scrivendo)
-  listen("config", (e) => { if (document.activeElement?.tagName !== "INPUT") fillGeneral(e.payload); });
+  listen("config", (e) => {
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    fillGeneral(e.payload);
+    fillLook(e.payload);
+  });
 })();

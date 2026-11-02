@@ -1,6 +1,7 @@
 // Niente console in release su Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod actions;
 mod assistant;
 mod config;
 mod hotkeys;
@@ -20,7 +21,7 @@ use std::{
         Mutex,
     },
 };
-use tauri::{menu::CheckMenuItem, AppHandle, Emitter, Manager, State, WindowEvent, Wry};
+use tauri::{menu::CheckMenuItem, AppHandle, Emitter, Manager, WindowEvent, Wry};
 
 pub struct AppState {
     pub cfg: Mutex<config::Config>,
@@ -28,6 +29,8 @@ pub struct AppState {
     pub dirty: AtomicBool,
     pub click_through: AtomicBool,
     pub handle_hover: AtomicBool,
+    /// Finestra di conferma aperta: il mouse deve funzionare anche in click-through.
+    pub modal: AtomicBool,
     pub tray_click_item: Mutex<Option<CheckMenuItem<Wry>>>,
     pub hotkey_map: Mutex<HashMap<u32, hotkeys::Action>>,
     pub hotkey_errors: Mutex<Vec<String>>,
@@ -64,6 +67,10 @@ pub struct FrontConfig {
     personality: config::Personality,
     memory_enabled: bool,
     stt: config::SttConfig,
+    permissions: config::Permissions,
+    clip: config::ClipConfig,
+    audio: config::AudioConfig,
+    autostart: bool,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -86,6 +93,10 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         personality: cfg.personality.clone(),
         memory_enabled: cfg.memory_enabled,
         stt: cfg.stt.clone(),
+        permissions: cfg.permissions.clone(),
+        clip: cfg.clip.clone(),
+        audio: cfg.audio.clone(),
+        autostart: cfg.autostart,
     }
 }
 
@@ -95,6 +106,7 @@ pub fn update_config(app: &AppHandle, f: impl FnOnce(&mut config::Config)) {
     f(&mut state.cfg.lock().unwrap());
     state.dirty.store(true, Ordering::Relaxed);
     let _ = app.emit("config", front_config(app));
+    tray::refresh(app);
 }
 
 #[tauri::command]
@@ -120,10 +132,9 @@ fn set_opacity(app: AppHandle, value: f64) {
 
 /// Cambia le hotkey senza riavvio. Se una non si registra, restituisce gli errori.
 #[tauri::command]
-fn set_hotkeys(app: AppHandle, state: State<AppState>, hotkeys: config::Hotkeys) -> Vec<String> {
+fn set_hotkeys(app: AppHandle, hotkeys: config::Hotkeys) -> Vec<String> {
     let errors = hotkeys::register(&app, &hotkeys);
-    state.cfg.lock().unwrap().hotkeys = hotkeys;
-    state.dirty.store(true, Ordering::Relaxed);
+    update_config(&app, |c| c.hotkeys = hotkeys);
     errors
 }
 
@@ -166,40 +177,57 @@ struct ProviderView {
     label: &'static str,
     default_base: &'static str,
     needs_key: bool,
-    has_key: bool,
 }
 
 #[tauri::command]
 fn providers_info() -> Vec<ProviderView> {
     providers::PROVIDERS
         .iter()
-        .map(|p| ProviderView {
-            id: p.id,
-            label: p.label,
-            default_base: p.default_base,
-            needs_key: p.needs_key,
-            has_key: p.needs_key && keys::has(p.id),
-        })
+        .map(|p| ProviderView { id: p.id, label: p.label, default_base: p.default_base, needs_key: p.needs_key })
         .collect()
 }
 
-/// Stato delle chiavi: solo sì/no, la chiave non esce mai dal backend.
+/// Aggiunge una chiave al provider (in coda all'ordine di prova).
 #[tauri::command]
-fn key_status() -> HashMap<String, bool> {
-    providers::PROVIDERS
-        .iter()
-        .filter(|p| p.needs_key)
-        .map(|p| (p.id.to_string(), keys::has(p.id)))
-        .collect()
-}
-
-/// Salva la chiave nel Credential Manager. Stringa vuota = cancella.
-#[tauri::command]
-fn set_api_key(provider: String, key: String) -> Result<(), String> {
+fn add_api_key(app: AppHandle, provider: String, label: String, key: String) -> Result<(), String> {
     if providers::info(&provider).map(|p| p.needs_key) != Some(true) {
         return Err("provider senza chiave".into());
     }
-    keys::set(&provider, &key)
+    let id = format!("{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis()).unwrap_or(0));
+    keys::set_slot(&provider, &id, &key)?;
+    update_config(&app, |c| {
+        let pc = c.ai.providers.entry(provider.clone()).or_default();
+        let n = pc.keys.len() + 1;
+        let label = label.trim();
+        pc.keys.push(config::KeySlot { id, label: if label.is_empty() { format!("Chiave {n}") } else { label.chars().take(40).collect() } });
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_api_key(app: AppHandle, provider: String, id: String) -> Result<(), String> {
+    keys::delete_slot(&provider, &id)?;
+    update_config(&app, |c| {
+        if let Some(pc) = c.ai.providers.get_mut(&provider) {
+            pc.keys.retain(|k| k.id != id);
+        }
+    });
+    Ok(())
+}
+
+/// Sposta una chiave su (-1) o giù (+1) nell'ordine di prova.
+#[tauri::command]
+fn move_api_key(app: AppHandle, provider: String, id: String, delta: i32) {
+    update_config(&app, |c| {
+        if let Some(pc) = c.ai.providers.get_mut(&provider) {
+            if let Some(i) = pc.keys.iter().position(|k| k.id == id) {
+                let j = i as i32 + delta;
+                if j >= 0 && (j as usize) < pc.keys.len() {
+                    pc.keys.swap(i, j as usize);
+                }
+            }
+        }
+    });
 }
 
 #[tauri::command]
@@ -216,6 +244,32 @@ async fn test_provider(app: AppHandle, provider: String) -> Result<String, Strin
     providers::test(&state.ai, &cfg, &provider).await
 }
 
+/// Aspetto dalla finestra Impostazioni (lo stesso della tray).
+#[tauri::command]
+fn set_look(app: AppHandle, opacity: f64, background: String, bg_intensity: f64, dialog_style: String, effects: bool) {
+    update_config(&app, |c| {
+        c.opacity = opacity.clamp(0.2, 1.0);
+        if ["scanline", "circuit", "both"].contains(&background.as_str()) {
+            c.background = background;
+        }
+        c.bg_intensity = bg_intensity.clamp(0.0, 1.0);
+        if ["chiaro", "scuro"].contains(&dialog_style.as_str()) {
+            c.dialog_style = dialog_style;
+        }
+        c.effects = effects;
+    });
+}
+
+/// Avvio con Windows (spento di default).
+#[tauri::command]
+fn set_autostart(app: AppHandle, on: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let al = app.autolaunch();
+    if on { al.enable() } else { al.disable() }.map_err(|e| e.to_string())?;
+    update_config(&app, |c| c.autostart = on);
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         // Seconda istanza: mostra quella già aperta ed esce.
@@ -225,11 +279,26 @@ fn main() {
             }
         }))
         .plugin(hotkeys::plugin())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .setup(|app| {
             let cfg_path = config::config_path(&app.path().config_dir()?);
             let data_dir = cfg_path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+            app.manage(actions::Actions::new(&data_dir));
             app.manage(assistant::Conversation::new(data_dir));
-            let cfg = config::load(&cfg_path);
+            let mut cfg = config::load(&cfg_path);
+            // migrazione: chiave singola delle versioni precedenti → slot "1"
+            let mut migrated = false;
+            for p in providers::PROVIDERS.iter().filter(|p| p.needs_key) {
+                let pc = cfg.ai.providers.entry(p.id.to_string()).or_default();
+                if pc.keys.is_empty() && keys::migrate_legacy(p.id) {
+                    pc.keys.push(config::KeySlot { id: "1".into(), label: "Chiave 1".into() });
+                    migrated = true;
+                }
+            }
+            if migrated {
+                let _ = config::save(&cfg_path, &cfg);
+            }
             let hk = cfg.hotkeys.clone();
             app.manage(AppState {
                 cfg: Mutex::new(cfg),
@@ -237,6 +306,7 @@ fn main() {
                 dirty: AtomicBool::new(false),
                 click_through: AtomicBool::new(false),
                 handle_hover: AtomicBool::new(false),
+                modal: AtomicBool::new(false),
                 tray_click_item: Mutex::new(None),
                 hotkey_map: Mutex::new(HashMap::new()),
                 hotkey_errors: Mutex::new(Vec::new()),
@@ -249,6 +319,7 @@ fn main() {
                 eprintln!("hotkey non registrata: {e}");
             }
             window::spawn_saver(handle.clone());
+            actions::spawn_reminder_loop(handle.clone());
             window::spawn_handle_poller(handle);
             Ok(())
         })
@@ -273,9 +344,10 @@ fn main() {
             set_ai_config,
             open_settings,
             focus_main,
-            key_status,
             providers_info,
-            set_api_key,
+            add_api_key,
+            delete_api_key,
+            move_api_key,
             list_models,
             test_provider,
             assistant::chat,
@@ -287,7 +359,19 @@ fn main() {
             assistant::memory_forget_all,
             assistant::memory_export,
             assistant::open_data_dir,
-            assistant::stt_test
+            assistant::stt_test,
+            assistant::set_permissions,
+            assistant::set_clip,
+            assistant::test_clip,
+            assistant::set_audio,
+            assistant::set_tts_key,
+            assistant::has_tts_key,
+            assistant::tts_speak,
+            actions::confirm_action,
+            actions::actions_log,
+            actions::clear_actions_log,
+            set_autostart,
+            set_look
         ])
         .run(tauri::generate_context!())
         .expect("errore all'avvio di Alter Ego");

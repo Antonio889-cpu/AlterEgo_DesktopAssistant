@@ -7,17 +7,42 @@
 </head>
 <body>
   <header><h1>ALTER EGO · Impostazioni</h1></header>
+  <nav id="tabs">
+    <button data-tab="general" class="on">Generale</button>
+    <button data-tab="ai">AI e chiavi</button>
+    <button data-tab="persona">Personalità</button>
+    <button data-tab="memory">Memoria</button>
+    <button data-tab="voice">Voce e audio</button>
+    <button data-tab="hotkeys">Tasti</button>
+    <button data-tab="clip">Clip</button>
+    <button data-tab="perms">Permessi</button>
+    <button data-tab="log">Registro</button>
+  </nav>
   <main>
-    <section>
+    <section data-tab="general">
       <h2>Generale</h2>
       <label>Il tuo nome <input id="user-name" maxlength="40" placeholder="es. Makoto" /></label>
       <label>Tag nome nel dialogo <input id="name-tag" maxlength="24" placeholder="Alter Ego" /></label>
       <button id="save-general">Salva</button>
+      <h3>Aspetto</h3>
+      <label>Opacità <input id="look-opacity" type="range" min="0.2" max="1" step="0.05" /></label>
+      <label>Sfondo
+        <select id="look-bg"><option value="scanline">Scanline</option><option value="circuit">Circuiti</option><option value="both">Entrambi</option></select>
+      </label>
+      <label>Intensità sfondo <input id="look-int" type="range" min="0" max="1" step="0.05" /></label>
+      <label>Box dialogo
+        <select id="look-dlg"><option value="chiaro">Chiaro (come screenshot)</option><option value="scuro">Scuro</option></select>
+      </label>
+      <label class="inline"><input type="checkbox" id="look-fx" /> Effetti animati (flicker e rumore; spegnili per CPU minima)</label>
+      <h3>Avvio</h3>
+      <label class="inline"><input type="checkbox" id="autostart" /> Avvia Alter Ego all'accesso a Windows</label>
+      <span id="autostart-result" class="result"></span>
     </section>
 
-    <section>
+    <section data-tab="ai">
       <h2>Intelligenza artificiale</h2>
       <p class="note">I provider vengono provati dall'alto in basso: se uno fallisce o va in rate limit si passa al successivo.
+        Ogni servizio può avere <b>più chiavi</b>: se una è esaurita, in rate limit o non valida, passa alla successiva.
         Le chiavi sono salvate nel <b>Credential Manager di Windows</b>, mai in file.</p>
       <div class="row">
         <label>Temperatura <input id="temperature" type="range" min="0" max="1.5" step="0.05" /> <output id="temperature-val"></output></label>
@@ -27,7 +52,7 @@
       <p class="note privacy"><b>Cosa esce dal PC:</b> solo il prompt di sistema e gli ultimi messaggi della conversazione,
         inviati al provider che risponde. Con Ollama tutto resta sul tuo computer.</p>
     </section>
-    <section>
+    <section data-tab="persona">
       <h2>Personalità e lingua</h2>
       <label>Lingua delle risposte
         <select id="language">
@@ -44,7 +69,7 @@
       <button id="open-data">Apri cartella dati</button>
     </section>
 
-    <section>
+    <section data-tab="memory">
       <h2>Memoria</h2>
       <label class="inline"><input type="checkbox" id="memory-enabled" /> Ricorda le conversazioni tra un avvio e l'altro (SQLite, solo su questo PC)</label>
       <p class="note" id="memory-stats"></p>
@@ -61,9 +86,9 @@
       </div>
     </section>
 
-    <section>
-      <h2>Voce (riconoscimento vocale)</h2>
-      <p class="note">Tieni premuto <b>Ctrl+Alt+Spazio</b> mentre parli, poi rilascia. L'audio va solo al servizio scelto qui.</p>
+    <section data-tab="voice">
+      <h2>Riconoscimento vocale (push-to-talk)</h2>
+      <p class="note">Tieni premuto il tasto push-to-talk (scheda <b>Tasti</b>) mentre parli, poi rilascia. L'audio va solo al servizio scelto qui.</p>
       <label>Servizio
         <select id="stt-provider">
           <option value="groq">Groq Whisper (usa la chiave Groq)</option>
@@ -75,6 +100,89 @@
       <label id="stt-url-row">URL server locale <input id="stt-url" placeholder="http://localhost:8000/v1" /></label>
       <label>Lingua <input id="stt-language" maxlength="5" placeholder="it" style="max-width:80px;min-width:0" /></label>
       <div class="actions"><button id="stt-test">Prova microfono (4 secondi)</button> <span id="stt-result" class="result"></span></div>
+    </section>
+
+    <section data-tab="voice">
+      <h2>Suoni del dialogo</h2>
+      <label>Blip
+        <select id="blips">
+          <option value="dr">Stile Danganronpa (ricreato, sintetizzato)</option>
+          <option value="soft">Blip morbidi (originali)</option>
+          <option value="off">Muto</option>
+        </select>
+      </label>
+      <label>Volume blip <input id="blip-volume" type="range" min="0" max="1" step="0.05" /></label>
+      <h2>Voce di Alter Ego (TTS)</h2>
+      <label>Voce
+        <select id="tts">
+          <option value="off">Spenta</option>
+          <option value="windows">Voci di Windows</option>
+          <option value="openai">Servizio compatibile OpenAI (/audio/speech)</option>
+        </select>
+      </label>
+      <label id="tts-voice-row">Voce di Windows <select id="tts-voice"></select></label>
+      <p class="note" id="tts-voice-note">Per una voce italiana: Impostazioni di Windows → Ora e lingua → Voce → Aggiungi voci (es. Elsa, Cosimo).</p>
+      <div id="tts-openai">
+        <label>URL <input id="tts-url" placeholder="http://localhost:8880/v1" /></label>
+        <label>Modello <input id="tts-model" placeholder="tts-1" /></label>
+        <label>Voce <input id="tts-remote-voice" placeholder="es. alloy, if_sara" /></label>
+        <label>Chiave (facoltativa) <input id="tts-key" type="password" placeholder="vuoto = nessuna" /> <button id="tts-key-save">Salva chiave</button></label>
+      </div>
+      <label>Velocità <input id="tts-rate" type="range" min="0.5" max="2" step="0.05" /></label>
+      <label>Volume voce <input id="tts-volume" type="range" min="0" max="1" step="0.05" /></label>
+      <label class="inline"><input type="checkbox" id="mute-blips" /> Niente blip mentre parla la voce</label>
+      <div class="actions"><button id="tts-test">Prova voce</button> <span id="tts-result" class="result"></span></div>
+    </section>
+
+    <section data-tab="hotkeys">
+      <h2>Tasti rapidi</h2>
+      <p class="note">Clicca un campo e premi la combinazione (es. Ctrl+Alt+A, oppure un tasto singolo come F8).
+        Per il push-to-talk puoi anche cliccare con il <b>tasto centrale</b> o i <b>tasti laterali del mouse</b> (Mouse4/Mouse5).
+        Canc o Backspace svuota il campo (tasto disattivato).</p>
+      <label>Mostra / nascondi <input class="hotkey" data-key="toggle_visibility" readonly /></label>
+      <label>Push-to-talk (parla) <input class="hotkey" data-key="push_to_talk" data-mouse="1" readonly /></label>
+      <label>Scrivi ad Alter Ego <input class="hotkey" data-key="text_input" readonly /></label>
+      <label>Click-through <input class="hotkey" data-key="toggle_click_through" readonly /></label>
+      <div class="actions"><button id="save-hotkeys">Salva tasti</button> <span id="hotkey-result" class="result"></span></div>
+    </section>
+
+    <section data-tab="clip">
+      <h2>Clip vocali</h2>
+      <p class="note">Quando dici una di queste frasi col push-to-talk (o la scrivi), Alter Ego preme la scorciatoia del tuo programma
+        di registrazione <b>senza passare dal modello AI</b>: è istantaneo e gratis. La registrazione in background
+        (Instant Replay / Instant Replay NVIDIA / Medal) deve essere attiva.</p>
+      <label class="inline"><input type="checkbox" id="clip-enabled" /> Clip vocali attive</label>
+      <label>Frasi (una per riga)</label>
+      <textarea id="clip-phrases" rows="6"></textarea>
+      <h3>Programmi</h3>
+      <p class="note">Attiva quelli che usi e controlla che la scorciatoia sia uguale a quella impostata nel programma.</p>
+      <div id="clip-targets"></div>
+      <label>Risposta di Alter Ego <input id="clip-reply" maxlength="80" placeholder="Clip salvata!" /></label>
+      <div class="actions"><button id="clip-test">Prova (invia la scorciatoia tra 3 secondi)</button> <span id="clip-result" class="result"></span></div>
+    </section>
+
+    <section data-tab="perms">
+      <h2>Permessi delle azioni sul PC</h2>
+      <p class="note">Tutto è <b>spento di default</b>. Alter Ego può usare solo ciò che attivi qui; le azioni con ⚠ chiedono
+        conferma ogni volta nella sua finestra. Ogni azione finisce nel Registro.</p>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="open" /> <b>Aprire programmi e siti</b></label>
+        <p class="note">Senza conferma quelli della lista; ⚠ conferma per altri siti. Nome = come lo chiami a voce; destinazione = percorso .exe, collegamento o URL.</p>
+        <div class="list" data-list="open_allowlist" data-cols="Nome|Percorso o URL"></div></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="files" /> <b>Gestione file</b> ⚠</label>
+        <p class="note">Leggere, scrivere, elencare ed eliminare file solo in queste cartelle. Conferma sempre.</p>
+        <div class="list" data-list="folders" data-cols="Cartella autorizzata"></div></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="reminders" /> <b>Promemoria, timer e sveglie</b> (notifiche di Windows)</label></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="clipboard" /> <b>Appunti</b> (⚠ conferma per leggere)</label></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="screen" /> <b>Lettura schermo</b> ⚠ (screenshot al modello con visione)</label></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="volume" /> <b>Volume e luminosità</b></label></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="shell" /> <b>Comandi</b> ⚠ (solo quelli in lista, mai testo libero)</label>
+        <div class="list" data-list="commands" data-cols="Nome|Comando"></div></div>
+    </section>
+
+    <section data-tab="log">
+      <h2>Registro azioni</h2>
+      <div class="actions"><button id="log-refresh">Aggiorna</button> <button id="log-clear" class="danger">Svuota</button></div>
+      <table id="log-table"><thead><tr><th>Quando</th><th>Azione</th><th>Dettaglio</th><th>Esito</th></tr></thead><tbody></tbody></table>
     </section>
   </main>
 
@@ -88,10 +196,13 @@
         </span>
       </div>
       <div class="body">
-        <label class="key-row">Chiave API
-          <input type="password" class="key" autocomplete="off" placeholder="incolla la chiave" />
-          <button class="save-key">Salva chiave</button><button class="del-key">Elimina</button>
-        </label>
+        <div class="key-row">
+          <div class="keys-title">Chiavi API (provate in quest'ordine)</div>
+          <ul class="keys"></ul>
+          <label><input class="key-label" maxlength="40" placeholder="etichetta (es. account 2)" style="max-width:200px;min-width:0" />
+            <input type="password" class="key" autocomplete="off" placeholder="incolla una chiave" />
+            <button class="add-key">Aggiungi chiave</button></label>
+        </div>
         <label>Modello
           <input class="model" list="" placeholder="" />
           <button class="load-models">Carica modelli</button>

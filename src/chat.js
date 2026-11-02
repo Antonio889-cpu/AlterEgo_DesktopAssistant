@@ -42,7 +42,7 @@ const Chat = (() => {
 
     const events = new Channel();
     events.onmessage = (ev) => {
-      if (ev.kind === "fallback") notify(`${ev.from} non risponde (${ev.reason}) → provo il successivo`);
+      if (ev.kind === "fallback") notify(`${ev.from}: ${ev.reason}`);
     };
     try {
       // contesto e memoria li gestisce il backend
@@ -51,7 +51,10 @@ const Chat = (() => {
       State.setEmotion(reply.emotion);
       State.setMode("speaking");
       busy = false;
-      await Dialog.say(displayText(reply));
+      const shown = displayText(reply);
+      Audio2.speak(window.appConfig?.language === "en" ? reply.it : reply.it || reply.en, window.appConfig?.language === "en" ? "en" : "it");
+      if (res.model === "clip") Audio2.chime();
+      await Dialog.say(shown);
     } catch (err) {
       busy = false;
       State.setEmotion("error");
@@ -77,6 +80,12 @@ const Chat = (() => {
       case "done":
         notify(`Hai detto: “${ev.text}”`);
         ask(ev.text);
+        break;
+      case "clip":
+        State.setEmotion(ev.ok ? "happy" : "worried");
+        State.setMode("speaking");
+        if (ev.ok) Audio2.chime();
+        Dialog.say(ev.ok ? ev.message : `Non sono riuscita a fare la clip… (${ev.message})`).then(() => State.settle());
         break;
       case "empty":
         State.settle();
@@ -118,5 +127,15 @@ const Chat = (() => {
   });
   input.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== input) closeInput(); }, 150));
 
-  return { ask, openInput, closeInput, parseReply, notify, onStt };
+  /** Alter Ego sta usando strumenti (azioni PC). */
+  function onToolUse(names) {
+    const labels = { open_target: "apro", list_dir: "guardo la cartella", read_file: "leggo il file", write_file: "scrivo il file",
+      delete_file: "elimino il file", set_reminder: "imposto il promemoria", list_reminders: "controllo i promemoria",
+      cancel_reminder: "annullo il promemoria", read_clipboard: "leggo gli appunti", write_clipboard: "copio negli appunti",
+      take_screenshot: "guardo lo schermo", set_volume: "regolo il volume", set_brightness: "regolo la luminosità", run_command: "eseguo il comando" };
+    State.setMode("thinking");
+    Dialog.pending("⚙ " + names.map((n) => labels[n] || n).join(", "));
+  }
+
+  return { onToolUse, ask, openInput, closeInput, parseReply, notify, onStt };
 })();

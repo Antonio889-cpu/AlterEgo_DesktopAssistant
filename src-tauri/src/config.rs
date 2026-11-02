@@ -33,11 +33,21 @@ impl Default for Hotkeys {
     }
 }
 
-/// Impostazioni di un provider AI. La chiave NON sta qui (Credential Manager).
+/// Una chiave API: qui solo id ed etichetta, il segreto sta nel Credential Manager.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct KeySlot {
+    pub id: String,
+    pub label: String,
+}
+
+/// Impostazioni di un provider AI. Le chiavi NON stanno qui (Credential Manager).
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(default)]
 pub struct ProviderCfg {
     pub enabled: bool,
+    /// Chiavi in ordine di prova: se una fallisce (401/403/429/quota) passa alla successiva.
+    pub keys: Vec<KeySlot>,
     /// Vuoto = default (Ollama: primo modello installato).
     pub model: String,
     /// Vuoto = URL predefinito del provider.
@@ -74,6 +84,12 @@ impl Default for AiConfig {
             temperature: 0.7,
             max_history: 12,
         }
+    }
+}
+
+impl ProviderCfg {
+    pub fn key_ids(&self) -> Vec<String> {
+        self.keys.iter().map(|k| k.id.clone()).collect()
     }
 }
 
@@ -133,6 +149,96 @@ impl Default for SttConfig {
     }
 }
 
+/// Voce di una lista consentita: nome mostrato al modello → programma/sito/comando.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct Named {
+    pub name: String,
+    pub target: String,
+}
+
+/// Permessi delle azioni sul PC: tutto spento di default (vedi docs/PERMESSI.md).
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(default)]
+pub struct Permissions {
+    pub open: bool,
+    pub open_allowlist: Vec<Named>,
+    pub files: bool,
+    pub folders: Vec<String>,
+    pub reminders: bool,
+    pub clipboard: bool,
+    pub screen: bool,
+    pub volume: bool,
+    pub shell: bool,
+    pub commands: Vec<Named>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct ClipTarget {
+    pub name: String,
+    pub hotkey: String,
+    pub enabled: bool,
+}
+
+/// Clip vocali: frasi riconosciute in locale (senza modello) → scorciatoia del programma di registrazione.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
+pub struct ClipConfig {
+    pub enabled: bool,
+    pub phrases: Vec<String>,
+    pub targets: Vec<ClipTarget>,
+    /// Risposta di Alter Ego dopo la clip.
+    pub reply: String,
+}
+
+impl Default for ClipConfig {
+    fn default() -> Self {
+        let t = |name: &str, hotkey: &str| ClipTarget { name: name.into(), hotkey: hotkey.into(), enabled: false };
+        Self {
+            enabled: true,
+            phrases: ["alter ego clip that", "alter ego clippa", "alter ego clip", "alter ego salva la clip", "clip that", "clippa"]
+                .map(String::from)
+                .to_vec(),
+            targets: vec![t("AMD Adrenalin (Instant Replay)", "Ctrl+Shift+S"), t("NVIDIA App / ShadowPlay", "Alt+F10"), t("Medal", "F8")],
+            reply: "Clip salvata!".into(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
+pub struct AudioConfig {
+    /// Suoni del dialogo: "dr" (stile Danganronpa, sintetizzato), "soft" (originale), "off".
+    pub blips: String,
+    pub blip_volume: f64,
+    /// Voce: "off", "windows" (voci di sistema) o "openai" (endpoint /audio/speech).
+    pub tts: String,
+    pub tts_voice: String,
+    pub tts_rate: f64,
+    pub tts_volume: f64,
+    pub tts_url: String,
+    pub tts_model: String,
+    /// Durante la voce i blip tacciono.
+    pub mute_blips_with_tts: bool,
+}
+
+impl Default for AudioConfig {
+    fn default() -> Self {
+        Self {
+            blips: "dr".into(),
+            blip_volume: 0.35,
+            tts: "off".into(),
+            tts_voice: String::new(),
+            tts_rate: 1.05,
+            tts_volume: 0.9,
+            tts_url: "http://localhost:8880/v1".into(),
+            tts_model: "tts-1".into(),
+            mute_blips_with_tts: true,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct Config {
@@ -160,6 +266,9 @@ pub struct Config {
     /// Memoria persistente (SQLite). Spenta = si ricorda solo la sessione corrente.
     pub memory_enabled: bool,
     pub stt: SttConfig,
+    pub permissions: Permissions,
+    pub clip: ClipConfig,
+    pub audio: AudioConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -183,6 +292,9 @@ impl Default for Config {
             personality: Personality::default(),
             memory_enabled: true,
             stt: SttConfig::default(),
+            permissions: Permissions::default(),
+            clip: ClipConfig::default(),
+            audio: AudioConfig::default(),
             last_monitor: None,
             geometry: HashMap::new(),
         }
@@ -200,6 +312,16 @@ impl Config {
         if !["groq", "local", "off"].contains(&self.stt.provider.as_str()) {
             self.stt.provider = "groq".into();
         }
+        if !["dr", "soft", "off"].contains(&self.audio.blips.as_str()) {
+            self.audio.blips = "dr".into();
+        }
+        if !["off", "windows", "openai"].contains(&self.audio.tts.as_str()) {
+            self.audio.tts = "off".into();
+        }
+        self.audio.blip_volume = self.audio.blip_volume.clamp(0.0, 1.0);
+        self.audio.tts_volume = self.audio.tts_volume.clamp(0.0, 1.0);
+        self.audio.tts_rate = self.audio.tts_rate.clamp(0.5, 2.0);
+        self.clip.phrases.retain(|p| !p.trim().is_empty());
     }
 }
 

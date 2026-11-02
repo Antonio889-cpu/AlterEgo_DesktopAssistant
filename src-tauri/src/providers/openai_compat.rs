@@ -1,10 +1,15 @@
 //! Adapter per endpoint compatibili OpenAI (Gemini, OpenRouter, Groq, DeepSeek, Ollama).
 
-use super::{Ai, ChatMessage, ProviderError, StreamEvent, Target};
+use super::{Ai, ChatMessage, ProviderError, StreamEvent, Target, ToolCall};
 use futures_util::StreamExt;
 use serde_json::{json, Value};
 use std::{sync::atomic::Ordering, time::Duration};
 use tauri::ipc::Channel;
+
+pub struct Reply {
+    pub text: String,
+    pub tool_calls: Vec<ToolCall>,
+}
 
 fn request(http: &reqwest::Client, t: &Target, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
     let mut req = http.request(method, format!("{}{}", t.base, path));
@@ -17,25 +22,33 @@ fn request(http: &reqwest::Client, t: &Target, method: reqwest::Method, path: &s
     req
 }
 
-fn status_error(status: reqwest::StatusCode, body: &str) -> ProviderError {
+pub fn status_error(status: reqwest::StatusCode, body: &str, sent_tools: bool) -> ProviderError {
     let detail: String = serde_json::from_str::<Value>(body)
         .ok()
         .and_then(|v| {
+            let v = if v.is_array() { v.get(0).cloned().unwrap_or(v) } else { v };
             v.pointer("/error/message")
                 .or_else(|| v.get("error"))
                 .or_else(|| v.get("message"))
                 .map(|m| m.as_str().map(str::to_string).unwrap_or_else(|| m.to_string()))
         })
         .unwrap_or_else(|| body.chars().take(200).collect());
-    let what = match status.as_u16() {
+    let code = status.as_u16();
+    let what = match code {
         401 | 403 => "chiave non valida o senza permessi",
+        402 => "credito esaurito",
         404 => "modello o endpoint non trovato",
         429 => "limite di richieste raggiunto",
         500..=599 => "errore del server",
         _ => "richiesta rifiutata",
     };
-    let retryable = status.as_u16() == 429 || status.is_server_error();
-    ProviderError::new(format!("{what} (HTTP {}): {}", status.as_u16(), detail.trim()), retryable)
+    let lower = detail.to_lowercase();
+    ProviderError {
+        message: format!("{what} (HTTP {code}): {}", detail.trim()),
+        retryable: code == 429 || status.is_server_error(),
+        key_problem: matches!(code, 401 | 402 | 403 | 429) || lower.contains("quota") || lower.contains("api key"),
+        tools_unsupported: sent_tools && matches!(code, 400 | 404 | 422 | 500) && lower.contains("tool"),
+    }
 }
 
 fn net_error(e: reqwest::Error) -> ProviderError {
@@ -59,26 +72,85 @@ fn to_wire(system: &str, messages: &[ChatMessage]) -> Vec<Value> {
             ]),
             None => json!(m.content),
         };
-        out.push(json!({ "role": m.role, "content": content }));
+        let mut v = json!({ "role": m.role, "content": content });
+        if let Some(calls) = &m.tool_calls {
+            v["tool_calls"] = calls
+                .iter()
+                .map(|c| json!({ "id": c.id, "type": "function", "function": { "name": c.name, "arguments": c.arguments } }))
+                .collect();
+        }
+        if let Some(id) = &m.tool_call_id {
+            v["tool_call_id"] = json!(id);
+        }
+        out.push(v);
     }
     out
 }
 
-/// Chiamata in streaming (SSE). Restituisce il testo completo.
+/// Accumula i frammenti di `tool_calls` che arrivano in streaming.
+#[derive(Default)]
+struct ToolAcc(Vec<ToolCall>);
+
+impl ToolAcc {
+    fn push(&mut self, deltas: &[Value]) {
+        for (pos, d) in deltas.iter().enumerate() {
+            let idx = d.get("index").and_then(Value::as_u64).map(|i| i as usize).unwrap_or(pos);
+            while self.0.len() <= idx {
+                self.0.push(ToolCall::default());
+            }
+            let c = &mut self.0[idx];
+            if let Some(id) = d.get("id").and_then(Value::as_str) {
+                c.id = id.to_string();
+            }
+            if let Some(n) = d.pointer("/function/name").and_then(Value::as_str) {
+                c.name.push_str(n);
+            }
+            if let Some(a) = d.pointer("/function/arguments") {
+                match a.as_str() {
+                    Some(s) => c.arguments.push_str(s),
+                    None => c.arguments.push_str(&a.to_string()),
+                }
+            }
+        }
+    }
+
+    fn finish(self) -> Vec<ToolCall> {
+        self.0
+            .into_iter()
+            .filter(|c| !c.name.is_empty())
+            .enumerate()
+            .map(|(i, mut c)| {
+                if c.id.is_empty() {
+                    c.id = format!("call_{i}");
+                }
+                if c.arguments.trim().is_empty() {
+                    c.arguments = "{}".into();
+                }
+                c
+            })
+            .collect()
+    }
+}
+
+/// Chiamata in streaming (SSE). Restituisce testo e/o richieste di strumenti.
 pub async fn stream_chat(
     ai: &Ai,
     gen: u64,
     t: &Target,
     system: &str,
     messages: &[ChatMessage],
+    tools: Option<&Value>,
     events: &Channel<StreamEvent>,
-) -> Result<String, ProviderError> {
-    let body = json!({
+) -> Result<Reply, ProviderError> {
+    let mut body = json!({
         "model": t.model,
         "messages": to_wire(system, messages),
         "temperature": t.temperature,
         "stream": true,
     });
+    if let Some(tools) = tools {
+        body["tools"] = tools.clone();
+    }
     // Ollama può impiegare molto a caricare il modello la prima volta.
     let first_timeout = Duration::from_secs(if t.id == "ollama" { 120 } else { 45 });
     let idle_timeout = Duration::from_secs(30);
@@ -91,14 +163,15 @@ pub async fn stream_chat(
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(status_error(status, &text));
+        return Err(status_error(status, &text, tools.is_some()));
     }
 
     let mut stream = resp.bytes_stream();
     let mut buf = String::new();
     let mut full = String::new();
+    let mut acc = ToolAcc::default();
     let mut first = true;
-    loop {
+    'read: loop {
         if ai.generation.load(Ordering::SeqCst) != gen {
             return Err(ProviderError::new("richiesta annullata", false));
         }
@@ -117,12 +190,18 @@ pub async fn stream_chat(
             let Some(data) = line.strip_prefix("data:") else { continue };
             let data = data.trim();
             if data == "[DONE]" {
-                return finish(full);
+                break 'read;
             }
             let Ok(v) = serde_json::from_str::<Value>(data) else { continue };
             if let Some(err) = v.get("error") {
-                let msg = err.get("message").and_then(Value::as_str).unwrap_or("errore dal provider");
-                return Err(ProviderError::new(msg.to_string(), false));
+                let msg = err.get("message").and_then(Value::as_str).unwrap_or("errore dal provider").to_string();
+                let lower = msg.to_lowercase();
+                return Err(ProviderError {
+                    key_problem: lower.contains("quota") || lower.contains("rate limit"),
+                    retryable: lower.contains("rate limit") || lower.contains("overloaded"),
+                    message: msg,
+                    ..Default::default()
+                });
             }
             if let Some(text) = v.pointer("/choices/0/delta/content").and_then(Value::as_str) {
                 if !text.is_empty() {
@@ -130,17 +209,16 @@ pub async fn stream_chat(
                     let _ = events.send(StreamEvent::Delta { text: text.to_string() });
                 }
             }
+            if let Some(calls) = v.pointer("/choices/0/delta/tool_calls").and_then(Value::as_array) {
+                acc.push(calls);
+            }
         }
     }
-    finish(full)
-}
-
-fn finish(full: String) -> Result<String, ProviderError> {
-    if full.trim().is_empty() {
-        Err(ProviderError::new("risposta vuota", true))
-    } else {
-        Ok(full)
+    let tool_calls = acc.finish();
+    if full.trim().is_empty() && tool_calls.is_empty() {
+        return Err(ProviderError::new("risposta vuota", true));
     }
+    Ok(Reply { text: full, tool_calls })
 }
 
 pub async fn list_models(http: &reqwest::Client, t: &Target) -> Result<Vec<String>, ProviderError> {
@@ -154,7 +232,7 @@ pub async fn list_models(http: &reqwest::Client, t: &Target) -> Result<Vec<Strin
     let status = resp.status();
     let text = resp.text().await.map_err(net_error)?;
     if !status.is_success() {
-        return Err(status_error(status, &text));
+        return Err(status_error(status, &text, false));
     }
     let v: Value = serde_json::from_str(&text).map_err(|_| ProviderError::new("risposta /models non valida", false))?;
     let mut ids: Vec<String> = v
@@ -164,4 +242,28 @@ pub async fn list_models(http: &reqwest::Client, t: &Target) -> Result<Vec<Strin
         .unwrap_or_default();
     ids.sort();
     Ok(ids)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_call_fragments() {
+        let mut acc = ToolAcc::default();
+        acc.push(&[json!({"index":0,"id":"c1","function":{"name":"set_","arguments":"{\"min"}})]);
+        acc.push(&[json!({"index":0,"function":{"name":"reminder","arguments":"utes\":5}"}})]);
+        let calls = acc.finish();
+        assert_eq!(calls, vec![ToolCall { id: "c1".into(), name: "set_reminder".into(), arguments: "{\"minutes\":5}".into() }]);
+    }
+
+    #[test]
+    fn errors_classified() {
+        let e = status_error(reqwest::StatusCode::TOO_MANY_REQUESTS, r#"{"error":{"message":"slow"}}"#, false);
+        assert!(e.key_problem && e.retryable);
+        let e = status_error(reqwest::StatusCode::BAD_REQUEST, r#"{"error":{"message":"tools not supported"}}"#, true);
+        assert!(e.tools_unsupported && !e.key_problem);
+        let e = status_error(reqwest::StatusCode::UNAUTHORIZED, "{}", false);
+        assert!(e.key_problem && !e.retryable);
+    }
 }

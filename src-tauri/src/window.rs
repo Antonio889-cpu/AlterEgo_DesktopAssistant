@@ -163,6 +163,8 @@ pub fn set_click_through(app: &AppHandle, on: bool) {
     if let Some(item) = state.tray_click_item.lock().unwrap().as_ref() {
         let _ = item.set_checked(on);
     }
+    // anche le impostazioni vedono lo stato aggiornato
+    let _ = app.emit("config", crate::front_config(app));
     let _ = app.emit("click-through", on);
 }
 
@@ -172,7 +174,7 @@ pub fn set_click_through(app: &AppHandle, on: bool) {
 pub fn spawn_handle_poller(app: AppHandle) {
     thread::spawn(move || loop {
         let state = app.state::<AppState>();
-        if !state.click_through.load(Ordering::Relaxed) {
+        if !state.click_through.load(Ordering::Relaxed) || state.modal.load(Ordering::Relaxed) {
             thread::sleep(Duration::from_millis(300));
             continue;
         }

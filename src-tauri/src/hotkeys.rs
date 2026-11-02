@@ -45,6 +45,7 @@ fn handle(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
 pub fn register(app: &AppHandle, hk: &Hotkeys) -> Vec<String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
+    crate::actions::mousehook::set_button(app, 0);
     let mut map = HashMap::new();
     let mut errors = Vec::new();
     for (combo, action, label) in [
@@ -55,6 +56,16 @@ pub fn register(app: &AppHandle, hk: &Hotkeys) -> Vec<String> {
     ] {
         if combo.trim().is_empty() {
             continue; // hotkey disattivata
+        }
+        // push-to-talk sul mouse: gestito dall'hook, non dalle hotkey globali
+        if matches!(action, Action::PushToTalk) {
+            if let Some(btn) = crate::actions::mousehook::parse(combo) {
+                crate::actions::mousehook::set_button(app, btn);
+                if cfg!(not(windows)) {
+                    errors.push(format!("{label} ({combo}): tasti del mouse supportati solo su Windows"));
+                }
+                continue;
+            }
         }
         match combo.parse::<Shortcut>() {
             Ok(sc) => match gs.register(sc) {

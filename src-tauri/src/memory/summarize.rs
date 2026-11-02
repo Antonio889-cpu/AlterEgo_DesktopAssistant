@@ -40,13 +40,9 @@ pub async fn maybe_run(ai: &providers::Ai, cfg: AiConfig, mem: &Memory) -> Resul
         .iter()
         .map(|m| format!("{}: {}\n", if m.role == "user" { "Utente" } else { "Alter Ego" }, m.content))
         .collect();
-    let msg = providers::ChatMessage {
-        role: "user".into(),
-        content: format!("RIASSUNTO PRECEDENTE:\n{previous}\n\nCONVERSAZIONE:\n<<<\n{convo}>>>"),
-        image: None,
-    };
+    let msg = providers::ChatMessage::new("user", &format!("RIASSUNTO PRECEDENTE:\n{previous}\n\nCONVERSAZIONE:\n<<<\n{convo}>>>"));
     let ch = tauri::ipc::Channel::new(|_| Ok(()));
-    let res = providers::chat(ai, cfg, SYSTEM.into(), vec![msg], ch).await?;
+    let res = providers::chat(ai, cfg, SYSTEM.into(), vec![msg], None, ch).await?;
     let (summary, facts) = parse(&res.text);
     if summary.is_empty() {
         return Err("riassunto vuoto".into());

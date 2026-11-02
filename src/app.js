@@ -44,7 +44,7 @@ async function demo() {
 // ---------- spostamento ----------
 $("screen").addEventListener("mousedown", (e) => {
   State.touch();
-  if (e.button !== 0 || e.target.closest("#dialog, #prompt")) return;
+  if (e.button !== 0 || e.target.closest("#dialog, #prompt, #confirm")) return;
   appWindow.startDragging();
 });
 
@@ -81,6 +81,10 @@ window.addEventListener("wheel", async (e) => {
 // ---------- tastiera ----------
 window.addEventListener("keydown", (e) => {
   State.touch();
+  if (confirmId !== null) {
+    if (e.key === "Escape") answerConfirm(false);
+    return; // Invio/Spazio agiscono sul pulsante con il focus
+  }
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
     Dialog.advance();
@@ -98,7 +102,43 @@ listen("demo", () => demo());
 listen("stt", (e) => Chat.onStt(e.payload));
 listen("text-input", () => Chat.openInput());
 
-Dialog.on("talk", (on) => Face.setTalking(on));
+// il volto "parla" mentre scorre il testo o mentre suona la voce
+let typing = false;
+const syncTalk = () => Face.setTalking(typing || Audio2.isSpeaking());
+Dialog.on("talk", (on) => { typing = on; syncTalk(); });
+Dialog.on("char", (ch) => Audio2.blip(ch));
+Audio2.onSpeaking(syncTalk);
+
+// ---------- conferme delle azioni PC ----------
+let confirmId = null;
+function answerConfirm(allow) {
+  if (confirmId === null) return;
+  invoke("confirm_action", { id: confirmId, allow });
+  confirmId = null;
+  $("confirm").classList.add("hidden");
+}
+$("confirm-yes").onclick = () => answerConfirm(true);
+$("confirm-no").onclick = () => answerConfirm(false);
+listen("confirm", (e) => {
+  confirmId = e.payload.id;
+  $("confirm-text").textContent = e.payload.text;
+  $("confirm").classList.remove("hidden");
+  State.setEmotion("worried");
+  invoke("focus_main");
+  setTimeout(() => $("confirm-no").focus(), 50); // default sicuro: Nega
+});
+listen("confirm-closed", (e) => {
+  if (confirmId === e.payload) { confirmId = null; $("confirm").classList.add("hidden"); }
+});
+listen("tool-use", (e) => Chat.onToolUse(e.payload));
+listen("reminder", async (e) => {
+  Audio2.chime();
+  State.setEmotion("surprised");
+  State.setMode("speaking");
+  Audio2.speak(e.payload.text);
+  await Dialog.say("⏰ Promemoria: " + e.payload.text);
+  State.settle();
+});
 
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 

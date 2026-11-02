@@ -4,14 +4,22 @@
 //! (`/chat/completions` con SSE e `/models`), quindi l'adapter è unico
 //! e cambia solo URL base e autenticazione. Punto di innesto per codice esterno
 //! (es. CyberAI): aggiungi qui un modulo e una voce in `PROVIDERS`.
+//!
+//! Ordine dei tentativi: provider (ordine di fallback) → chiavi del provider
+//! (rotazione su 401/402/403/429) → retry con backoff su errori temporanei.
 
 mod openai_compat;
 pub mod prompt;
 
 use crate::{config::AiConfig, keys};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{
-    sync::atomic::{AtomicU64, Ordering},
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Mutex,
+    },
     time::Duration,
 };
 use tauri::ipc::Channel;
@@ -35,13 +43,33 @@ pub fn info(id: &str) -> Option<&'static ProviderInfo> {
     PROVIDERS.iter().find(|p| p.id == id)
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
     /// Immagine PNG in base64 (solo con modelli con visione).
     #[serde(default)]
     pub image: Option<String>,
+    /// Messaggio "assistant" che chiede di usare strumenti.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    /// Messaggio "tool": risposta a una chiamata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+}
+
+impl ChatMessage {
+    pub fn new(role: &str, content: &str) -> Self {
+        Self { role: role.into(), content: content.into(), ..Default::default() }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, PartialEq)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    /// Argomenti JSON come stringa (formato OpenAI).
+    pub arguments: String,
 }
 
 /// Eventi inviati al frontend durante una richiesta.
@@ -60,18 +88,25 @@ pub struct ChatResult {
     pub text: String,
     pub provider: String,
     pub model: String,
+    #[serde(skip)]
+    pub tool_calls: Vec<ToolCall>,
 }
 
-/// Errore di un tentativo. `retryable`: ha senso riprovare lo stesso provider.
-#[derive(Debug)]
+/// Errore di un tentativo.
+#[derive(Debug, Default)]
 pub struct ProviderError {
     pub message: String,
+    /// Ha senso riprovare lo stesso provider (rete, 5xx, 429).
     pub retryable: bool,
+    /// Problema legato alla chiave (401/402/403/429): prova la chiave successiva.
+    pub key_problem: bool,
+    /// Il modello non accetta il parametro `tools`: riprova senza.
+    pub tools_unsupported: bool,
 }
 
 impl ProviderError {
     pub fn new(message: impl Into<String>, retryable: bool) -> Self {
-        Self { message: message.into(), retryable }
+        Self { message: message.into(), retryable, ..Default::default() }
     }
 }
 
@@ -88,37 +123,64 @@ pub struct Ai {
     pub http: reqwest::Client,
     /// Ogni nuova richiesta incrementa il contatore: quelle vecchie si fermano.
     pub generation: AtomicU64,
+    /// Ultima chiave funzionante per provider: si riparte da lì.
+    sticky: Mutex<HashMap<String, usize>>,
 }
 
 impl Ai {
     pub fn new() -> Self {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
-            .user_agent("AlterEgo/0.1")
+            .user_agent("AlterEgo/1.0")
             .build()
             .expect("client HTTP");
-        Self { http, generation: AtomicU64::new(0) }
+        Self { http, generation: AtomicU64::new(0), sticky: Mutex::new(HashMap::new()) }
+    }
+
+    /// Chiavi del provider in ordine di prova (partendo dall'ultima che ha funzionato).
+    pub fn key_order(&self, provider: &str, ids: &[String]) -> Vec<(usize, String)> {
+        let start = self.sticky.lock().unwrap().get(provider).copied().unwrap_or(0);
+        let n = ids.len();
+        (0..n)
+            .map(|i| (start + i) % n)
+            .filter_map(|i| keys::get_slot(provider, &ids[i]).map(|k| (i, k)))
+            .collect()
+    }
+
+    pub fn mark_good(&self, provider: &str, index: usize) {
+        self.sticky.lock().unwrap().insert(provider.to_string(), index);
     }
 }
 
-fn resolve(cfg: &AiConfig, id: &str) -> Result<Target, String> {
+fn base_url(cfg: &AiConfig, id: &str) -> Result<String, String> {
     let meta = info(id).ok_or_else(|| format!("provider sconosciuto: {id}"))?;
     let pc = cfg.providers.get(id).cloned().unwrap_or_default();
-    let key = if meta.needs_key {
-        Some(keys::get(id).ok_or("chiave API mancante")?)
+    Ok(if pc.base_url.trim().is_empty() { meta.default_base.to_string() } else { pc.base_url.trim().trim_end_matches('/').to_string() })
+}
+
+/// Chiavi utilizzabili per un provider: `[None]` per Ollama, altrimenti una per slot.
+fn keys_for(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<Vec<(usize, Option<String>)>, String> {
+    let meta = info(id).ok_or_else(|| format!("provider sconosciuto: {id}"))?;
+    if !meta.needs_key {
+        return Ok(vec![(0, None)]);
+    }
+    let ids = cfg.providers.get(id).map(|p| p.key_ids()).unwrap_or_default();
+    let list: Vec<_> = ai.key_order(id, &ids).into_iter().map(|(i, k)| (i, Some(k))).collect();
+    if list.is_empty() {
+        Err("chiave API mancante".into())
     } else {
-        None
-    };
-    let base = if pc.base_url.trim().is_empty() { meta.default_base.to_string() } else { pc.base_url.trim().trim_end_matches('/').to_string() };
-    Ok(Target { id: id.into(), base, key, model: pc.model.trim().to_string(), temperature: cfg.temperature })
+        Ok(list)
+    }
 }
 
 /// Invia la conversazione al primo provider disponibile nell'ordine di fallback.
+/// `tools`: definizioni degli strumenti (formato OpenAI) o None.
 pub async fn chat(
     ai: &Ai,
     cfg: AiConfig,
     system: String,
     messages: Vec<ChatMessage>,
+    tools: Option<Value>,
     events: Channel<StreamEvent>,
 ) -> Result<ChatResult, String> {
     let gen = ai.generation.fetch_add(1, Ordering::SeqCst) + 1;
@@ -134,70 +196,101 @@ pub async fn chat(
     let has_image = messages.iter().any(|m| m.image.is_some());
     let mut failures = Vec::new();
 
-    for id in enabled {
+    'providers: for id in enabled {
         let pc = cfg.providers.get(&id).cloned().unwrap_or_default();
         if has_image && !pc.vision {
             failures.push(format!("{id}: visione non abilitata"));
             continue;
         }
-        let mut target = match resolve(&cfg, &id) {
-            Ok(t) => t,
+        let fail = |failures: &mut Vec<String>, msg: String| {
+            let _ = events.send(StreamEvent::Fallback { from: id.clone(), reason: msg.clone() });
+            failures.push(format!("{id}: {msg}"));
+        };
+        let (base, key_list) = match base_url(&cfg, &id).and_then(|b| keys_for(ai, &cfg, &id).map(|k| (b, k))) {
+            Ok(v) => v,
             Err(e) => {
-                let _ = events.send(StreamEvent::Fallback { from: id.clone(), reason: e.clone() });
-                failures.push(format!("{id}: {e}"));
+                fail(&mut failures, e);
                 continue;
             }
         };
-        if target.model.is_empty() {
-            // Ollama senza modello scelto: usa il primo installato.
-            match openai_compat::list_models(&ai.http, &target).await {
-                Ok(list) if !list.is_empty() => target.model = list[0].clone(),
-                Ok(_) => {
-                    failures.push(format!("{id}: nessun modello disponibile"));
-                    continue;
-                }
-                Err(e) => {
-                    failures.push(format!("{id}: {}", e.message));
-                    continue;
-                }
-            }
-        }
+        let n_keys = key_list.len();
+        let mut model = pc.model.trim().to_string();
+        let mut use_tools = tools.clone();
+        let mut last_msg = String::new();
 
-        let mut last_err = None;
-        for attempt in 0..3u32 {
-            if ai.generation.load(Ordering::SeqCst) != gen {
-                return Err("richiesta annullata".into());
-            }
-            let _ = events.send(StreamEvent::Start { provider: id.clone(), model: target.model.clone() });
-            match openai_compat::stream_chat(ai, gen, &target, &system, &messages, &events).await {
-                Ok(text) => {
-                    return Ok(ChatResult { text, provider: id, model: target.model });
-                }
-                Err(e) => {
-                    let _ = events.send(StreamEvent::Reset);
-                    let retry = e.retryable && attempt < 2;
-                    last_err = Some(e);
-                    if !retry {
-                        break;
+        for (k_pos, (k_index, key)) in key_list.into_iter().enumerate() {
+            let mut target = Target { id: id.clone(), base: base.clone(), key, model: model.clone(), temperature: cfg.temperature };
+            if target.model.is_empty() {
+                // Ollama senza modello scelto: usa il primo installato.
+                match openai_compat::list_models(&ai.http, &target).await {
+                    Ok(list) if !list.is_empty() => {
+                        model = list[0].clone();
+                        target.model = model.clone();
                     }
-                    // backoff: 0.8 s, poi 2.4 s
-                    tokio::time::sleep(Duration::from_millis(800 * 3u64.pow(attempt))).await;
+                    Ok(_) => {
+                        fail(&mut failures, "nessun modello disponibile".into());
+                        continue 'providers;
+                    }
+                    Err(e) => {
+                        fail(&mut failures, e.message);
+                        continue 'providers;
+                    }
+                }
+            }
+            let more_keys = k_pos + 1 < n_keys;
+            let mut attempt = 0u32;
+            loop {
+                if ai.generation.load(Ordering::SeqCst) != gen {
+                    return Err("richiesta annullata".into());
+                }
+                let _ = events.send(StreamEvent::Start { provider: id.clone(), model: target.model.clone() });
+                match openai_compat::stream_chat(ai, gen, &target, &system, &messages, use_tools.as_ref(), &events).await {
+                    Ok(reply) => {
+                        ai.mark_good(&id, k_index);
+                        return Ok(ChatResult { text: reply.text, provider: id, model: target.model, tool_calls: reply.tool_calls });
+                    }
+                    Err(e) => {
+                        let _ = events.send(StreamEvent::Reset);
+                        last_msg = keys::redact(&e.message, target.key.as_deref());
+                        if e.tools_unsupported && use_tools.is_some() {
+                            use_tools = None; // il modello non supporta gli strumenti: riprova senza
+                            continue;
+                        }
+                        if e.key_problem && more_keys {
+                            let _ = events.send(StreamEvent::Fallback {
+                                from: format!("{id} (chiave {})", k_pos + 1),
+                                reason: format!("{last_msg} → provo la chiave successiva"),
+                            });
+                            break; // chiave successiva
+                        }
+                        if e.retryable && attempt < 2 {
+                            // backoff: 0.8 s, poi 2.4 s
+                            tokio::time::sleep(Duration::from_millis(800 * 3u64.pow(attempt))).await;
+                            attempt += 1;
+                            continue;
+                        }
+                        fail(&mut failures, last_msg.clone());
+                        continue 'providers;
+                    }
                 }
             }
         }
-        let msg = last_err.map(|e| e.message).unwrap_or_default();
-        let msg = keys::redact(&msg, target.key.as_deref());
-        let _ = events.send(StreamEvent::Fallback { from: id.clone(), reason: msg.clone() });
-        failures.push(format!("{id}: {msg}"));
+        fail(&mut failures, last_msg);
     }
     Err(failures.join(" · "))
 }
 
 pub async fn list_models(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<Vec<String>, String> {
-    let target = resolve(cfg, id)?;
-    openai_compat::list_models(&ai.http, &target)
-        .await
-        .map_err(|e| keys::redact(&e.message, target.key.as_deref()))
+    let base = base_url(cfg, id)?;
+    let mut last = String::from("nessuna chiave");
+    for (_, key) in keys_for(ai, cfg, id)? {
+        let t = Target { id: id.into(), base: base.clone(), key, model: String::new(), temperature: 0.0 };
+        match openai_compat::list_models(&ai.http, &t).await {
+            Ok(v) => return Ok(v),
+            Err(e) => last = keys::redact(&e.message, t.key.as_deref()),
+        }
+    }
+    Err(last)
 }
 
 /// Prova rapida: una domanda minima senza streaming verso la UI.
@@ -208,8 +301,8 @@ pub async fn test(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<String, String> {
         p.enabled = true;
     }
     let ch = Channel::new(|_| Ok(()));
-    let msg = ChatMessage { role: "user".into(), content: "Rispondi solo con la parola: ok".into(), image: None };
-    chat(ai, one, "Sei un test di connessione.".into(), vec![msg], ch)
+    let msg = ChatMessage::new("user", "Rispondi solo con la parola: ok");
+    chat(ai, one, "Sei un test di connessione.".into(), vec![msg], None, ch)
         .await
         .map(|r| format!("{} risponde ({}): {}", r.provider, r.model, r.text.trim()))
 }
@@ -225,7 +318,7 @@ mod tests {
         let mut c = AiConfig::default();
         c.order = order.iter().map(|(id, _)| id.to_string()).collect();
         for (id, base) in order {
-            c.providers.insert(id.to_string(), ProviderCfg { enabled: true, model: "m".into(), base_url: base.to_string(), vision: false });
+            c.providers.insert(id.to_string(), ProviderCfg { enabled: true, model: "m".into(), base_url: base.to_string(), ..Default::default() });
         }
         c.normalize();
         for (id, p) in c.providers.iter_mut() {
@@ -249,14 +342,14 @@ mod tests {
     }
 
     fn user(text: &str) -> Vec<ChatMessage> {
-        vec![ChatMessage { role: "user".into(), content: text.into(), image: None }]
+        vec![ChatMessage::new("user", text)]
     }
 
     #[tokio::test]
     async fn streaming_ok() {
         let ai = Ai::new();
         let (ch, log) = channel();
-        let r = chat(&ai, cfg(&[("ollama", "http://127.0.0.1:18080/ok/v1")]), "sys".into(), user("ciao"), ch).await.unwrap();
+        let r = chat(&ai, cfg(&[("ollama", "http://127.0.0.1:18080/ok/v1")]), "sys".into(), user("ciao"), None, ch).await.unwrap();
         assert_eq!(r.text, "[happy]\nCiao! Sono il mock (m).");
         assert!(log.lock().unwrap().iter().filter(|e| e.contains("delta")).count() >= 4);
     }
@@ -267,7 +360,7 @@ mod tests {
         let (ch, log) = channel();
         // gemini senza chiave → salta; ollama 500 → (retry) → fallback; deepseek senza chiave → salta
         let c = cfg(&[("gemini", ""), ("ollama", "http://127.0.0.1:18080/fail500/v1")]);
-        let err = chat(&ai, c, "s".into(), user("x"), ch).await.unwrap_err();
+        let err = chat(&ai, c, "s".into(), user("x"), None, ch).await.unwrap_err();
         assert!(err.contains("gemini: chiave API mancante"), "{err}");
         assert!(err.contains("ollama: errore del server (HTTP 500): boom"), "{err}");
         assert!(log.lock().unwrap().iter().any(|e| e.contains("fallback")));
@@ -277,7 +370,7 @@ mod tests {
     async fn retry_after_429() {
         let ai = Ai::new();
         let (ch, _) = channel();
-        let r = chat(&ai, cfg(&[("ollama", "http://127.0.0.1:18080/flaky/v1")]), "s".into(), user("x"), ch).await.unwrap();
+        let r = chat(&ai, cfg(&[("ollama", "http://127.0.0.1:18080/flaky/v1")]), "s".into(), user("x"), None, ch).await.unwrap();
         assert!(r.text.contains("mock"));
     }
 
@@ -285,7 +378,7 @@ mod tests {
     async fn connection_refused_is_reported() {
         let ai = Ai::new();
         let (ch, _) = channel();
-        let err = chat(&ai, cfg(&[("ollama", "http://127.0.0.1:1/v1")]), "s".into(), user("x"), ch).await.unwrap_err();
+        let err = chat(&ai, cfg(&[("ollama", "http://127.0.0.1:1/v1")]), "s".into(), user("x"), None, ch).await.unwrap_err();
         assert!(err.contains("connessione impossibile"), "{err}");
     }
 
@@ -296,8 +389,30 @@ mod tests {
         assert_eq!(list_models(&ai, &c, "ollama").await.unwrap(), vec!["mock-a", "mock-b"]);
         c.providers.get_mut("ollama").unwrap().model.clear();
         let (ch, _) = channel();
-        let r = chat(&ai, c, "s".into(), user("x"), ch).await.unwrap();
+        let r = chat(&ai, c, "s".into(), user("x"), None, ch).await.unwrap();
         assert_eq!(r.model, "mock-a");
+    }
+
+    #[tokio::test]
+    async fn rotates_api_keys() {
+        use crate::config::KeySlot;
+        crate::keys::TEST_KEYS.with(|m| {
+            let mut m = m.borrow_mut();
+            m.insert("api-key:gemini:a".into(), "bad-quota".into());
+            m.insert("api-key:gemini:b".into(), "bad".into());
+            m.insert("api-key:gemini:c".into(), "good".into());
+        });
+        let ai = Ai::new();
+        let mut c = cfg(&[("gemini", "http://127.0.0.1:18080/keycheck/v1")]);
+        c.providers.get_mut("gemini").unwrap().keys = ["a", "b", "c"].map(|id| KeySlot { id: id.into(), label: id.into() }).to_vec();
+        let (ch, log) = channel();
+        let r = chat(&ai, c.clone(), "s".into(), user("x"), None, ch).await.unwrap();
+        assert!(r.text.contains("mock"));
+        assert_eq!(log.lock().unwrap().iter().filter(|e| e.contains("chiave successiva")).count(), 2);
+        // la volta dopo parte direttamente dalla chiave buona
+        let (ch, log) = channel();
+        chat(&ai, c, "s".into(), user("x"), None, ch).await.unwrap();
+        assert_eq!(log.lock().unwrap().iter().filter(|e| e.contains("chiave successiva")).count(), 0);
     }
 
     #[test]

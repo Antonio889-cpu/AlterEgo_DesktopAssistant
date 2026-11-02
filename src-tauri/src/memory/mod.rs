@@ -32,6 +32,13 @@ pub struct Item {
     pub content: String,
 }
 
+#[derive(Serialize, Clone, Debug)]
+pub struct Reminder {
+    pub id: i64,
+    pub due: i64,
+    pub text: String,
+}
+
 #[derive(Serialize)]
 pub struct Overview {
     pub messages: i64,
@@ -198,6 +205,38 @@ impl Memory {
         })
     }
 
+    pub fn add_reminder(&self, due: i64, text: &str) -> R<i64> {
+        let c = self.conn.lock().unwrap();
+        c.execute("INSERT INTO reminders (ts, due, text) VALUES (?1, ?2, ?3)", params![now(), due, text]).map_err(e)?;
+        Ok(c.last_insert_rowid())
+    }
+
+    pub fn pending_reminders(&self) -> R<Vec<Reminder>> {
+        let c = self.conn.lock().unwrap();
+        let mut st = c.prepare("SELECT id, due, text FROM reminders WHERE done = 0 ORDER BY due").map_err(e)?;
+        let v = st
+            .query_map([], |r| Ok(Reminder { id: r.get(0)?, due: r.get(1)?, text: r.get(2)? }))
+            .map_err(e)?
+            .collect::<Result<_, _>>()
+            .map_err(e)?;
+        Ok(v)
+    }
+
+    pub fn cancel_reminder(&self, id: i64) -> R<()> {
+        let n = self.conn.lock().unwrap().execute("DELETE FROM reminders WHERE id = ?1 AND done = 0", [id]).map_err(e)?;
+        if n == 0 { Err("promemoria non trovato".into()) } else { Ok(()) }
+    }
+
+    /// Promemoria scaduti: li segna come fatti e li restituisce.
+    pub fn take_due_reminders(&self, now_ts: i64) -> R<Vec<Reminder>> {
+        let due: Vec<Reminder> = self.pending_reminders()?.into_iter().filter(|r| r.due <= now_ts).collect();
+        let c = self.conn.lock().unwrap();
+        for r in &due {
+            c.execute("UPDATE reminders SET done = 1 WHERE id = ?1", [r.id]).map_err(e)?;
+        }
+        Ok(due)
+    }
+
     /// "Dimentica tutto": svuota ogni tabella e compatta il file.
     pub fn forget_all(&self) -> R<()> {
         self.conn
@@ -238,6 +277,17 @@ mod tests {
         assert!(m.pending_for_summary(4).unwrap().is_empty());
         m.add_message("user", "nuovo").unwrap();
         assert_eq!(m.pending_for_summary(4).unwrap().len(), 1); // "msg 6" esce dalla finestra
+    }
+
+    #[test]
+    fn reminders() {
+        let m = Memory::in_memory();
+        let a = m.add_reminder(100, "acqua").unwrap();
+        m.add_reminder(200, "pausa").unwrap();
+        assert_eq!(m.take_due_reminders(150).unwrap().len(), 1);
+        assert_eq!(m.pending_reminders().unwrap().len(), 1);
+        assert!(m.cancel_reminder(a).is_err()); // già fatto
+        assert_eq!(m.take_due_reminders(150).unwrap().len(), 0);
     }
 
     #[test]

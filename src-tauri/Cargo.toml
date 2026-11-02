@@ -1,6 +1,6 @@
 [package]
 name = "alter-ego"
-version = "0.1.0"
+version = "1.0.0"
 description = "Alter Ego – assistente desktop personale"
 edition = "2021"
 
@@ -15,11 +15,26 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 futures-util = "0.3"
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "sync"] }
 keyring = { version = "3", features = ["windows-native", "linux-native"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 cpal = "0.15"
 hound = "3.5"
+arboard = { version = "3", default-features = false }
+png = "0.17"
+base64 = "0.22"
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Threading",
+] }
 
 [profile.release]
 opt-level = "s"
@@ -29,4 +44,4 @@ strip = true
 panic = "abort"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["time", "macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["time", "sync", "macros", "rt-multi-thread"] }

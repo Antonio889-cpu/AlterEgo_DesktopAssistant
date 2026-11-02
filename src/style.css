@@ -309,6 +309,39 @@ body[data-mode="sleep"] #face img.on { animation: breathe 4s ease-in-out infinit
 #prompt input::placeholder { color: var(--dlg-text); opacity: .45; }
 #prompt.hidden { display: none; }
 
+/* finestra di conferma: stesso stile del box dialogo, al centro */
+#confirm {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  top: 22%;
+  height: 50%;
+  z-index: 9;
+}
+#confirm.hidden { display: none; }
+#confirm .inner { grid-template-columns: auto 1fr; padding: 3vh 3.4vh; }
+.confirm-body { display: flex; flex-direction: column; height: 100%; gap: 2vh; min-width: 0; }
+#confirm-text {
+  flex: 1;
+  font-size: 3.6vh;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow: auto;
+}
+.confirm-buttons { display: flex; gap: 2.4vh; justify-content: flex-end; }
+.confirm-buttons button {
+  font: 3.6vh "DotGothic16", monospace;
+  padding: .6vh 3vh;
+  color: var(--dlg-text);
+  background: transparent;
+  border: .42vh solid var(--dlg-border);
+  box-shadow: .3vh .3vh 0 var(--dlg-shadow);
+  cursor: pointer;
+}
+.confirm-buttons button:hover, .confirm-buttons button:focus-visible { background: rgba(255, 255, 255, .25); outline: none; }
+#confirm-yes { font-weight: bold; }
+
 #toast {
   position: absolute;
   left: 18%;
