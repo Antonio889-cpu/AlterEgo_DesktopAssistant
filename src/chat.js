@@ -88,13 +88,13 @@ const Chat = (() => {
         Dialog.say(ev.ok ? ev.message : `Non sono riuscita a fare la clip… (${ev.message})`).then(() => State.settle());
         break;
       case "empty":
-        State.settle();
+        State.settle(true);
         Dialog.say("Ehm… non ho sentito niente. Tieni premuto il tasto mentre parli.");
         break;
       case "error":
         State.setEmotion("worried");
         State.setMode("speaking");
-        Dialog.say(`Non riesco a sentirti… (${ev.message})`).then(() => State.settle());
+        Dialog.say(`Non riesco a sentirti… (${ev.message})`).then(() => State.settle(true));
         break;
     }
   }
@@ -111,7 +111,7 @@ const Chat = (() => {
   function closeInput() {
     prompt.classList.add("hidden");
     input.blur();
-    if (State.mode() === "listening") State.settle();
+    if (State.mode() === "listening") State.settle(true);
   }
 
   input.addEventListener("keydown", (e) => {
