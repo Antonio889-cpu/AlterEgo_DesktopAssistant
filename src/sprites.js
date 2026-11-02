@@ -1,5 +1,6 @@
-// Mappa stati → sprite. File in assets/sprites/ (generati da tools/process_sprites.py).
-// Gli stati senza sprite proprio usano quello più vicino: vedi docs/MANCANTI.md.
+// Sprite inclusi nella build (solo build private: assets/sprites/ non è nella repo) e
+// alias per gli stati senza sprite proprio (vedi docs/MANCANTI.md).
+// Gli sprite importati dall'utente (%APPDATA%\AlterEgo\sprites) hanno la precedenza: vedi face.js.
 window.SPRITES = {
   files: {
     idle: "idle.png",

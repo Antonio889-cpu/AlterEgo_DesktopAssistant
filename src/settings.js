@@ -255,6 +255,31 @@ $("stt-test").onclick = async (ev) => {
 };
 
 
+// ---------- sprite ----------
+async function spriteStatus() {
+  const sprites = await invoke("load_user_sprites");
+  const n = Object.keys(sprites || {}).length;
+  $("sprite-status").textContent = n ? `Sprite importati: ${Object.keys(sprites).join(", ")}` : "Nessuno sprite importato: Alter Ego usa il volto segnaposto (o quelli inclusi in una build privata).";
+}
+function spriteResult(t, cls = "") { const r = $("sprite-result"); r.textContent = t; r.className = "result " + cls; }
+$("sprite-file").onchange = async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  spriteResult("elaboro…");
+  const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(f); });
+  try { const saved = await invoke("import_sprite_sheet", { data }); spriteResult(`importati ${saved.length} sprite ✓`, "ok"); }
+  catch (err) { spriteResult(String(err), "bad"); }
+  e.target.value = "";
+  spriteStatus();
+};
+$("sprite-dir").onclick = () => invoke("open_sprite_dir").catch((e) => spriteResult(String(e), "bad"));
+$("sprite-reload").onclick = async () => { await invoke("reload_sprites"); spriteStatus(); spriteResult("ricaricati", "ok"); };
+$("sprite-remove").onclick = async () => {
+  if (!confirm("Rimuovere gli sprite importati?")) return;
+  try { await invoke("remove_user_sprites"); spriteResult("rimossi", "ok"); } catch (err) { spriteResult(String(err), "bad"); }
+  spriteStatus();
+};
+
 // ---------- schede ----------
 function showTab(name) {
   document.querySelectorAll("nav#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === name));
@@ -262,6 +287,7 @@ function showTab(name) {
   try { localStorage.setItem("tab", name); } catch {}
   if (name === "log") refreshLog();
   if (name === "memory") refreshMemory();
+  if (name === "persona") spriteStatus();
 }
 document.querySelectorAll("nav#tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
 

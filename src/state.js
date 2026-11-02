@@ -37,8 +37,10 @@ const State = (() => {
       emotion = EMOTIONS.includes(e) ? e : "idle";
       render();
     },
-    /** Dopo la risposta: torna idle, l'emozione resta per qualche secondo. */
-    settle() {
+    /** Dopo la risposta: torna idle, l'emozione resta per qualche secondo.
+     *  Non interrompe ascolto/pensiero in corso (a meno di force). */
+    settle(force = false) {
+      if (!force && (mode === "listening" || mode === "thinking")) return;
       mode = "idle";
       render();
       clearTimeout(holdTimer);

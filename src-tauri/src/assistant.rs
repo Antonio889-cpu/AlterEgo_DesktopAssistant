@@ -413,3 +413,48 @@ pub async fn tts_speak(app: AppHandle, text: String) -> Result<String, String> {
     }
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
+
+// ---------- sprite (fuori dall'exe) ----------
+
+#[tauri::command]
+pub fn load_user_sprites(conv: State<Conversation>) -> std::collections::BTreeMap<String, String> {
+    crate::sprites::load(&conv.data_dir)
+}
+
+/// Importa un foglio sprite (PNG in base64) e avvisa la finestra principale.
+#[tauri::command]
+pub async fn import_sprite_sheet(app: AppHandle, data: String) -> Result<Vec<String>, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data.split(',').next_back().unwrap_or(""))
+        .map_err(|_| "file non valido".to_string())?;
+    let dir = app.state::<Conversation>().data_dir.clone();
+    let saved = tauri::async_runtime::spawn_blocking(move || crate::sprites::import_sheet(&dir, &bytes))
+        .await
+        .map_err(|e| e.to_string())??;
+    let _ = app.emit("sprites-changed", ());
+    Ok(saved)
+}
+
+#[tauri::command]
+pub fn remove_user_sprites(app: AppHandle, conv: State<Conversation>) -> Result<(), String> {
+    crate::sprites::remove_all(&conv.data_dir)?;
+    let _ = app.emit("sprites-changed", ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_sprite_dir(conv: State<Conversation>) -> Result<(), String> {
+    let dir = crate::sprites::dir(&conv.data_dir);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    let r = std::process::Command::new("explorer").arg(&dir).spawn();
+    #[cfg(not(windows))]
+    let r = std::process::Command::new("xdg-open").arg(&dir).spawn();
+    r.map(|_| ()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn reload_sprites(app: AppHandle) {
+    let _ = app.emit("sprites-changed", ());
+}

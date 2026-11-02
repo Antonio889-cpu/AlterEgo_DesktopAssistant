@@ -8,6 +8,7 @@ mod hotkeys;
 mod keys;
 mod memory;
 mod providers;
+mod sprites;
 mod stt;
 mod tray;
 mod window;
@@ -285,6 +286,8 @@ fn main() {
             let cfg_path = config::config_path(&app.path().config_dir()?);
             let data_dir = cfg_path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
             app.manage(actions::Actions::new(&data_dir));
+            // cartella degli sprite importati dall'utente (vedi sprites.rs)
+            let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(assistant::Conversation::new(data_dir));
             let mut cfg = config::load(&cfg_path);
             // migrazione: chiave singola delle versioni precedenti → slot "1"
@@ -371,7 +374,12 @@ fn main() {
             actions::actions_log,
             actions::clear_actions_log,
             set_autostart,
-            set_look
+            set_look,
+            assistant::load_user_sprites,
+            assistant::import_sprite_sheet,
+            assistant::remove_user_sprites,
+            assistant::open_sprite_dir,
+            assistant::reload_sprites
         ])
         .run(tauri::generate_context!())
         .expect("errore all'avvio di Alter Ego");

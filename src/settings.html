@@ -67,6 +67,20 @@
       <p class="note">La scheda del personaggio è il file <code>persona\alter_ego.md</code> nella cartella dati: modificalo liberamente,
         vale dal messaggio successivo.</p>
       <button id="open-data">Apri cartella dati</button>
+      <h3>Sprite</h3>
+      <p class="note">Gli sprite di Alter Ego non sono inclusi nell'app (sono © Spike Chunsoft). Importa il tuo foglio 3×3
+        (riquadri con cornice chiara, come quello originale): l'app ritaglia le espressioni e toglie lo sfondo.
+        Oppure copia a mano dei PNG trasparenti chiamati <code>idle.png</code>, <code>happy.png</code>, <code>embarrassed.png</code>,
+        <code>worried.png</code>, <code>thinking.png</code>, <code>sad.png</code>, <code>surprised.png</code>, <code>error.png</code>
+        (facoltativi: <code>blink.png</code>, <code>talk_open.png</code>, <code>talk_closed.png</code>) nella cartella sprite.</p>
+      <p id="sprite-status" class="note"></p>
+      <div class="actions">
+        <label class="button-like">Importa foglio sprite (PNG)… <input id="sprite-file" type="file" accept="image/png" hidden /></label>
+        <button id="sprite-dir">Apri cartella sprite</button>
+        <button id="sprite-reload">Ricarica</button>
+        <button id="sprite-remove" class="danger">Rimuovi sprite importati</button>
+        <span id="sprite-result" class="result"></span>
+      </div>
     </section>
 
     <section data-tab="memory">

@@ -168,6 +168,23 @@ body.fx #screen::after {
   filter: var(--face-filter, none);
 }
 #face img.on { display: block; }
+.face-placeholder {
+  position: absolute;
+  inset: 8% 0 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2vh;
+  font-family: "DotGothic16", monospace;
+  color: #f2ff8a;
+  text-shadow: 0 0 1vh rgba(230, 255, 120, .8), .4vh .4vh 0 rgba(20, 60, 0, .6);
+  white-space: nowrap;
+}
+.face-placeholder span { font-size: 15vh; line-height: 1; }
+.face-placeholder small { font-size: 2.6vh; opacity: .75; }
+#face.placeholder { -webkit-mask-image: none; mask-image: none; }
+#face.talking .face-placeholder span { animation: talk-bob .26s steps(2) infinite; display: inline-block; }
 #face.talking img.on { animation: talk-bob .26s steps(2) infinite; }
 @keyframes talk-bob { 50% { transform: translateY(-0.6%); } }
 body[data-mode="sleep"] #face { opacity: .55; }

@@ -79,3 +79,5 @@ input.hotkey.capturing { outline: 2px solid var(--warn); }
 #log-table td:nth-child(3) { word-break: break-all; }
 #log-table td.ok { color: var(--accent); }
 #log-table td.bad { color: var(--bad); }
+label.button-like { display: inline-block; margin: 0; background: #1d4a1f; border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+label.button-like:hover { border-color: var(--accent); }
