@@ -1,0 +1,59 @@
+# Compila Alter Ego su Windows e pubblica la release quando si carica un tag "v*".
+# La build non contiene sprite (© Spike Chunsoft): non sono nella repo.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Dipendenze
+        run: npm ci
+
+      - name: Build
+        run: npx tauri build
+
+      - name: Prepara i file della release
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item (Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe | Select-Object -First 1).FullName "out/AlterEgo_${version}_setup.exe"
+          Compress-Archive -Path src-tauri/target/release/alter-ego.exe -DestinationPath "out/AlterEgo_${version}_portable.zip"
+          Get-ChildItem out -File | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name } | Set-Content out/SHA256SUMS.txt
+          Get-Content out/SHA256SUMS.txt
+
+      - name: Pubblica la release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Alter Ego ${{ github.ref_name }}
+          body_path: .github/release-notes.md
+          files: out/*
+
+      - name: Artefatti (avvio manuale)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: alter-ego-windows
+          path: out/*
