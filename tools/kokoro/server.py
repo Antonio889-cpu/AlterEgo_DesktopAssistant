@@ -48,8 +48,13 @@ def log(msg: str, err: bool = False):
 
 
 def load(device: str):
+    import time
+
+    t0 = time.time()
     log("Carico PyTorch (al primo avvio può volerci più di un minuto)…")
     import torch
+
+    log(f"PyTorch {torch.__version__} caricato in {time.time() - t0:.0f} s")
 
     log("Carico la libreria kokoro…")
     from kokoro import KModel
@@ -151,14 +156,33 @@ class Handler(BaseHTTPRequestHandler):
             self._json(500, {"error": {"message": f"{type(e).__name__}: {e}"}})
 
 
+def watch_parent(pid: int):
+    """Esce quando termina il processo `pid`, senza toccare stdin/stdout."""
+    import time
+
+    if os.name == "nt":
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        SYNCHRONIZE = 0x00100000
+        handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+        if not handle:
+            return  # processo non accessibile: meglio restare attivi che uscire a caso
+        kernel32.WaitForSingleObject(handle, 0xFFFFFFFF)
+    else:
+        while os.getppid() == pid:
+            time.sleep(1)
+    os._exit(0)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8880)
     ap.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     ap.add_argument("--warmup", action="store_true", help="scarica modello e voci italiane/inglesi, poi esce")
-    ap.add_argument("--exit-with-parent", action="store_true",
-                    help="esce quando si chiude stdin (cioè quando termina il programma che l'ha avviato, anche se va in crash)")
+    ap.add_argument("--parent-pid", type=int, default=0,
+                    help="esce quando termina questo processo (Alter Ego), anche se va in crash")
     args = ap.parse_args()
 
     if args.warmup:
@@ -192,16 +216,10 @@ def main():
             log("Errore nel caricamento: " + state["error"], err=True)
 
     threading.Thread(target=loader, daemon=True).start()
-    if args.exit_with_parent:
-        def watch_parent():
-            try:
-                while sys.stdin.buffer.read(1):
-                    pass
-            except Exception:  # noqa: BLE001
-                pass
-            os._exit(0)
-
-        threading.Thread(target=watch_parent, daemon=True).start()
+    if args.parent_pid:
+        # NON leggere stdin in un thread: su Windows una lettura bloccata su una pipe blocca anche
+        # gli altri thread che toccano gli handle standard (es. import torch → subprocess) = stallo.
+        threading.Thread(target=watch_parent, args=(args.parent_pid,), daemon=True).start()
     log(f"In ascolto su http://{args.host}:{args.port} (caricamento del modello…)")
     try:
         srv.serve_forever()

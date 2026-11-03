@@ -122,10 +122,12 @@ impl Kokoro {
         let log = std::fs::File::create(self.dir.join("server.log")).map_err(|e| e.to_string())?;
         let mut cmd = Command::new(self.python());
         cmd.arg(self.dir.join("server.py"))
-            .args(["--host", "127.0.0.1", "--port", &port.to_string(), "--exit-with-parent"])
+            .args(["--host", "127.0.0.1", "--port", &port.to_string()])
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string())
             .current_dir(&self.dir)
-            // pipe aperta finché Alter Ego vive: se si chiude (anche per un crash) il server esce
-            .stdin(Stdio::piped())
+            // il server controlla da sé che Alter Ego sia vivo (--parent-pid): stdin non serve
+            .stdin(Stdio::null())
             .stdout(log.try_clone().map_err(|e| e.to_string())?)
             .stderr(log)
             // niente richieste a Hugging Face a ogni avvio se il modello è già in cache

@@ -1,6 +1,12 @@
-## Alter Ego 1.0.3
+## Alter Ego 1.0.4
 
 ⚠ **Contiene gli sprite originali di Alter Ego (© Spike Chunsoft): solo per uso personale, non distribuire.**
+
+### Correzioni
+- **Kokoro fermo su "In ascolto… (caricamento del modello…)"**: il server restava bloccato per sempre durante il caricamento di PyTorch. Causa: per chiudersi insieme ad Alter Ego leggeva stdin in un thread, e su Windows una lettura bloccata su una pipe blocca anche gli altri thread che usano gli handle standard (stallo). Ora il server controlla direttamente se il processo di Alter Ego è ancora vivo, senza usare stdin.
+- Il log del server indica anche quanto ci ha messo PyTorch a caricarsi.
+
+## Alter Ego 1.0.3
 
 ### Correzioni
 - **Kokoro "connessione rifiutata (os error 10061)" durante il caricamento**: mentre Python carica PyTorch il server non riesce ad accettare connessioni e Windows le rifiutava. Ora Alter Ego segue l'avanzamento dal log del server (PyTorch → libreria → modello → voce) e la mostra nelle impostazioni; la prima frase aspetta fino a 5 minuti che il modello sia pronto. Coda di connessioni del server più ampia.
@@ -31,8 +37,8 @@
 - Voci di Windows tramite le API di sistema (WinRT), con scelta automatica della voce per la lingua.
 
 ### File
-- `AlterEgo_1.0.3_setup.exe`: installer (aggiorna le versioni precedenti mantenendo impostazioni, chiavi e memoria).
-- `AlterEgo_1.0.3_portable.zip`: estrai e avvia `alter-ego.exe`.
+- `AlterEgo_1.0.4_setup.exe`: installer (aggiorna le versioni precedenti mantenendo impostazioni, chiavi e memoria).
+- `AlterEgo_1.0.4_portable.zip`: estrai e avvia `alter-ego.exe`.
 - `SHA256SUMS.txt`: impronte dei file.
 
 Build non firmata: SmartScreen può chiedere *Ulteriori informazioni → Esegui comunque*.
