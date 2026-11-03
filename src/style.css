@@ -325,6 +325,7 @@ body[data-mode="sleep"] #face img.on { animation: breathe 4s ease-in-out infinit
 }
 #prompt input::placeholder { color: var(--dlg-text); opacity: .45; }
 #prompt.hidden { display: none; }
+#dialog.suspended { display: none; }
 
 /* finestra di conferma: stesso stile del box dialogo, al centro */
 #confirm {

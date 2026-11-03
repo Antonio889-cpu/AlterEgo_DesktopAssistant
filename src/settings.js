@@ -290,6 +290,7 @@ function showTab(name) {
   if (name === "persona") spriteStatus();
   if (name === "voice" && audio) { refreshDevices().then(refreshAudioStatus); if (audio.tts === "kokoro") refreshKokoro(); }
   if (name === "ai") refreshUsage();
+  if (name === "costs") refreshCosts();
 }
 
 /** Token e cache dei provider da quando l'app è aperta (DeepSeek riporta la cache). */
@@ -443,6 +444,7 @@ function fillAudio(cfg) {
   $("link-mic-vol").value = ml.mic_volume;
   $("link-voice-vol").value = ml.voice_volume;
   $("link-blips").checked = ml.include_blips;
+  $("link-music").checked = !!ml.include_music;
   fillVoices();
   ttsRows();
   refreshDevices().then(refreshAudioStatus);
@@ -489,6 +491,119 @@ $("link-cable").onchange = (e) => { audio.mic_link.cable_device = e.target.value
 $("link-mic-vol").oninput = (e) => { audio.mic_link.mic_volume = +e.target.value; saveAudio(); };
 $("link-voice-vol").oninput = (e) => { audio.mic_link.voice_volume = +e.target.value; saveAudio(); };
 $("link-blips").onchange = (e) => { audio.mic_link.include_blips = e.target.checked; saveAudio(); };
+$("link-music").onchange = (e) => { audio.mic_link.include_music = e.target.checked; saveAudio(); };
+
+// ---------- musica ----------
+function fillMusic(cfg) {
+  $("music-lyrics").checked = cfg.music.lyrics;
+  $("music-reactive").checked = cfg.music.reactive_sprite;
+}
+const saveMusic = () => invoke("music_settings", { lyrics: $("music-lyrics").checked, reactiveSprite: $("music-reactive").checked });
+$("music-lyrics").onchange = saveMusic;
+$("music-reactive").onchange = saveMusic;
+$("music-go").onclick = async () => {
+  const q = $("music-query").value.trim();
+  const r = $("music-result");
+  if (!q) return;
+  r.textContent = "cerco… (la prima volta scarica yt-dlp)"; r.className = "result";
+  try { r.textContent = await invoke("music_play", { query: q }); r.className = "result ok"; }
+  catch (e) { r.textContent = String(e); r.className = "result bad"; }
+};
+
+// ---------- costi ----------
+let prices = [];
+let costRows = [];
+const usd = (v) => (v === 0 ? "$0" : v < 0.01 ? "$" + v.toFixed(5) : "$" + v.toFixed(v < 1 ? 4 : 2));
+const num = (n) => (n || 0).toLocaleString("it-IT");
+function rowModel(r) {
+  if (r.kind === "ricerca web" || r.kind === "pagina web") return "DeepSeek " + r.model;
+  return `${r.provider}${r.model ? " / " + r.model : ""}`;
+}
+function renderCosts() {
+  const filter = $("cost-filter").value;
+  const now = Date.now() / 1000;
+  const day = new Date(); day.setHours(0, 0, 0, 0);
+  const month = new Date(day.getFullYear(), day.getMonth(), 1);
+  const sum = (pred) => costRows.filter(pred).reduce((a, r) => a + r.cost, 0);
+  const count = (pred) => costRows.filter(pred).length;
+  const cards = [
+    ["Oggi", sum((r) => r.ts * 1000 >= day), count((r) => r.ts * 1000 >= day)],
+    ["Ultimi 7 giorni", sum((r) => r.ts >= now - 7 * 86400), count((r) => r.ts >= now - 7 * 86400)],
+    ["Questo mese", sum((r) => r.ts * 1000 >= month), count((r) => r.ts * 1000 >= month)],
+    ["Totale registrato", sum(() => true), costRows.length],
+  ];
+  const chat = costRows.filter((r) => r.input + r.cached > 0);
+  const inTok = chat.reduce((a, r) => a + r.input + r.cached, 0);
+  const cached = chat.reduce((a, r) => a + r.cached, 0);
+  cards.push(["Input dalla cache", null, inTok ? Math.round((cached / inTok) * 100) + "%" : "—"]);
+  $("cost-cards").innerHTML = cards.map(([t, v, n]) => v === null
+    ? `<div class="card"><small>${t}</small><b>${n}</b><small>${num(cached)} di ${num(inTok)} token</small></div>`
+    : `<div class="card"><small>${t}</small><b>${usd(v)}</b><small>${num(n)} richieste</small></div>`).join("");
+
+  // per servizio e modello
+  const groups = new Map();
+  for (const r of costRows) {
+    const k = r.provider + "\u0000" + (r.kind.includes("web") ? r.model : r.model);
+    const g = groups.get(k) || { provider: r.provider, model: r.model, n: 0, input: 0, cached: 0, output: 0, cost: 0 };
+    g.n++; g.input += r.input; g.cached += r.cached; g.output += r.output; g.cost += r.cost;
+    groups.set(k, g);
+  }
+  const tb = document.querySelector("#cost-by tbody");
+  const gs = [...groups.values()].sort((a, b) => b.cost - a.cost);
+  tb.innerHTML = gs.length ? gs.map((g) => `<tr><td>${esc(g.provider)}</td><td>${esc(g.model || "—")}</td><td class="num">${num(g.n)}</td><td class="num">${num(g.input)}</td><td class="num">${num(g.cached)}</td><td class="num">${num(g.output)}</td><td class="num">${usd(g.cost)}</td></tr>`).join("")
+    : '<tr><td colspan="7" class="note">nessuna richiesta registrata</td></tr>';
+
+  // elenco richieste
+  const rows = costRows.filter((r) => !filter || r.kind === filter).slice(0, 500);
+  const body = document.querySelector("#cost-table tbody");
+  body.innerHTML = rows.map((r) => {
+    const tokIn = r.kind === "trascrizione" ? `${r.audio_secs.toFixed(0)} s audio` : r.calls ? `${r.calls}×` : num(r.input);
+    const d = new Date(r.ts * 1000);
+    const when = d.toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    return `<tr><td>${when}</td><td>${esc(r.kind)}</td><td>${esc(rowModel(r))}</td><td class="num">${tokIn}</td><td class="num">${r.cached ? num(r.cached) : ""}</td><td class="num">${r.output ? num(r.output) : ""}</td><td class="num">${r.ms ? (r.ms / 1000).toFixed(1) + " s" : ""}</td><td class="num">${usd(r.cost)}${r.reported_cost != null ? " ✓" : ""}</td></tr>`;
+  }).join("") || '<tr><td colspan="8" class="note">nessuna richiesta</td></tr>';
+}
+async function refreshCosts() {
+  try { costRows = await invoke("costs_list", { limit: 20000 }); } catch (e) { $("cost-result").textContent = String(e); return; }
+  renderCosts();
+}
+function fillPrices(cfg) {
+  prices = structuredClone(cfg.prices || []);
+  const tb = document.querySelector("#price-table tbody");
+  tb.innerHTML = "";
+  prices.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    const cell = (key, type = "number") => {
+      const td = document.createElement("td");
+      const inp = document.createElement("input");
+      inp.type = type; inp.value = p[key]; if (type === "number") { inp.step = "any"; inp.min = "0"; }
+      inp.oninput = () => { p[key] = type === "number" ? +inp.value || 0 : inp.value.trim(); savePrices(); };
+      td.append(inp); return td;
+    };
+    tr.append(cell("provider", "text"), cell("model", "text"), cell("input"), cell("cached"), cell("output"), cell("per_call"), cell("per_hour"));
+    const td = document.createElement("td");
+    const del = document.createElement("button"); del.textContent = "✕";
+    del.onclick = () => { prices.splice(i, 1); savePrices(true); };
+    td.append(del); tr.append(td);
+    tb.append(tr);
+  });
+}
+let priceTimer = null;
+function savePrices(redraw = false) {
+  clearTimeout(priceTimer);
+  priceTimer = setTimeout(async () => { await invoke("set_prices", { prices }); refreshCosts(); }, 400);
+  if (redraw) fillPrices({ prices });
+}
+$("price-add").onclick = () => { prices.push({ provider: "", model: "", input: 0, cached: 0, output: 0, per_call: 0, per_hour: 0 }); fillPrices({ prices }); };
+$("price-reset").onclick = async () => { if (confirm("Ripristinare i prezzi predefiniti?")) { await invoke("reset_prices"); fillPrices(await invoke("get_config")); refreshCosts(); } };
+$("cost-filter").onchange = renderCosts;
+$("cost-refresh").onclick = refreshCosts;
+$("cost-export").onclick = async () => {
+  const r = $("cost-result");
+  try { r.textContent = "Salvato: " + await invoke("costs_export"); r.className = "result ok"; } catch (e) { r.textContent = String(e); r.className = "result bad"; }
+};
+$("cost-clear").onclick = async () => { if (confirm("Svuotare il registro dei costi?")) { await invoke("costs_clear"); refreshCosts(); } };
+setInterval(() => { if (!document.hidden && localStorage.getItem("tab") === "costs") refreshCosts(); }, 5000);
 $("vb-download").onclick = () => invoke("open_vbcable_page").catch((e) => alert(e));
 $("link-rename").onclick = async () => {
   const d = $("link-driver");
@@ -687,6 +802,8 @@ $("log-clear").onclick = async () => { if (confirm("Svuotare il registro delle a
   fillHotkeys(cfg);
   fillClip(cfg);
   fillPerms(cfg);
+  fillMusic(cfg);
+  fillPrices(cfg);
   let tab = "general";
   try { tab = localStorage.getItem("tab") || "general"; } catch {}
   showTab(tab);

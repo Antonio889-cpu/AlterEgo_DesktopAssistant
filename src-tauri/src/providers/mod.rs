@@ -119,6 +119,11 @@ pub struct Target {
     pub temperature: f64,
 }
 
+/// Classifica una risposta HTTP non riuscita (stesse regole della chat).
+pub fn status_error_public(status: reqwest::StatusCode, body: &str) -> ProviderError {
+    openai_compat::status_error(status, body, false)
+}
+
 /// L'URL punta a questo PC (127.0.0.1, localhost, ::1)?
 pub fn is_loopback(url: &str) -> bool {
     reqwest::Url::parse(url.trim())
@@ -156,6 +161,12 @@ pub struct Ai {
     sticky: Mutex<HashMap<String, usize>>,
     /// Token usati per provider da quando l'app è aperta (cache compresa).
     usage: Mutex<HashMap<String, Usage>>,
+    /// Tipo di richieste per il registro dei costi ("chat", "riassunto").
+    pub kind: &'static str,
+    /// File del registro dei costi (impostato all'avvio).
+    pub cost_log: Mutex<Option<std::path::PathBuf>>,
+    /// Provider che hanno rifiutato `stream_options`: non lo si manda più.
+    pub no_usage: Mutex<std::collections::HashSet<String>>,
 }
 
 /// Contatori dei token (dai campi `usage` delle risposte).
@@ -170,6 +181,10 @@ pub struct Usage {
 
 impl Ai {
     pub fn new() -> Self {
+        Self::with_kind("chat")
+    }
+
+    pub fn with_kind(kind: &'static str) -> Self {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .user_agent("AlterEgo/1.0")
@@ -181,7 +196,16 @@ impl Ai {
             .no_proxy()
             .build()
             .expect("client HTTP locale");
-        Self { http, local, generation: AtomicU64::new(0), sticky: Mutex::new(HashMap::new()), usage: Mutex::new(HashMap::new()) }
+        Self {
+            http,
+            local,
+            generation: AtomicU64::new(0),
+            sticky: Mutex::new(HashMap::new()),
+            usage: Mutex::new(HashMap::new()),
+            kind,
+            cost_log: Mutex::new(None),
+            no_usage: Mutex::new(Default::default()),
+        }
     }
 
     /// Client giusto per l'URL: senza proxy per i servizi locali.
@@ -191,7 +215,7 @@ impl Ai {
 
     /// Registra il blocco `usage` di una risposta. DeepSeek usa `prompt_cache_hit_tokens` /
     /// `prompt_cache_miss_tokens`, OpenAI e compatibili `prompt_tokens_details.cached_tokens`.
-    pub fn record_usage(&self, provider: &str, u: &Value) {
+    pub fn record_usage(&self, provider: &str, model: &str, u: &Value, ms: u64) {
         let n = |p: &str| u.pointer(p).and_then(Value::as_u64);
         let hit = n("/prompt_cache_hit_tokens").or_else(|| n("/prompt_tokens_details/cached_tokens")).unwrap_or(0);
         let input = n("/prompt_tokens")
@@ -203,6 +227,26 @@ impl Ai {
         e.input += input;
         e.cached += hit;
         e.output += n("/completion_tokens").unwrap_or(0);
+        drop(all);
+        self.log_cost(crate::costs::Entry {
+            ts: crate::costs::now(),
+            kind: self.kind.into(),
+            provider: provider.into(),
+            model: model.into(),
+            input: input.saturating_sub(hit),
+            cached: hit,
+            output: n("/completion_tokens").unwrap_or(0),
+            ms,
+            // OpenRouter riporta il costo effettivo (in dollari)
+            reported_cost: u.get("cost").and_then(Value::as_f64),
+            ..Default::default()
+        });
+    }
+
+    pub fn log_cost(&self, e: crate::costs::Entry) {
+        if let Some(p) = self.cost_log.lock().unwrap().as_ref() {
+            crate::costs::append(p, &e);
+        }
     }
 
     pub fn usage(&self) -> HashMap<String, Usage> {
@@ -403,8 +447,17 @@ mod usage_tests {
     #[test]
     fn usage_deepseek_and_openai() {
         let ai = Ai::new();
-        ai.record_usage("deepseek", &serde_json::json!({"prompt_tokens": 1000, "prompt_cache_hit_tokens": 900, "prompt_cache_miss_tokens": 100, "completion_tokens": 50}));
-        ai.record_usage("openrouter", &serde_json::json!({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 4}, "completion_tokens": 2}));
+        let log = std::env::temp_dir().join(format!("ae-usage-{}.jsonl", std::process::id()));
+        let _ = std::fs::remove_file(&log);
+        *ai.cost_log.lock().unwrap() = Some(log.clone());
+        ai.record_usage("deepseek", "deepseek-flash", &serde_json::json!({"prompt_tokens": 1000, "prompt_cache_hit_tokens": 900, "prompt_cache_miss_tokens": 100, "completion_tokens": 50}), 1200);
+        ai.record_usage("openrouter", "x", &serde_json::json!({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 4}, "completion_tokens": 2, "cost": 0.5}), 10);
+        let rows = crate::costs::read(&log, 10);
+        assert_eq!(rows[1].input, 100);
+        assert_eq!(rows[1].cached, 900);
+        assert_eq!(rows[1].ms, 1200);
+        assert_eq!(rows[0].reported_cost, Some(0.5));
+        let _ = std::fs::remove_file(&log);
         let u = ai.usage();
         assert_eq!(u["deepseek"], Usage { requests: 1, input: 1000, cached: 900, output: 50 });
         assert_eq!(u["openrouter"].cached, 4);

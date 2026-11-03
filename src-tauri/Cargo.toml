@@ -1,6 +1,6 @@
 [package]
 name = "alter-ego"
-version = "1.0.4"
+version = "1.1.0"
 description = "Alter Ego – assistente desktop personale"
 edition = "2021"
 
@@ -15,7 +15,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 futures-util = "0.3"
-tokio = { version = "1", features = ["time", "sync"] }
+tokio = { version = "1", features = ["time", "sync", "process", "io-util"] }
 keyring = { version = "3", features = ["windows-native", "linux-native"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 cpal = "0.15"
@@ -25,6 +25,9 @@ png = "0.17"
 base64 = "0.22"
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
+# musica: decodifica m4a/AAC (YouTube via yt-dlp) e mp3, spettro per il visualizzatore
+symphonia = { version = "0.5", default-features = false, features = ["aac", "isomp4", "mp3", "wav", "pcm"] }
+rustfft = "6"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

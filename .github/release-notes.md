@@ -1,6 +1,19 @@
-## Alter Ego 1.0.4
+## Alter Ego 1.1.0
 
 ⚠ **Contiene gli sprite originali di Alter Ego (© Spike Chunsoft): solo per uso personale, non distribuire.**
+
+### Novità
+- **Musica (Music Search and Play)**: "metti *titolo*" → Alter Ego cerca su YouTube (yt-dlp, scaricato al primo uso insieme a Deno) e suona il brano in un **lettore in stile CRT**: spettro delle frequenze, titolo e artista, avanzamento con salto, casuale / indietro / play-pausa / avanti / ripeti, volume, **testo sincronizzato** (LRCLIB) e il **volto di Alter Ego che cambia a tempo di musica**. Coda dei brani, cache degli ultimi 30, volume che si abbassa mentre lei parla, musica anche in Mic-Link (facoltativo).
+- **Ricerca web** con le nuove API **Search** e **Fetch** di DeepSeek (stesse chiavi della chat, ~$0,75 / 1000 chiamate).
+- **Pannello Costi**: ogni richiesta (chat, riassunti, ricerche, pagine, trascrizioni) con token, cache, durata e costo; totali di oggi / 7 giorni / mese, riepilogo per modello, prezzi modificabili, esportazione CSV. OpenRouter riporta il costo effettivo.
+- **Terminale**: Alter Ego può eseguire comandi PowerShell o cmd, con conferma oppure **in autonomia** (i comandi distruttivi chiedono sempre conferma).
+- DeepSeek: modello predefinito `deepseek-flash` per le nuove configurazioni.
+
+### Correzioni
+- Il box di testo per scrivere non si sovrappone più al dialogo in corso (il dialogo si nasconde e torna quando chiudi il box).
+- L'animazione "vecchia TV" parte solo quando la finestra viene davvero mostrata o nascosta, non più ogni volta che si apre il box di testo.
+
+## Alter Ego 1.0.4
 
 ### Correzioni
 - **Kokoro fermo su "In ascolto… (caricamento del modello…)"**: il server restava bloccato per sempre durante il caricamento di PyTorch. Causa: per chiudersi insieme ad Alter Ego leggeva stdin in un thread, e su Windows una lettura bloccata su una pipe blocca anche gli altri thread che usano gli handle standard (stallo). Ora il server controlla direttamente se il processo di Alter Ego è ancora vivo, senza usare stdin.
@@ -37,8 +50,8 @@
 - Voci di Windows tramite le API di sistema (WinRT), con scelta automatica della voce per la lingua.
 
 ### File
-- `AlterEgo_1.0.4_setup.exe`: installer (aggiorna le versioni precedenti mantenendo impostazioni, chiavi e memoria).
-- `AlterEgo_1.0.4_portable.zip`: estrai e avvia `alter-ego.exe`.
+- `AlterEgo_1.1.0_setup.exe`: installer (aggiorna le versioni precedenti mantenendo impostazioni, chiavi e memoria).
+- `AlterEgo_1.1.0_portable.zip`: estrai e avvia `alter-ego.exe`.
 - `SHA256SUMS.txt`: impronte dei file.
 
 Build non firmata: SmartScreen può chiedere *Ulteriori informazioni → Esegui comunque*.

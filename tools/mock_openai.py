@@ -20,6 +20,11 @@ class H(BaseHTTPRequestHandler):
             return self._json(200 if ok else 400, {"text": " Ciao Alter Ego "} if ok else {"error": "multipart non valido"})
         body = json.loads(raw)
         with open(os.environ.get("MOCK_LAST", "/tmp/mock_last.json"), "w") as f: json.dump(body, f, ensure_ascii=False, indent=1)
+        if self.path.endswith("/tools/search"):
+            ok = self.headers.get("Authorization", "").startswith("Bearer ") and 1 <= len(body.get("query", "")) <= 128
+            return self._json(200 if ok else 400, {"results": [{"title": "Risultato per " + body.get("query", ""), "url": "https://example.com/a", "snippet": "estratto di prova"}]})
+        if self.path.endswith("/tools/fetch"):
+            return self._json(200, {"title": "Pagina", "markdown": "# Pagina di prova\ncontenuto"})
         if self.path.endswith("/audio/speech"):
             with open("/tmp/mock_speech.json", "w") as f: json.dump(body, f)  # file a parte: i test girano in parallelo
             # 0,2 s di tono a 24 kHz, 16 bit mono
@@ -40,6 +45,12 @@ class H(BaseHTTPRequestHandler):
             last = body["messages"][-1]["content"]
             if "promemoria" in last:
                 call = {"name": "set_reminder", "arguments": json.dumps({"text": "pausa", "minutes": 1})}
+            elif "metti" in last:
+                call = {"name": "play_music", "arguments": json.dumps({"query": last.split("metti", 1)[1].strip()})}
+            elif "cerca" in last:
+                call = {"name": "web_search", "arguments": json.dumps({"query": last.split("cerca", 1)[1].strip(), "count": 3})}
+            elif "comando" in last:
+                call = {"name": "run_shell", "arguments": json.dumps({"shell": "cmd", "command": "echo ciao-dal-terminale"})}
             else:
                 call = {"name": "write_file", "arguments": json.dumps({"path": os.environ.get("MOCK_FILE", "/tmp/ae_box/nota.txt"), "content": "ciao da Alter Ego"})}
             self.send_response(200); self.send_header("Content-Type", "text/event-stream"); self.end_headers()
@@ -57,5 +68,8 @@ class H(BaseHTTPRequestHandler):
         self.send_response(200); self.send_header("Content-Type", "text/event-stream"); self.end_headers()
         for piece in ["[happy]\n", "Ciao! ", "Sono il ", f"mock ({body['model']})."]:
             self.wfile.write(f"data: {json.dumps({'choices':[{'delta':{'content':piece}}]})}\n\n".encode()); self.wfile.flush(); time.sleep(0.02)
+        if body.get("stream_options", {}).get("include_usage"):
+            u = {"prompt_tokens": 1200, "prompt_cache_hit_tokens": 1000, "prompt_cache_miss_tokens": 200, "completion_tokens": 30}
+            self.wfile.write(f"data: {json.dumps({'choices': [], 'usage': u})}\n\n".encode())
         self.wfile.write(b"data: [DONE]\n\n")
 ThreadingHTTPServer(("127.0.0.1", 18080), H).serve_forever()

@@ -172,10 +172,12 @@ pub fn show_main(app: &AppHandle) {
         PENDING.store(2, Ordering::SeqCst); // l'uscita non si annulla
         return;
     }
+    // l'animazione "accensione" solo se la finestra era davvero nascosta
+    // (non quando si apre il box di testo o una conferma con la finestra già visibile)
     if !win.is_visible().unwrap_or(true) {
         let _ = win.show(); // nessun set_focus: non rubiamo il focus
+        let _ = app.emit_to(MAIN, "tv", "on");
     }
-    let _ = app.emit_to(MAIN, "tv", "on");
 }
 
 /// Nasconde la finestra (o esce dall'app) dopo l'animazione di spegnimento.

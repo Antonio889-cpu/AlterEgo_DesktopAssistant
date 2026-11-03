@@ -151,30 +151,50 @@ pub async fn stream_chat(
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
     }
-    // DeepSeek: chiede l'uso dei token in fondo allo stream (contiene i token letti dalla cache)
-    if t.id == "deepseek" {
+    // uso dei token in fondo allo stream (per il pannello Costi; DeepSeek riporta anche la cache).
+    // Ollama è gratis; un provider che rifiuta il parametro viene ricordato e non lo riceve più.
+    let want_usage = t.id != "ollama" && !ai.no_usage.lock().unwrap().contains(&t.id);
+    if want_usage {
         body["stream_options"] = json!({ "include_usage": true });
+        if t.id == "openrouter" {
+            body["usage"] = json!({ "include": true }); // costo effettivo in dollari
+        }
     }
+    let started = std::time::Instant::now();
     // Ollama può impiegare molto a caricare il modello la prima volta.
     let first_timeout = Duration::from_secs(if t.id == "ollama" { 120 } else { 45 });
     let idle_timeout = Duration::from_secs(30);
 
-    let send = request(ai.client_for(&t.base), t, reqwest::Method::POST, "/chat/completions").json(&body).send();
-    let resp = tokio::time::timeout(first_timeout, send)
-        .await
-        .map_err(|_| ProviderError::new("tempo scaduto in attesa della risposta", true))?
-        .map_err(net_error)?;
-    if !resp.status().is_success() {
+    let mut retried = false;
+    let resp = loop {
+        let send = request(ai.client_for(&t.base), t, reqwest::Method::POST, "/chat/completions").json(&body).send();
+        let resp = tokio::time::timeout(first_timeout, send)
+            .await
+            .map_err(|_| ProviderError::new("tempo scaduto in attesa della risposta", true))?
+            .map_err(net_error)?;
+        if resp.status().is_success() {
+            break resp;
+        }
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
+        if want_usage && !retried && status.as_u16() == 400 && text.to_lowercase().contains("stream_options") {
+            ai.no_usage.lock().unwrap().insert(t.id.clone());
+            if let Some(o) = body.as_object_mut() {
+                o.remove("stream_options");
+                o.remove("usage");
+            }
+            retried = true;
+            continue;
+        }
         return Err(status_error(status, &text, tools.is_some()));
-    }
+    };
 
     let mut stream = resp.bytes_stream();
     let mut buf = String::new();
     let mut full = String::new();
     let mut acc = ToolAcc::default();
     let mut first = true;
+    let mut usage: Option<Value> = None;
     'read: loop {
         if ai.generation.load(Ordering::SeqCst) != gen {
             return Err(ProviderError::new("richiesta annullata", false));
@@ -208,7 +228,7 @@ pub async fn stream_chat(
                 });
             }
             if let Some(u) = v.get("usage").filter(|u| u.is_object()) {
-                ai.record_usage(&t.id, u);
+                usage = Some(u.clone());
             }
             if let Some(text) = v.pointer("/choices/0/delta/content").and_then(Value::as_str) {
                 if !text.is_empty() {
@@ -222,6 +242,8 @@ pub async fn stream_chat(
         }
     }
     let tool_calls = acc.finish();
+    // anche senza `usage` la richiesta va nel registro (token sconosciuti = 0)
+    ai.record_usage(&t.id, &t.model, usage.as_ref().unwrap_or(&json!({})), started.elapsed().as_millis() as u64);
     if full.trim().is_empty() && tool_calls.is_empty() {
         return Err(ProviderError::new("risposta vuota", true));
     }

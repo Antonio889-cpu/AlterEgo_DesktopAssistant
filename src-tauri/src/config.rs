@@ -78,7 +78,7 @@ impl Default for AiConfig {
                 model("gemini", "gemini-2.5-flash", false),
                 model("openrouter", "openrouter/auto", false),
                 model("groq", "llama-3.3-70b-versatile", false),
-                model("deepseek", "deepseek-chat", false),
+                model("deepseek", "deepseek-flash", false),
                 model("ollama", "", true),
             ]),
             temperature: 0.7,
@@ -174,6 +174,71 @@ pub struct Permissions {
     /// Esegue senza chiedere le azioni che di solito chiedono conferma
     /// (restano valide le autorizzazioni per tipo di azione e le cartelle consentite).
     pub auto_approve: bool,
+    /// Terminale: comandi PowerShell o cmd scritti dal modello.
+    pub terminal: bool,
+    /// Terminale senza conferma (i comandi distruttivi la chiedono comunque).
+    pub terminal_autonomous: bool,
+    /// Ricerca web e lettura di pagine (API Search/Fetch di DeepSeek).
+    pub web: bool,
+    /// Cerca musica su YouTube e la riproduce.
+    pub music: bool,
+}
+
+/// Prezzo di un modello o servizio, in dollari. `model` vuoto = tutti i modelli del provider;
+/// altrimenti vale per i modelli che iniziano così.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(default)]
+pub struct Price {
+    pub provider: String,
+    pub model: String,
+    /// $ per milione di token di input (non in cache).
+    pub input: f64,
+    /// $ per milione di token di input letti dalla cache.
+    pub cached: f64,
+    /// $ per milione di token di output.
+    pub output: f64,
+    /// $ per chiamata (ricerca/pagina web).
+    pub per_call: f64,
+    /// $ per ora di audio (trascrizione).
+    pub per_hour: f64,
+}
+
+/// Prezzi iniziali (modificabili in Impostazioni → Costi). Vanno verificati sui siti dei provider.
+pub fn default_prices() -> Vec<Price> {
+    let p = |provider: &str, model: &str, input: f64, cached: f64, output: f64| Price {
+        provider: provider.into(), model: model.into(), input, cached, output, ..Default::default()
+    };
+    vec![
+        // DeepSeek V4.1 Flash, tariffa piena (fuori dalla fascia scontata), ottobre 2026
+        p("deepseek", "deepseek-flash", 0.30, 0.006, 1.20),
+        p("deepseek", "", 0.30, 0.006, 1.20),
+        Price { provider: "deepseek".into(), model: "search".into(), per_call: 0.00075, ..Default::default() },
+        Price { provider: "deepseek".into(), model: "fetch".into(), per_call: 0.00075, ..Default::default() },
+        Price { provider: "groq".into(), model: "whisper".into(), per_hour: 0.04, ..Default::default() },
+        p("ollama", "", 0.0, 0.0, 0.0),
+    ]
+}
+
+/// Lettore musicale.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct MusicConfig {
+    pub volume: f64,
+    pub shuffle: bool,
+    /// "off", "one" (ripete il brano), "all" (ripete la coda).
+    pub repeat: String,
+    /// Testi sincronizzati da LRCLIB.
+    pub lyrics: bool,
+    /// Il volto di Alter Ego nel lettore cambia con la musica.
+    pub reactive_sprite: bool,
+    /// Posizione del lettore (pixel fisici).
+    pub player_pos: Option<(i32, i32)>,
+}
+
+impl Default for MusicConfig {
+    fn default() -> Self {
+        Self { volume: 0.7, shuffle: false, repeat: "off".into(), lyrics: true, reactive_sprite: true, player_pos: None }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -223,11 +288,13 @@ pub struct MicLink {
     pub voice_volume: f64,
     /// Anche i blip del dialogo finiscono nel microfono virtuale.
     pub include_blips: bool,
+    /// Anche la musica del lettore finisce nel microfono virtuale.
+    pub include_music: bool,
 }
 
 impl Default for MicLink {
     fn default() -> Self {
-        Self { enabled: false, mic_device: String::new(), cable_device: String::new(), mic_volume: 1.0, voice_volume: 0.9, include_blips: false }
+        Self { enabled: false, mic_device: String::new(), cable_device: String::new(), mic_volume: 1.0, voice_volume: 0.9, include_blips: false, include_music: false }
     }
 }
 
@@ -321,6 +388,8 @@ pub struct Config {
     pub permissions: Permissions,
     pub clip: ClipConfig,
     pub audio: AudioConfig,
+    pub prices: Vec<Price>,
+    pub music: MusicConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -348,6 +417,8 @@ impl Default for Config {
             memory_enabled: true,
             stt: SttConfig::default(),
             permissions: Permissions::default(),
+            prices: default_prices(),
+            music: MusicConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
             last_monitor: None,

@@ -24,7 +24,7 @@ impl Conversation {
             Ok(m) => (Some(m), None),
             Err(e) => (None, Some(e)),
         };
-        Self { memory, memory_error, session: Mutex::new(Vec::new()), recorder: stt::Recorder::default(), ai_bg: providers::Ai::new(), data_dir }
+        Self { memory, memory_error, session: Mutex::new(Vec::new()), recorder: stt::Recorder::default(), ai_bg: providers::Ai::with_kind("riassunto"), data_dir }
     }
 
     fn mem(&self, enabled: bool) -> Option<&Memory> {
@@ -315,7 +315,11 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
         emit_stt(&app, stt::SttEvent::Transcribing);
         let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
         let http = app.state::<AppState>().ai.client_for(if cfg.provider == "local" { &cfg.base_url } else { "https://api.groq.com" }).clone();
-        match stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await {
+        let secs = wav_seconds(&wav);
+        let t0 = std::time::Instant::now();
+        let res = stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await;
+        log_stt_cost(&app, &cfg, secs, t0, res.is_ok());
+        match res {
             Ok(t) if t.is_empty() => emit_stt(&app, stt::SttEvent::Empty),
             Ok(text) => {
                 // frase della clip: si esegue subito, senza modello
@@ -332,6 +336,29 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
     });
 }
 
+/// Durata di un WAV 16 kHz mono 16 bit (quello che produce stt::to_wav).
+fn wav_seconds(wav: &[u8]) -> f64 {
+    wav.len().saturating_sub(44) as f64 / 32_000.0
+}
+
+/// Le trascrizioni Groq si pagano a ore di audio: vanno nel registro dei costi.
+fn log_stt_cost(app: &AppHandle, cfg: &config::SttConfig, secs: f64, t0: std::time::Instant, ok: bool) {
+    if !ok || cfg.provider == "off" {
+        return;
+    }
+    let provider = if cfg.provider == "groq" { "groq" } else { "locale" };
+    app.state::<AppState>().ai.log_cost(crate::costs::Entry {
+        ts: crate::costs::now(),
+        kind: "trascrizione".into(),
+        provider: provider.into(),
+        model: if cfg.model.trim().is_empty() { "whisper-large-v3-turbo".into() } else { cfg.model.trim().to_string() },
+        // Groq conta almeno 10 secondi per richiesta
+        audio_secs: if provider == "groq" { secs.max(10.0) } else { secs },
+        ms: t0.elapsed().as_millis() as u64,
+        ..Default::default()
+    });
+}
+
 /// Prova microfono dalle impostazioni: registra 4 secondi e trascrive.
 #[tauri::command]
 pub async fn stt_test(app: AppHandle) -> Result<String, String> {
@@ -342,7 +369,11 @@ pub async fn stt_test(app: AppHandle) -> Result<String, String> {
     let wav = conv.recorder.finish()?.ok_or("nessun audio registrato")?;
     let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
     let http = app.state::<AppState>().ai.client_for(if cfg.provider == "local" { &cfg.base_url } else { "https://api.groq.com" }).clone();
-    let text = stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await?;
+    let secs = wav_seconds(&wav);
+    let t0 = std::time::Instant::now();
+    let res = stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await;
+    log_stt_cost(&app, &cfg, secs, t0, res.is_ok());
+    let text = res?;
     Ok(if text.is_empty() { "(silenzio: nessuna parola riconosciuta)".into() } else { text })
 }
 

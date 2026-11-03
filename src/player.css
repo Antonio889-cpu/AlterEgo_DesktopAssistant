@@ -1,0 +1,348 @@
+/* Lettore musicale: stessa estetica CRT della finestra principale (cornice chiara con glow,
+   schermo verde con scanline), impaginazione ispirata alla reference. Finestra fissa 600×248. */
+
+@font-face {
+  font-family: "DotGothic16";
+  src: url("assets/fonts/DotGothic16-Regular.ttf") format("truetype");
+  font-display: block;
+}
+
+:root {
+  --frame: #f6fff2;
+  --glow: rgba(110, 255, 60, .85);
+  --bg-center: #1d5a0b;
+  --bg-edge: #061a02;
+  --text: #d9ffb0;
+  --accent: #8dff45;
+  --dim: rgba(190, 255, 140, .55);
+  --line: rgba(141, 255, 69, .35);
+  --scan-dark: rgba(8, 40, 0, .5);
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: "DotGothic16", monospace;
+  color: var(--text);
+}
+
+#panel { position: fixed; inset: 7px; transform-origin: 50% 50%; }
+#panel.tv-off { visibility: hidden; }
+
+#screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 2.5px solid var(--frame);
+  border-radius: 9px;
+  box-shadow:
+    0 0 3px 1px var(--glow),
+    0 0 8px 0 rgba(110, 255, 60, .4),
+    inset 0 0 9px rgba(110, 255, 60, .55);
+  background: radial-gradient(ellipse 85% 95% at 38% 30%, var(--bg-center) 0%, #11400a 55%, var(--bg-edge) 100%);
+  cursor: grab;
+  isolation: isolate;
+}
+
+/* ---------- sprite di Alter Ego (a destra, sfumato) ---------- */
+#face {
+  position: absolute;
+  right: -26px;
+  top: -20px;
+  width: 262px;
+  height: 207px;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 40%), linear-gradient(to bottom, #000 70%, transparent 96%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0%, #000 40%), linear-gradient(to bottom, #000 70%, transparent 96%);
+  mask-composite: intersect;
+  opacity: .5;
+  mix-blend-mode: screen;
+  transition: transform .12s ease-out, filter .12s ease-out;
+}
+#face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  /* monocromatico verde, come uno schermo CRT */
+  filter: grayscale(1) sepia(1) hue-rotate(52deg) saturate(2.6) brightness(.95) contrast(1.1);
+  transition: opacity .45s ease;
+}
+#face img.on { opacity: 1; }
+#face.beat { transform: scale(1.025); filter: brightness(1.35); }
+
+/* ---------- riga in alto: spettro, nota, titolo ---------- */
+#top {
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  right: 40px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 2;
+}
+#viz {
+  width: 104px;
+  height: 52px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  flex: none;
+}
+#viz span {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(to top, #5fdc22, var(--accent) 60%, #e7ffc8);
+  box-shadow: 0 0 4px rgba(141, 255, 69, .7);
+  transform-origin: bottom;
+}
+#note {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  fill: var(--accent);
+  filter: drop-shadow(0 0 4px var(--glow));
+}
+#meta { min-width: 0; max-width: 300px; }
+#title {
+  font-size: 23px;
+  line-height: 1.15;
+  color: #e9ffcc;
+  text-shadow: 0 0 6px rgba(141, 255, 69, .9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#title.status::after { content: "▌"; animation: blink 1s steps(2) infinite; margin-left: 2px; }
+#artist {
+  font-size: 14px;
+  color: var(--accent);
+  opacity: .9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- barra di avanzamento ---------- */
+#progress {
+  position: absolute;
+  left: 18px;
+  right: 192px;
+  top: 84px;
+  z-index: 2;
+}
+#bar {
+  position: relative;
+  height: 14px;
+  cursor: pointer;
+}
+#bar::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 6px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(141, 255, 69, .22);
+}
+#fill {
+  position: absolute;
+  left: 0; top: 6px;
+  height: 3px;
+  width: 0;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 5px var(--glow);
+}
+#knob {
+  position: absolute;
+  top: 2.5px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: #e9ffcc;
+  box-shadow: 0 0 6px var(--glow);
+}
+#times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--text);
+  margin-top: 1px;
+}
+
+/* ---------- comandi ---------- */
+#controls {
+  position: absolute;
+  left: 22px;
+  right: 18px;
+  top: 118px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  z-index: 2;
+}
+button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+button svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px var(--glow));
+}
+button svg .solid { fill: currentColor; stroke: none; }
+button.small svg { width: 24px; height: 24px; opacity: .55; }
+button.small.on svg { opacity: 1; }
+button:hover svg { filter: drop-shadow(0 0 6px var(--glow)) brightness(1.25); }
+button.big {
+  width: 50px;
+  height: 50px;
+  border: 2.5px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--glow), inset 0 0 6px rgba(141, 255, 69, .45);
+}
+button.big svg { width: 26px; height: 26px; }
+#i-play { display: none; }
+body.paused #i-play { display: block; }
+body.paused #i-pause { display: none; }
+#rep1 { font: 8px "DotGothic16", monospace; fill: currentColor; stroke: none; text-anchor: middle; display: none; }
+#b-repeat.one #rep1 { display: block; }
+
+#vol { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+#vol-icon { width: 24px; height: 24px; fill: none; stroke: var(--accent); stroke-width: 1.9; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--glow)); }
+#vol-icon .solid { fill: var(--accent); stroke: none; }
+#volume { -webkit-appearance: none; appearance: none; width: 118px; height: 14px; background: transparent; cursor: pointer; }
+#volume::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--v, 70%), rgba(141, 255, 69, .22) var(--v, 70%));
+  box-shadow: 0 0 4px rgba(141, 255, 69, .5);
+}
+#volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: #e9ffcc;
+  box-shadow: 0 0 6px var(--glow);
+}
+
+/* ---------- testo ---------- */
+#lyrics {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60px;
+  border-top: 1.5px solid var(--line);
+  box-shadow: 0 -1px 6px rgba(141, 255, 69, .18);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 5px 18px 0;
+  background: linear-gradient(to bottom, rgba(10, 40, 4, .55), rgba(6, 26, 2, .7));
+  z-index: 3;
+}
+#cursor { color: var(--accent); font-size: 15px; line-height: 17px; text-shadow: 0 0 5px var(--glow); }
+#lines { min-width: 0; flex: 1; }
+#lines div {
+  font-size: 15px;
+  line-height: 17px;
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color .3s, text-shadow .3s;
+}
+#lines .l0 { color: #e9ffcc; text-shadow: 0 0 6px rgba(141, 255, 69, .85); }
+#lines .l1 { color: var(--text); opacity: .75; }
+#lines .l2 { color: var(--text); opacity: .5; }
+#lyrics.none #cursor { opacity: .35; }
+
+/* ---------- chiudi ---------- */
+#close { position: absolute; right: 9px; top: 9px; z-index: 5; }
+#close svg { width: 20px; height: 20px; stroke-width: 2.2; }
+
+/* ---------- overlay CRT ---------- */
+#scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent 2px, var(--scan-dark) 2px, var(--scan-dark) 4px);
+  opacity: .55;
+  z-index: 10;
+}
+#vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 95% 90% at 50% 50%, transparent 60%, rgba(0, 20, 0, .5) 100%);
+  z-index: 11;
+}
+body.fx #screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(160, 255, 120, .035);
+  animation: flicker 3.5s steps(1) infinite;
+  z-index: 12;
+}
+@keyframes flicker { 0%, 100% { opacity: 1; } 47% { opacity: .4; } 48% { opacity: 1; } 83% { opacity: .7; } }
+
+/* ---------- accensione / spegnimento "vecchia TV" (come la finestra principale) ---------- */
+#tv-flash { display: none; }
+#panel.tv-on-anim { animation: tv-on .55s cubic-bezier(.2, .7, .3, 1) both; }
+#panel.tv-off-anim { animation: tv-off .42s cubic-bezier(.55, 0, .8, .4) both; pointer-events: none; }
+#panel.tv-on-anim #tv-flash, #panel.tv-off-anim #tv-flash {
+  display: block; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+  background: radial-gradient(ellipse at center, #fff 0%, rgba(210, 255, 240, .85) 35%, rgba(120, 255, 200, 0) 75%);
+  mix-blend-mode: screen;
+  animation: tv-flash .55s ease-out both;
+}
+#panel.tv-off-anim #tv-flash { animation: tv-flash-off .42s ease-in both; }
+@keyframes tv-on {
+  0%   { transform: scale(.02, .004); filter: brightness(5) saturate(0); opacity: 0; }
+  10%  { transform: scale(.05, .004); opacity: 1; }
+  38%  { transform: scale(1, .012); filter: brightness(5) saturate(0); }
+  66%  { transform: scale(1, 1.05); filter: brightness(2) saturate(.5); }
+  82%  { transform: scale(1, .985); filter: brightness(1.2) saturate(.9); }
+  100% { transform: none; filter: none; }
+}
+@keyframes tv-flash { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tv-off {
+  0%   { transform: none; filter: none; opacity: 1; }
+  40%  { transform: scale(1, .012); filter: brightness(5) saturate(0); }
+  70%  { transform: scale(.03, .012); filter: brightness(7) saturate(0); opacity: 1; }
+  100% { transform: scale(0, 0); filter: brightness(9); opacity: 0; }
+}
+@keyframes tv-flash-off { 0% { opacity: 0; } 35%, 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #panel.tv-on-anim, #panel.tv-off-anim { animation-duration: .01s; }
+}

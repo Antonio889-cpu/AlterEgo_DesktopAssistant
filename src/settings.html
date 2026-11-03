@@ -16,6 +16,7 @@
     <button data-tab="hotkeys">Tasti</button>
     <button data-tab="clip">Clip</button>
     <button data-tab="perms">Permessi</button>
+    <button data-tab="costs">Costi</button>
     <button data-tab="log">Registro</button>
   </nav>
   <main>
@@ -179,6 +180,15 @@
     </section>
 
     <section data-tab="voice">
+      <h2>Musica</h2>
+      <p class="note">Chiedi ad Alter Ego "metti <i>titolo</i>": cerca su YouTube e suona nel lettore (serve il permesso <b>Musica</b>).
+        Mentre parla, la musica si abbassa da sola.</p>
+      <label class="inline"><input type="checkbox" id="music-lyrics" /> Testi sincronizzati (LRCLIB)</label>
+      <label class="inline"><input type="checkbox" id="music-reactive" /> Il volto di Alter Ego nel lettore cambia a tempo di musica</label>
+      <div class="actions"><input id="music-query" placeholder="Prova: titolo e artista" /> <button id="music-go">Cerca e suona</button> <span id="music-result" class="result"></span></div>
+    </section>
+
+    <section data-tab="voice">
       <h2>Mic-Link</h2>
       <p class="note">Crea un microfono virtuale, <b>AlterEgo Link Audio</b>, che contiene <b>il tuo microfono + la voce di Alter Ego</b>.
         Sceglilo come microfono in Discord, OBS, giochi… e gli altri sentiranno anche lei.</p>
@@ -195,6 +205,7 @@
       <label>Volume microfono <input id="link-mic-vol" type="range" min="0" max="2" step="0.05" /></label>
       <label>Volume voce di Alter Ego <input id="link-voice-vol" type="range" min="0" max="1.5" step="0.05" /></label>
       <label class="inline"><input type="checkbox" id="link-blips" /> Anche i blip del dialogo</label>
+      <label class="inline"><input type="checkbox" id="link-music" /> Anche la musica del lettore</label>
       <div class="actions"><span id="link-status" class="result"></span></div>
       <p class="note">Il microfono resta usabile anche dal push-to-talk. Se dopo l'installazione di VB-CABLE non senti più niente,
         Windows lo ha messo come uscita predefinita: rimetti i tuoi altoparlanti in Impostazioni → Sistema → Audio.</p>
@@ -246,6 +257,36 @@
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="volume" /> <b>Volume e luminosità</b></label></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="shell" /> <b>Comandi</b> ⚠ (solo quelli in lista, mai testo libero)</label>
         <div class="list" data-list="commands" data-cols="Nome|Comando"></div></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="web" /> <b>Ricerca web</b> (API Search e Fetch di DeepSeek)</label>
+        <p class="note">Alter Ego cerca sul web e legge le pagine quando serve. Usa la chiave DeepSeek (scheda AI e chiavi):
+          ogni ricerca o pagina costa circa $0,00075 e finisce nella scheda Costi. Il testo trovato è trattato come dato.</p></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="music" /> <b>Musica</b> (cerca su YouTube e suona)</label>
+        <p class="note">Al primo uso scarica <b>yt-dlp</b> e <b>Deno</b> da GitHub in <code>%APPDATA%\AlterEgo\tools</code>. I brani restano in una cache (ultimi 30).</p></div>
+      <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="terminal" /> <b>Terminale</b> ⚠ (PowerShell e cmd, comandi scritti da Alter Ego)</label>
+        <p class="note">Alter Ego può eseguire qualsiasi comando non interattivo (timeout 120 s) e leggerne l'output.</p>
+        <label class="inline sub"><input type="checkbox" data-perm="terminal_autonomous" /> <b>In autonomia</b>: senza chiedere conferma</label>
+        <p class="note">Anche in autonomia, i comandi potenzialmente distruttivi (formattazioni, cancellazioni ricorsive, registro di sistema,
+          utenti, spegnimento, download da internet…) chiedono sempre conferma.</p></div>
+    </section>
+
+    <section data-tab="costs">
+      <h2>Costi</h2>
+      <p class="note">Ogni richiesta a pagamento con token, cache, durata e costo stimato. I costi sono calcolati con i prezzi qui sotto
+        (OpenRouter riporta il costo effettivo). <b>Verifica i prezzi sul sito di ogni provider</b>: cambiano spesso e DeepSeek ha fasce orarie scontate.</p>
+      <div id="cost-cards" class="cards"></div>
+      <h3>Per servizio e modello</h3>
+      <table id="cost-by" class="grid"><thead><tr><th>Servizio</th><th>Modello</th><th>Richieste</th><th>Input</th><th>Cache</th><th>Output</th><th>Costo</th></tr></thead><tbody></tbody></table>
+      <h3>Richieste</h3>
+      <div class="actions">
+        <select id="cost-filter"><option value="">Tutte</option><option value="chat">Chat</option><option value="riassunto">Riassunti</option><option value="ricerca web">Ricerche web</option><option value="pagina web">Pagine web</option><option value="trascrizione">Trascrizioni</option></select>
+        <button id="cost-refresh">Aggiorna</button> <button id="cost-export">Esporta CSV</button> <button id="cost-clear" class="danger">Svuota</button>
+        <span id="cost-result" class="result"></span>
+      </div>
+      <div class="scroll"><table id="cost-table" class="grid"><thead><tr><th>Quando</th><th>Tipo</th><th>Servizio / modello</th><th title="input non in cache">Input</th><th title="input letto dalla cache">Cache</th><th>Output</th><th>Durata</th><th>Costo</th></tr></thead><tbody></tbody></table></div>
+      <h3>Prezzi (dollari)</h3>
+      <p class="note">Modello vuoto = tutti i modelli del servizio; altrimenti vale per i modelli che iniziano così. Token: $ per milione.</p>
+      <table id="price-table" class="grid prices"><thead><tr><th>Servizio</th><th>Modello</th><th>Input</th><th>Cache</th><th>Output</th><th>$ / chiamata</th><th>$ / ora audio</th><th></th></tr></thead><tbody></tbody></table>
+      <div class="actions"><button id="price-add">+ Prezzo</button> <button id="price-reset">Ripristina predefiniti</button></div>
     </section>
 
     <section data-tab="log">

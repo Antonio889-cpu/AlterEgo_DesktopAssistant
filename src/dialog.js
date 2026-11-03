@@ -126,7 +126,7 @@ const Dialog = (() => {
 
   /** Clic/Invio: completa la pagina, poi passa alla successiva, poi chiude. */
   function advance() {
-    if (box.classList.contains("hidden") || box.classList.contains("pending")) return;
+    if (box.classList.contains("hidden") || box.classList.contains("pending") || box.classList.contains("suspended")) return;
     if (timer) {
       stopTyping();
       shown = pages[page].length;
@@ -143,7 +143,7 @@ const Dialog = (() => {
   /** Mostra un messaggio. Un nuovo messaggio interrompe quello in corso. */
   function say(text) {
     stopTyping();
-    box.classList.remove("pending");
+    box.classList.remove("pending", "suspended");
     if (resolveCurrent) resolveCurrent();
     box.classList.remove("hidden");
     pages = paginate(String(text));
@@ -158,7 +158,7 @@ const Dialog = (() => {
     stopTyping();
     clearAuto();
     if (resolveCurrent) { const r = resolveCurrent; resolveCurrent = null; r(); }
-    box.classList.remove("hidden", "waiting");
+    box.classList.remove("hidden", "waiting", "suspended");
     box.classList.add("pending");
     textEl.textContent = label;
     pages = [""];
@@ -167,6 +167,26 @@ const Dialog = (() => {
 
   function setName(name) { tagEl.textContent = name; }
 
+  /** Nasconde il box mentre è aperto l'input di testo (stessa posizione: si sovrapporrebbero).
+   *  La pagina in corso viene completata subito, così non continua a "parlare" da nascosta. */
+  function suspend(on) {
+    if (on) {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+        emit("talk", false);
+        shown = pages[page].length;
+        textEl.textContent = pages[page];
+        box.classList.add("waiting");
+      }
+      clearAuto();
+      box.classList.add("suspended");
+    } else if (box.classList.contains("suspended")) {
+      box.classList.remove("suspended");
+      if (box.classList.contains("waiting")) scheduleAuto();
+    }
+  }
+
   box.addEventListener("click", advance);
 
   return {
@@ -174,6 +194,7 @@ const Dialog = (() => {
     pending,
     advance,
     setName,
+    suspend,
     isOpen: () => !box.classList.contains("hidden"),
     on: (type, fn) => listeners[type].push(fn),
   };

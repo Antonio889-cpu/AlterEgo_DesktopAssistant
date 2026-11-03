@@ -87,3 +87,20 @@ label.button-like:hover { border-color: var(--accent); }
 .danger-zone { border: 1px solid #7a5a22; border-radius: 6px; padding: 8px 10px; background: #2a2210; margin-bottom: 6px; }
 .danger-zone .note { margin-left: 26px; }
 a { color: var(--accent); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.card { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: #0d2611; }
+.card b { display: block; font: 20px "DotGothic16", monospace; color: var(--accent); }
+.card small { color: var(--muted); }
+table.grid { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+table.grid th, table.grid td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #1d3d1f; white-space: nowrap; }
+table.grid td.num, table.grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.grid tr.total td { color: var(--accent); border-top: 1px solid var(--line); }
+.scroll { max-height: 340px; overflow: auto; border: 1px solid #1d3d1f; border-radius: 4px; margin-top: 6px; }
+.scroll table.grid { margin-top: 0; }
+.scroll thead th { position: sticky; top: 0; background: var(--panel); }
+table.prices input { min-width: 0 !important; width: 100%; padding: 2px 5px; }
+table.prices td { padding: 2px 3px; }
+label.sub { margin-left: 26px; }
+#cost-table { font-size: 12.5px; }
+#cost-table td:nth-child(3) { white-space: normal; word-break: break-word; min-width: 140px; }
+#cost-table th, #cost-table td { padding: 3px 5px; }

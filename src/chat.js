@@ -103,6 +103,7 @@ const Chat = (() => {
     if (busy) return;
     invoke("focus_main");
     State.setMode("listening");
+    Dialog.suspend(true);
     prompt.classList.remove("hidden");
     input.value = "";
     setTimeout(() => input.focus(), 30);
@@ -110,6 +111,7 @@ const Chat = (() => {
 
   function closeInput() {
     prompt.classList.add("hidden");
+    Dialog.suspend(false);
     input.blur();
     if (State.mode() === "listening") State.settle(true);
   }

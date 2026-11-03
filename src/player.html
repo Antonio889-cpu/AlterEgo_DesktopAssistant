@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Alter Ego – Musica</title>
+  <link rel="stylesheet" href="player.css" />
+</head>
+<body class="fx">
+  <div id="panel" class="tv-off">
+    <div id="screen">
+      <!-- sprite di Alter Ego: cambia a tempo di musica -->
+      <div id="face" aria-hidden="true"></div>
+
+      <div id="top">
+        <div id="viz" aria-hidden="true"></div>
+        <svg id="note" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2.5v12a3 3 0 1 1-2-2.83V7.1L9 8.8z" /></svg>
+        <div id="meta">
+          <div id="title">…</div>
+          <div id="artist"></div>
+        </div>
+      </div>
+
+      <div id="progress">
+        <div id="bar"><div id="fill"></div><div id="knob"></div></div>
+        <div id="times"><span id="pos">0:00</span><span id="dur">0:00</span></div>
+      </div>
+
+      <div id="controls">
+        <button id="b-shuffle" class="small" title="Casuale" aria-label="Casuale">
+          <svg viewBox="0 0 24 24"><path d="M3 7h3.5c2 0 3.2 1 4.3 2.6l2.4 3.8C14.3 15 15.5 16 17.5 16H21M17.5 13l3.5 3-3.5 3M3 16h3.5c1.4 0 2.4-.5 3.2-1.4M13.5 9.4c.8-.9 1.8-1.4 3.2-1.4H21M17.5 5l3.5 3-3.5 3" /></svg>
+        </button>
+        <button id="b-prev" title="Precedente" aria-label="Precedente">
+          <svg viewBox="0 0 24 24"><path class="solid" d="M18 5v14L8 12zM6 5h2.5v14H6z" /></svg>
+        </button>
+        <button id="b-play" class="big" title="Play / pausa" aria-label="Play / pausa">
+          <svg viewBox="0 0 24 24"><path id="i-pause" class="solid" d="M8 6h3v12H8zM13 6h3v12h-3z" /><path id="i-play" class="solid" d="M8.5 5.5v13l10-6.5z" /></svg>
+        </button>
+        <button id="b-next" title="Successivo" aria-label="Successivo">
+          <svg viewBox="0 0 24 24"><path class="solid" d="M6 5v14l10-7zM15.5 5H18v14h-2.5z" /></svg>
+        </button>
+        <button id="b-repeat" class="small" title="Ripeti" aria-label="Ripeti">
+          <svg viewBox="0 0 24 24"><path d="M5 11V9.5A2.5 2.5 0 0 1 7.5 7H19M16 4l3 3-3 3M19 13v1.5a2.5 2.5 0 0 1-2.5 2.5H5M8 20l-3-3 3-3" /><text id="rep1" x="12" y="14.6">1</text></svg>
+        </button>
+        <div id="vol">
+          <svg id="vol-icon" viewBox="0 0 24 24"><path class="solid" d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" /><path id="vol-w1" d="M15 9.2a4 4 0 0 1 0 5.6" /><path id="vol-w2" d="M17.6 6.6a7.6 7.6 0 0 1 0 10.8" /></svg>
+          <input id="volume" type="range" min="0" max="1" step="0.01" aria-label="Volume" />
+        </div>
+      </div>
+
+      <div id="lyrics">
+        <span id="cursor">▶</span>
+        <div id="lines"><div class="l0"></div><div class="l1"></div><div class="l2"></div></div>
+      </div>
+
+      <button id="close" title="Chiudi (ferma la musica)" aria-label="Chiudi">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+
+      <div id="scanlines"></div>
+      <div id="vignette"></div>
+      <div id="tv-flash"></div>
+    </div>
+  </div>
+  <script src="sprites.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>

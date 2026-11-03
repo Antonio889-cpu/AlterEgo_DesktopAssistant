@@ -5,13 +5,16 @@ mod actions;
 mod assistant;
 mod audio;
 mod config;
+mod costs;
 mod hotkeys;
 mod keys;
 mod memory;
+mod music;
 mod providers;
 mod sprites;
 mod stt;
 mod tray;
+mod web;
 mod window;
 
 use serde::Serialize;
@@ -76,6 +79,8 @@ pub struct FrontConfig {
     clip: config::ClipConfig,
     audio: config::AudioConfig,
     autostart: bool,
+    prices: Vec<config::Price>,
+    music: config::MusicConfig,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -105,6 +110,8 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         clip: cfg.clip.clone(),
         audio: cfg.audio.clone(),
         autostart: cfg.autostart,
+        prices: cfg.prices.clone(),
+        music: cfg.music.clone(),
     }
 }
 
@@ -245,6 +252,58 @@ async fn list_models(app: AppHandle, provider: String) -> Result<Vec<String>, St
     providers::list_models(&state.ai, &cfg, &provider).await
 }
 
+/// Registro dei costi: ultime righe (dalla più recente) con il costo calcolato dai prezzi attuali.
+#[derive(Serialize)]
+struct CostRow {
+    #[serde(flatten)]
+    entry: costs::Entry,
+    cost: f64,
+}
+
+#[tauri::command]
+fn costs_list(app: AppHandle, limit: Option<usize>) -> Vec<CostRow> {
+    let path = app.state::<assistant::Conversation>().data_dir.join("costs.jsonl");
+    let prices = app.state::<AppState>().cfg.lock().unwrap().prices.clone();
+    costs::read(&path, limit.unwrap_or(5000).min(50_000))
+        .into_iter()
+        .map(|e| CostRow { cost: costs::cost(&prices, &e), entry: e })
+        .collect()
+}
+
+#[tauri::command]
+fn costs_clear(app: AppHandle) -> Result<(), String> {
+    let path = app.state::<assistant::Conversation>().data_dir.join("costs.jsonl");
+    std::fs::write(path, b"").map_err(|e| e.to_string())
+}
+
+/// Esporta il registro dei costi in CSV nella cartella Documenti. Restituisce il percorso.
+#[tauri::command]
+fn costs_export(app: AppHandle) -> Result<String, String> {
+    let rows = costs_list(app.clone(), Some(50_000));
+    let mut csv = String::from("data_unix;tipo;provider;modello;input;input_cache;output;chiamate;audio_s;ms;costo_usd\n");
+    for r in rows.iter().rev() {
+        let e = &r.entry;
+        csv.push_str(&format!(
+            "{};{};{};{};{};{};{};{};{:.1};{};{:.6}\n",
+            e.ts, e.kind, e.provider, e.model, e.input, e.cached, e.output, e.calls, e.audio_secs, e.ms, r.cost
+        ));
+    }
+    let dir = app.path().document_dir().unwrap_or_else(|_| app.state::<assistant::Conversation>().data_dir.clone());
+    let path = dir.join(format!("AlterEgo-costi-{}.csv", costs::now()));
+    std::fs::write(&path, csv).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
+
+#[tauri::command]
+fn set_prices(app: AppHandle, prices: Vec<config::Price>) {
+    update_config(&app, |c| c.prices = prices);
+}
+
+#[tauri::command]
+fn reset_prices(app: AppHandle) {
+    update_config(&app, |c| c.prices = config::default_prices());
+}
+
 /// Token usati per provider da quando l'app è aperta (con la parte letta dalla cache).
 #[tauri::command]
 fn ai_usage(app: AppHandle) -> HashMap<String, providers::Usage> {
@@ -324,6 +383,8 @@ fn main() {
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
             app.manage(audio::AudioEngine::new());
+            app.manage(music::Music::new(&data_dir));
+            let cost_log = data_dir.join("costs.jsonl");
             app.manage(assistant::Conversation::new(data_dir));
             let mut cfg = config::load(&cfg_path);
             // migrazione: chiave singola delle versioni precedenti → slot "1"
@@ -351,6 +412,8 @@ fn main() {
                 hotkey_errors: Mutex::new(Vec::new()),
                 ai: providers::Ai::new(),
             });
+            *app.state::<AppState>().ai.cost_log.lock().unwrap() = Some(cost_log.clone());
+            *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap() = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             window::create_main(&handle)?;
@@ -360,6 +423,7 @@ fn main() {
             }
             window::spawn_saver(handle.clone());
             actions::spawn_reminder_loop(handle.clone());
+            music::spawn_analyzer(handle.clone());
             window::spawn_handle_poller(handle);
             Ok(())
         })
@@ -367,6 +431,7 @@ fn main() {
             WindowEvent::Moved(_) | WindowEvent::Resized(_) if win.label() == window::MAIN => {
                 window::record_geometry(win)
             }
+            WindowEvent::Moved(_) if win.label() == music::PLAYER => music::record_player_position(win),
             // Alt+F4 nasconde invece di chiudere: si esce solo dalla tray.
             WindowEvent::CloseRequested { api, .. } if win.label() == window::MAIN => {
                 api.prevent_close();
@@ -391,6 +456,23 @@ fn main() {
             list_models,
             test_provider,
             ai_usage,
+            costs_list,
+            costs_clear,
+            costs_export,
+            set_prices,
+            reset_prices,
+            music::music_state,
+            music::music_toggle,
+            music::music_next,
+            music::music_prev,
+            music::music_seek,
+            music::music_volume,
+            music::music_shuffle,
+            music::music_repeat,
+            music::music_stop,
+            music::music_play,
+            music::music_settings,
+            music::player_closed,
             assistant::chat,
             assistant::set_persona_options,
             assistant::set_stt,

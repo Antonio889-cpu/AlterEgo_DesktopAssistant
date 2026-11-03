@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permessi della finestra principale",
-  "windows": ["main", "settings"],
+  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale)",
+  "windows": ["main", "settings", "player"],
   "permissions": ["core:default", "core:window:allow-start-dragging"]
 }

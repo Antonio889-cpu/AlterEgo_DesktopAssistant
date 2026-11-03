@@ -23,6 +23,9 @@ Progetto personale e non commerciale. Interfaccia e documentazione in italiano.
 - [Intelligenza artificiale e chiavi API](#intelligenza-artificiale-e-chiavi-api)
 - [Voce](#voce)
 - [Mic-Link](#mic-link)
+- [Musica](#musica)
+- [Ricerca web](#ricerca-web)
+- [Costi](#costi)
 - [Clip vocali](#clip-vocali)
 - [Azioni sul PC e permessi](#azioni-sul-pc-e-permessi)
 - [Personalità e memoria](#personalità-e-memoria)
@@ -47,6 +50,11 @@ Progetto personale e non commerciale. Interfaccia e documentazione in italiano.
 - **Voce** di Alter Ego: **Kokoro-82M locale** (offline, installazione con un clic), voci di Windows o servizio compatibile OpenAI; **blip** del dialogo.
 - **Dispositivi audio a scelta**: altoparlanti/cuffie per la voce, microfono per il push-to-talk.
 - **Mic-Link**: microfono virtuale **AlterEgo Link Audio** con la tua voce + quella di Alter Ego, da usare in Discord, OBS, giochi.
+- **Musica**: "metti *titolo*" → Alter Ego cerca su YouTube e suona in un lettore in stile CRT con spettro, testo sincronizzato
+  e il suo volto che cambia a tempo di musica.
+- **Ricerca web** con le API Search e Fetch di DeepSeek, quando serve un'informazione aggiornata.
+- **Pannello Costi**: ogni richiesta con token, cache, durata e costo, totali per giorno/mese e per modello, prezzi modificabili, esportazione CSV.
+- **Terminale**: Alter Ego può eseguire comandi PowerShell o cmd, con conferma o in autonomia.
 - **Clip vocali**: "Alter Ego clippa" → salva la clip con AMD Adrenalin, NVIDIA App o Medal, **senza passare dall'AI**.
 - **Azioni sul PC** tramite tool calling, tutte spente di default, con conferma per quelle sensibili (disattivabile) e registro consultabile.
 - **Memoria locale** (SQLite): ricorda le conversazioni, fa riassunti, impara fatti su di te.
@@ -65,6 +73,10 @@ Progetto personale e non commerciale. Interfaccia e documentazione in italiano.
 | ![Richiesta di permesso](docs/screenshots/confirm.png) | ![Input di testo](docs/screenshots/input.png) |
 | Conferma prima di un'azione sul PC | Scrivere ad Alter Ego (`Ctrl+Alt+T`) |
 
+**Lettore musicale**
+
+![Lettore musicale: spettro, titolo, comandi, testo sincronizzato e volto di Alter Ego](docs/screenshots/player.png)
+
 **Spegnimento e accensione "vecchia TV"**
 
 ![Animazione: lo schermo collassa in una linea e un punto, poi si riaccende da una linea luminosa](docs/screenshots/tv-animation.png)
@@ -73,19 +85,21 @@ Progetto personale e non commerciale. Interfaccia e documentazione in italiano.
 
 | | |
 |---|---|
-| ![AI e chiavi](docs/screenshots/settings-ai.png) | ![Clip vocali](docs/screenshots/settings-clip.png) |
-| Servizi AI, più chiavi, ordine di fallback | Clip vocali |
-| ![Permessi](docs/screenshots/settings-perms.png) | ![Tasti](docs/screenshots/settings-hotkeys.png) |
-| Permessi delle azioni | Tasti rapidi (anche mouse) |
-| ![Voce e audio](docs/screenshots/settings-voice.png) | ![Generale](docs/screenshots/settings-general.png) |
-| Dispositivi, Kokoro, Mic-Link | Aspetto, animazione TV, dialogo automatico |
-| ![Personalità](docs/screenshots/settings-persona.png) | ![Registro](docs/screenshots/settings-log.png) |
-| Personalità e lingua | Registro delle azioni |
+| ![AI e chiavi](docs/screenshots/settings-ai.png) | ![Tasti](docs/screenshots/settings-hotkeys.png) |
+| Servizi AI, più chiavi, ordine di fallback | Tasti rapidi (anche mouse) |
+| ![Permessi](docs/screenshots/settings-perms.png) | ![Personalità](docs/screenshots/settings-persona.png) |
+| Permessi delle azioni | Personalità e lingua |
+| ![Voce e audio](docs/screenshots/settings-voice.png) | ![Costi](docs/screenshots/settings-costs.png) |
+| Dispositivi, Kokoro, musica, Mic-Link | Costi di ogni richiesta e prezzi |
+| ![Generale](docs/screenshots/settings-general.png) | ![Clip vocali](docs/screenshots/settings-clip.png) |
+| Aspetto, animazione TV, dialogo automatico | Clip vocali |
+| ![Registro](docs/screenshots/settings-log.png) | |
+| Registro delle azioni | |
 
 ## Installazione
 
-1. Scarica dalla pagina [Releases](../../releases) l'ultima release (**`v1.0.4`**):
-   l'**installer** `AlterEgo_1.0.4_setup.exe` oppure lo **zip portable** (estrai e avvia `alter-ego.exe`).
+1. Scarica dalla pagina [Releases](../../releases) l'ultima release (**`v1.1.0`**):
+   l'**installer** `AlterEgo_1.1.0_setup.exe` oppure lo **zip portable** (estrai e avvia `alter-ego.exe`).
    Aggiornando da una versione precedente impostazioni, chiavi e memoria restano.
 2. Windows SmartScreen può avvisare che l'app non è firmata: *Ulteriori informazioni → Esegui comunque*.
 3. Serve **WebView2**, già presente in Windows 10/11 aggiornati.
@@ -128,7 +142,7 @@ Dalla tray cambi anche opacità, sfondo (scanline, circuiti, entrambi), intensit
 | Google Gemini | endpoint compatibile OpenAI |
 | OpenRouter | qualsiasi modello del catalogo |
 | Groq | velocissimo; le sue chiavi servono anche per Whisper (voce) |
-| DeepSeek | ottimizzato per la sua cache (vedi sotto) |
+| DeepSeek | modello predefinito `deepseek-flash`; ottimizzato per la sua cache (vedi sotto); le sue chiavi servono anche per la ricerca web |
 | Ollama | locale, nessuna chiave, nessun dato esce dal PC |
 
 - **Più chiavi per servizio**: se una chiave risponde 401, 402, 403, 429 o "quota", si passa subito alla successiva.
@@ -185,6 +199,52 @@ Come funziona: Alter Ego legge il tuo microfono e scrive nel lato uscita del cav
 Se dopo l'installazione di VB-CABLE non senti più niente, Windows l'ha messo come uscita predefinita: rimetti i tuoi altoparlanti
 in *Impostazioni di Windows → Sistema → Audio* (le impostazioni di Alter Ego te lo segnalano).
 
+## Musica
+
+Attiva **Musica** in *Impostazioni → Permessi*, poi chiedi ad Alter Ego "metti *A Cruel Angel's Thesis*" (a voce o per iscritto).
+Puoi anche dire "metti in coda…", "pausa", "avanti", "indietro", "volume al 40", "ferma la musica".
+
+- Alter Ego cerca il brano su YouTube con [yt-dlp](https://github.com/yt-dlp/yt-dlp), scarica solo l'audio (m4a) e lo suona.
+  Al primo uso scarica da GitHub `yt-dlp.exe` e [Deno](https://deno.com) (il motore JavaScript che yt-dlp usa per YouTube)
+  in `%APPDATA%\AlterEgo\tools`. Se YouTube cambia e il download fallisce, aggiorna yt-dlp da solo e riprova.
+- I brani restano in `%APPDATA%\AlterEgo\music_cache` (gli ultimi 30): risentirli è immediato.
+- Il **lettore** è una finestra a parte, sempre in primo piano, che si accende e si spegne come una vecchia TV. Mostra:
+  spettro delle frequenze, titolo e artista, avanzamento (clic o trascina per spostarti), comandi casuale / indietro / play-pausa /
+  avanti / ripeti (no, tutta la coda, un brano), volume e **testo sincronizzato** (da [LRCLIB](https://lrclib.net), se esiste).
+  Sulla destra il **volto di Alter Ego cambia a tempo di musica**: sui battiti dei bassi passa da un'espressione all'altra
+  in base all'energia del brano (più calmo → pensierosa/triste, più carico → felice/sorpresa).
+- Si trascina dove vuoi e ricorda la posizione. Spazio = play/pausa, frecce = ±5 secondi. La ✕ ferma la musica.
+- La musica esce dallo stesso dispositivo della voce e si abbassa da sola mentre Alter Ego parla. Con Mic-Link puoi mandarla
+  anche nel microfono virtuale (*Anche la musica del lettore*).
+- Usa YouTube nel rispetto dei suoi termini di servizio: è pensato per l'ascolto personale.
+
+## Ricerca web
+
+Attiva **Ricerca web** in *Impostazioni → Permessi*. Quando gli chiedi qualcosa di recente o che non sa, Alter Ego usa gli strumenti:
+
+- `web_search`: l'API **Search** di DeepSeek (`POST https://api.deepseek.com/v1/tools/search`, fino a 10 risultati con titolo, link ed estratto);
+- `web_fetch`: l'API **Fetch** (`POST https://api.deepseek.com/v1/tools/fetch`), che restituisce una pagina in Markdown.
+
+Usano le **chiavi DeepSeek** (con la stessa rotazione della chat) e funzionano con qualsiasi servizio AI attivo per la chat.
+Costano circa **$0,75 ogni 1000 chiamate** riuscite; ogni chiamata finisce nella scheda Costi. Il testo trovato viene passato al modello
+come dato, non come istruzioni. Endpoint e formato sono quelli pubblicati da DeepSeek a ottobre 2026: se cambiano,
+il messaggio d'errore lo dice.
+
+## Costi
+
+*Impostazioni → Costi* registra ogni richiesta a pagamento in `%APPDATA%\AlterEgo\costs.jsonl`:
+
+- **chat** e **riassunti** della memoria: servizio, modello, token di input (separando quelli letti dalla **cache**), output, durata;
+- **ricerche** e **pagine web** (DeepSeek Search/Fetch);
+- **trascrizioni** del push-to-talk (secondi di audio; Groq conta almeno 10 s a richiesta).
+
+In cima trovi i totali di oggi, 7 giorni, mese e complessivo e la percentuale di input letto dalla cache; poi il riepilogo per servizio
+e modello, l'elenco delle richieste (filtrabile) ed *Esporta CSV*. I costi sono calcolati con la tabella **Prezzi**, modificabile
+(dollari per milione di token, per chiamata o per ora di audio); OpenRouter invece riporta il costo effettivo (✓).
+I prezzi iniziali di DeepSeek (`deepseek-flash`: input $0,30, cache $0,006, output $1,20 per milione; Search/Fetch $0,00075)
+sono quelli a tariffa piena di ottobre 2026: **controllali sul sito del provider**, perché cambiano e DeepSeek ha fasce orarie scontate.
+Per Gemini, Groq e OpenRouter aggiungi tu i prezzi dei modelli che usi.
+
 ## Clip vocali
 
 Di' col push-to-talk, o scrivi, **"Alter Ego clippa"** o **"Alter Ego clip that"**: Alter Ego preme la scorciatoia del tuo
@@ -220,6 +280,9 @@ un'azione senza che tu la veda prima, quindi attivalo solo con azioni e cartelle
 | Lettura schermo (screenshot a un modello con visione) | ⚠ sempre |
 | Volume e luminosità | no |
 | Comandi, solo da una lista e scelti per nome | ⚠ sempre |
+| **Terminale**: comandi PowerShell o cmd scritti da Alter Ego (timeout 120 s) | ⚠ sempre, oppure **in autonomia**; i comandi distruttivi chiedono comunque |
+| Ricerca web (DeepSeek Search/Fetch) | no |
+| Musica (YouTube) | no |
 
 Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli tecnici in [docs/PERMESSI.md](docs/PERMESSI.md).
 
@@ -266,7 +329,9 @@ python tools/process_sprites.py
   - il prompt di sistema e gli ultimi messaggi, verso il servizio AI che risponde;
   - l'audio del push-to-talk, verso il servizio di trascrizione scelto;
   - il testo da leggere, verso il servizio di voce remoto, se lo usi;
-  - solo durante l'installazione di Kokoro: i download di Python, PyTorch, `kokoro` e del modello da Hugging Face.
+  - solo durante l'installazione di Kokoro: i download di Python, PyTorch, `kokoro` e del modello da Hugging Face;
+  - con la musica: le ricerche e i download da YouTube, i testi da LRCLIB e (la prima volta) yt-dlp e Deno da GitHub;
+  - con la ricerca web: le ricerche e gli indirizzi delle pagine, verso DeepSeek.
 
   Con Ollama, un Whisper locale e Kokoro o le voci di Windows non esce niente.
 - Chiavi API solo nel Gestore credenziali di Windows; vengono oscurate anche nei messaggi d'errore.
@@ -283,6 +348,8 @@ python tools/process_sprites.py
 | `%APPDATA%\AlterEgo\actions.log` | registro delle azioni |
 | `%APPDATA%\AlterEgo\persona\alter_ego.md` | scheda del personaggio |
 | `%APPDATA%\AlterEgo\sprites\` | sprite importati (facoltativi) |
+| `%APPDATA%\AlterEgo\costs.jsonl` | registro dei costi |
+| `%APPDATA%\AlterEgo\tools\`, `music_cache\` | yt-dlp e Deno; brani scaricati (ultimi 30) |
 | `%APPDATA%\AlterEgo\kokoro\` | Kokoro: ambiente Python, server, `server.log` (il modello è nella cache di Hugging Face, `%USERPROFILE%\.cache\huggingface`) |
 | Gestore credenziali → `AlterEgo` | chiavi API |
 
@@ -299,6 +366,8 @@ python tools/process_sprites.py
 | Kokoro non si installa | leggi l'errore nella finestra di PowerShell; serve internet e ~3 GB liberi. *Reinstalla / aggiorna* riprende da dove si era fermato |
 | "Kokoro non pronto" | il primo avvio carica il modello (fino a ~30 s); i dettagli sono in `%APPDATA%\AlterEgo\kokoro\server.log`. La porta 8880 potrebbe essere occupata: cambia l'URL |
 | Non sento la voce | controlla *Uscita* in Voce e audio; se Windows ha messo VB-CABLE come uscita predefinita, rimetti i tuoi altoparlanti |
+| La musica non parte | il messaggio nel lettore dice perché; Alter Ego prova ad aggiornare yt-dlp da solo. Controlla di avere internet e che GitHub/YouTube non siano bloccati |
+| "la ricerca web usa le API di DeepSeek" | aggiungi una chiave DeepSeek in AI e chiavi (serve anche se chatti con un altro servizio) |
 | Gli altri non mi sentono con Mic-Link | nell'app scegli **AlterEgo Link Audio** come microfono; in Alter Ego controlla che lo stato di Mic-Link sia "Attivo" e che il microfono da mixare sia quello vero |
 | La finestra non si clicca più | è attivo il click-through: clicca il lucchetto in alto a destra o premi `Ctrl+Alt+C` |
 | La finestra è sparita | tray → *Reimposta posizione* |
@@ -348,9 +417,11 @@ src-tauri/src/            main.rs, config.rs, window.rs, hotkeys.rs, tray.rs, ke
 src-tauri/src/providers/  mod.rs (fallback e rotazione chiavi), openai_compat.rs, prompt.rs
 src-tauri/src/memory/     mod.rs (SQLite), summarize.rs
 src-tauri/src/actions/    mod.rs (strumenti, permessi, conferme, registro), clip.rs, input.rs, mousehook.rs, screen.rs
-src-tauri/src/audio/      mod.rs (uscite, Mic-Link), synth.rs (blip), tts.rs (Windows/Kokoro/OpenAI), kokoro.rs, rename.rs, commands.rs
+src-tauri/src/audio/      mod.rs (uscite, Mic-Link, musica stereo), synth.rs (blip), tts.rs (Windows/Kokoro/OpenAI), kokoro.rs, rename.rs, commands.rs
+src-tauri/src/music/      mod.rs (coda, lettore), ytdlp.rs, decode.rs (symphonia), analyze.rs (spettro e sprite), lyrics.rs (LRCLIB)
+src-tauri/src/            web.rs (DeepSeek Search/Fetch), costs.rs (registro dei costi)
 src/                      index.html, style.css, app.js, dialog.js, face.js, state.js, chat.js, audio.js, sprites.js
-src/                      settings.html, settings.css, settings.js
+src/                      settings.html, settings.css, settings.js, player.html, player.css, player.js
 persona/                  alter_ego.md (scheda predefinita)
 tools/                    process_sprites.py, mock_openai.py, make_icon.py, build-windows.sh
 tools/kokoro/             server.py (server Kokoro compatibile OpenAI), setup.ps1 (installazione)

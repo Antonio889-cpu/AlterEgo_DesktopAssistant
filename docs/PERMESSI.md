@@ -41,3 +41,27 @@ In cima a *Impostazioni → Permessi* c'è **Non chiedere conferma** (spento di 
 Rischio: il modello può essere spinto da un testo letto (file, appunti, schermo, pagina web) a chiedere un'azione; senza conferma
 non la vedi prima che parta. Il prompt di sistema dice di trattare quei testi come dati, ma non è una garanzia:
 attivalo solo con azioni, cartelle e comandi che ti va bene far eseguire in automatico.
+
+## Terminale (PowerShell e cmd)
+
+Strumento `run_shell`: Alter Ego scrive un comando non interattivo e lo esegue in PowerShell (`-NoProfile -NonInteractive`)
+o in cmd, nella tua cartella utente, con finestra nascosta e timeout di 120 secondi. Riceve l'output (massimo 6000 caratteri)
+come **dato**.
+
+- Spento di default. Con il permesso attivo chiede conferma per ogni comando.
+- **In autonomia**: esegue senza chiedere. Anche così chiedono **sempre** conferma i comandi che contengono, per esempio:
+  `format`, `diskpart`, `bcdedit`, `cipher /w`, `vssadmin delete`, `reg delete HKLM`, `Remove-Item -Recurse`, `rd /s`, `del /s`,
+  `takeown`, `icacls`, spegnimento/riavvio, gestione utenti, `Set-ExecutionPolicy`, download (`Invoke-WebRequest`, `curl`)
+  e comandi codificati (`-EncodedCommand`). È una rete di sicurezza, non una garanzia: un comando dannoso scritto in altro modo passa.
+- Ogni comando, eseguito o negato, finisce nel Registro.
+
+## Ricerca web
+
+Strumenti `web_search` e `web_fetch` (API Search e Fetch di DeepSeek). Nessuna conferma: inviano a DeepSeek il testo della
+ricerca o l'indirizzo della pagina. Si accettano solo pagine `http`/`https` senza credenziali nell'indirizzo. Il contenuto
+torna al modello come dato.
+
+## Musica
+
+Strumenti `play_music` e `music_control`. Nessuna conferma. La prima volta scarica `yt-dlp.exe` e `deno.exe` da GitHub
+(release ufficiali) in `%APPDATA%\AlterEgo\tools`; poi esegue yt-dlp con finestra nascosta per cercare e scaricare l'audio.

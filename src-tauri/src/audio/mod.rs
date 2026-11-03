@@ -22,6 +22,7 @@ use std::{
     collections::VecDeque,
     sync::{
         atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU32},
         mpsc, Arc, Mutex,
     },
     time::Duration,
@@ -33,24 +34,39 @@ pub const LINK_NAME: &str = "AlterEgo Link Audio";
 const MIC_MAX_SECONDS: f32 = 0.15;
 
 /// Una coda di uscita: `voice` è sequenziale (le frasi si accodano), `fx` si mixa
-/// "da adesso" (i blip si sovrappongono a ciò che sta suonando).
-#[derive(Default)]
+/// "da adesso" (i blip si sovrappongono a ciò che sta suonando), `music` è stereo.
 struct Sink {
     rate: u32,
     active: bool,
     voice: VecDeque<f32>,
     fx: VecDeque<f32>,
+    music: VecDeque<(f32, f32)>,
+    /// Volume musica attuale per il "ducking" (scende mentre parla Alter Ego).
+    duck: f32,
+}
+
+impl Default for Sink {
+    fn default() -> Self {
+        Self { rate: 0, active: false, voice: VecDeque::new(), fx: VecDeque::new(), music: VecDeque::new(), duck: 1.0 }
+    }
 }
 
 impl Sink {
-    fn next(&mut self) -> f32 {
-        self.voice.pop_front().unwrap_or(0.0) + self.fx.pop_front().unwrap_or(0.0)
-    }
+    /// Svuota voce e suoni (la musica continua).
     fn clear(&mut self) {
         self.voice.clear();
         self.fx.clear();
     }
+    fn clear_all(&mut self) {
+        self.clear();
+        self.music.clear();
+    }
 }
+
+/// Volume della musica mentre parla Alter Ego.
+const DUCK_LEVEL: f32 = 0.3;
+/// Campioni conservati per lo spettro del lettore musicale.
+const ANALYSIS_LEN: usize = 4096;
 
 fn mix_into(buf: &mut VecDeque<f32>, samples: &[f32]) {
     let n = buf.len();
@@ -71,6 +87,13 @@ struct Shared {
     mic: Mutex<VecDeque<f32>>,
     gains: Mutex<LinkGains>,
     status: Mutex<Status>,
+    music_paused: AtomicBool,
+    /// Volume musica (f32 in bit).
+    music_gain: AtomicU32,
+    /// Frame di musica già suonati dagli altoparlanti (per la posizione nel brano).
+    music_played: AtomicU64,
+    /// Ultimi campioni di musica suonati (mono), per lo spettro.
+    analysis: Mutex<VecDeque<f32>>,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -78,6 +101,7 @@ struct LinkGains {
     mic: f32,
     voice: f32,
     blips: bool,
+    music: bool,
 }
 
 /// Stato visibile nelle impostazioni.
@@ -116,6 +140,7 @@ pub struct AudioEngine {
 impl AudioEngine {
     pub fn new() -> Self {
         let shared = Arc::new(Shared::default());
+        shared.music_gain.store(0.8f32.to_bits(), Ordering::Relaxed);
         let (tx, rx) = mpsc::channel::<Setup>();
         let sh = shared.clone();
         std::thread::Builder::new()
@@ -129,7 +154,7 @@ impl AudioEngine {
     pub fn configure(&self, a: &AudioConfig) {
         let ml = &a.mic_link;
         *self.shared.gains.lock().unwrap() =
-            LinkGains { mic: ml.mic_volume as f32, voice: ml.voice_volume as f32, blips: ml.include_blips };
+            LinkGains { mic: ml.mic_volume as f32, voice: ml.voice_volume as f32, blips: ml.include_blips, music: ml.include_music };
         let setup = Setup {
             output: a.output_device.clone(),
             link: ml.enabled.then(|| (ml.mic_device.clone(), ml.cable_device.clone())),
@@ -179,6 +204,84 @@ impl AudioEngine {
 
     pub fn status(&self) -> Status {
         self.shared.status.lock().unwrap().clone()
+    }
+
+    // ---------- musica (stereo) ----------
+
+    /// Rate degli altoparlanti (0 = nessuna uscita) e del cavo Mic-Link se riceve la musica.
+    pub fn music_rates(&self) -> (u32, Option<u32>) {
+        let sp = self.shared.speaker.lock().unwrap();
+        let speaker = if sp.active { sp.rate } else { 0 };
+        drop(sp);
+        let link = self.shared.link.lock().unwrap();
+        let g = *self.shared.gains.lock().unwrap();
+        (speaker, (link.active && g.music).then_some(link.rate))
+    }
+
+    /// Accoda musica già ricampionata. Senza uscita audio conta i frame come "suonati"
+    /// (così posizione e spettro funzionano lo stesso) e restituisce false.
+    pub fn push_music(&self, speaker: &[(f32, f32)], link: Option<&[(f32, f32)]>) -> bool {
+        let mut sp = self.shared.speaker.lock().unwrap();
+        let active = sp.active;
+        if active {
+            sp.music.extend(speaker.iter().copied());
+        }
+        drop(sp);
+        if let Some(l) = link {
+            let mut lk = self.shared.link.lock().unwrap();
+            if lk.active {
+                lk.music.extend(l.iter().copied());
+            }
+        }
+        if !active {
+            self.shared.music_played.fetch_add(speaker.len() as u64, Ordering::Relaxed);
+            push_analysis(&self.shared, speaker.iter().map(|(l, r)| (l + r) * 0.5));
+        }
+        active
+    }
+
+    /// Secondi di musica in coda sugli altoparlanti.
+    pub fn music_buffered(&self) -> f32 {
+        let s = self.shared.speaker.lock().unwrap();
+        if s.rate == 0 { 0.0 } else { s.music.len() as f32 / s.rate as f32 }
+    }
+
+    pub fn music_clear(&self) {
+        self.shared.speaker.lock().unwrap().music.clear();
+        self.shared.link.lock().unwrap().music.clear();
+        self.shared.analysis.lock().unwrap().clear();
+    }
+
+    pub fn music_is_paused(&self) -> bool {
+        self.shared.music_paused.load(Ordering::Relaxed)
+    }
+
+    pub fn set_music_paused(&self, paused: bool) {
+        self.shared.music_paused.store(paused, Ordering::Relaxed);
+    }
+
+    pub fn set_music_gain(&self, gain: f32) {
+        self.shared.music_gain.store(gain.clamp(0.0, 1.5).to_bits(), Ordering::Relaxed);
+    }
+
+    /// Frame suonati dall'ultimo azzeramento (azzerando si legge e si riparte da 0).
+    pub fn music_played(&self, reset: bool) -> u64 {
+        if reset { self.shared.music_played.swap(0, Ordering::Relaxed) } else { self.shared.music_played.load(Ordering::Relaxed) }
+    }
+
+    /// Ultimi `n` campioni di musica suonati (mono).
+    pub fn music_analysis(&self, n: usize) -> Vec<f32> {
+        let a = self.shared.analysis.lock().unwrap();
+        a.iter().skip(a.len().saturating_sub(n)).copied().collect()
+    }
+}
+
+fn push_analysis(sh: &Shared, samples: impl Iterator<Item = f32>) {
+    let mut a = sh.analysis.lock().unwrap();
+    a.extend(samples);
+    let len = a.len();
+    if len > ANALYSIS_LEN {
+        a.drain(..len - ANALYSIS_LEN);
     }
 }
 
@@ -257,7 +360,7 @@ fn run(rx: mpsc::Receiver<Setup>, sh: Arc<Shared>) {
         for s in [&sh.speaker, &sh.link] {
             let mut s = s.lock().unwrap();
             s.active = false;
-            s.clear();
+            s.clear_all();
         }
         sh.mic.lock().unwrap().clear();
         let mut status = Status::default();
@@ -326,35 +429,69 @@ fn open_output(name: &str, sh: Arc<Shared>, link: bool) -> Result<(String, cpal:
     {
         let mut s = if link { sh.link.lock().unwrap() } else { sh.speaker.lock().unwrap() };
         s.rate = rate;
-        s.clear();
+        s.clear_all();
     }
     let err_fn = |e| eprintln!("errore uscita audio: {e}");
     let sh2 = sh.clone();
 
-    // campione successivo (mono) per questa uscita
-    let next = move || -> f32 {
-        if link {
-            let g = *sh.gains.lock().unwrap();
-            let m = sh.mic.lock().unwrap().pop_front().unwrap_or(0.0) * g.mic;
-            (m + sh.link.lock().unwrap().next()).clamp(-1.0, 1.0)
-        } else {
-            sh.speaker.lock().unwrap().next().clamp(-1.0, 1.0)
+    // riempie `buf` con `frames` frame stereo: voce + suoni (+ microfono per Mic-Link) + musica
+    let mut played: Vec<f32> = Vec::with_capacity(4096);
+    let render = move |frames: usize, buf: &mut Vec<(f32, f32)>| {
+        buf.clear();
+        let g = *sh.gains.lock().unwrap();
+        let music_on = !sh.music_paused.load(Ordering::Relaxed);
+        let gain = f32::from_bits(sh.music_gain.load(Ordering::Relaxed));
+        let mut mic = if link { Some(sh.mic.lock().unwrap()) } else { None };
+        let mut s = if link { sh.link.lock().unwrap() } else { sh.speaker.lock().unwrap() };
+        played.clear();
+        for _ in 0..frames {
+            let v = s.voice.pop_front().unwrap_or(0.0) + s.fx.pop_front().unwrap_or(0.0);
+            // ducking morbido (~50 ms) mentre Alter Ego parla
+            let target = if s.voice.is_empty() { 1.0 } else { DUCK_LEVEL };
+            s.duck += (target - s.duck) * 0.0005;
+            let (ml, mr) = if music_on {
+                match s.music.pop_front() {
+                    Some(m) => {
+                        played.push((m.0 + m.1) * 0.5);
+                        m
+                    }
+                    None => (0.0, 0.0),
+                }
+            } else {
+                (0.0, 0.0)
+            };
+            let mg = gain * s.duck;
+            let m = mic.as_mut().and_then(|q| q.pop_front()).unwrap_or(0.0) * g.mic;
+            buf.push(((v + m + ml * mg).clamp(-1.0, 1.0), (v + m + mr * mg).clamp(-1.0, 1.0)));
+        }
+        drop(s);
+        if !link && !played.is_empty() {
+            sh.music_played.fetch_add(played.len() as u64, Ordering::Relaxed);
+            push_analysis(&sh, played.iter().copied());
         }
     };
-    fn fill<T: Copy>(out: &mut [T], channels: usize, next: &mut impl FnMut() -> f32, conv: impl Fn(f32) -> T) {
-        for frame in out.chunks_mut(channels) {
-            let v = conv(next());
-            frame.iter_mut().for_each(|s| *s = v);
+    fn fill<T: Copy>(out: &mut [T], channels: usize, buf: &mut Vec<(f32, f32)>, render: &mut impl FnMut(usize, &mut Vec<(f32, f32)>), conv: impl Fn(f32) -> T) {
+        render(out.len() / channels, buf);
+        for (frame, (l, r)) in out.chunks_mut(channels).zip(buf.iter()) {
+            match frame.len() {
+                1 => frame[0] = conv((l + r) * 0.5),
+                _ => {
+                    frame[0] = conv(*l);
+                    frame[1] = conv(*r);
+                    frame[2..].iter_mut().for_each(|x| *x = conv((l + r) * 0.5));
+                }
+            }
         }
     }
-    let mut n = next;
+    let mut buf = Vec::<(f32, f32)>::with_capacity(4096);
+    let mut n = render;
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_output_stream(
-            &config.into(), move |d: &mut [f32], _: &_| fill(d, channels, &mut n, |v| v), err_fn, None),
+            &config.into(), move |d: &mut [f32], _: &_| fill(d, channels, &mut buf, &mut n, |v| v), err_fn, None),
         cpal::SampleFormat::I16 => device.build_output_stream(
-            &config.into(), move |d: &mut [i16], _: &_| fill(d, channels, &mut n, |v| (v * 32767.0) as i16), err_fn, None),
+            &config.into(), move |d: &mut [i16], _: &_| fill(d, channels, &mut buf, &mut n, |v| (v * 32767.0) as i16), err_fn, None),
         cpal::SampleFormat::U16 => device.build_output_stream(
-            &config.into(), move |d: &mut [u16], _: &_| fill(d, channels, &mut n, |v| ((v + 1.0) * 32767.5) as u16), err_fn, None),
+            &config.into(), move |d: &mut [u16], _: &_| fill(d, channels, &mut buf, &mut n, |v| ((v + 1.0) * 32767.5) as u16), err_fn, None),
         other => return Err(format!("{dev_name}: formato non supportato ({other:?})")),
     }
     .map_err(|e| format!("{dev_name}: {e}"))?;
@@ -365,19 +502,19 @@ fn open_output(name: &str, sh: Arc<Shared>, link: bool) -> Result<(String, cpal:
 }
 
 /// Linear resampler con stato, per il microfono in tempo reale.
-struct Resampler {
+pub struct Resampler {
     step: f64,
     pos: f64,
     last: f32,
 }
 
 impl Resampler {
-    fn new(from: u32, to: u32) -> Self {
+    pub fn new(from: u32, to: u32) -> Self {
         Self { step: from as f64 / to as f64, pos: 0.0, last: 0.0 }
     }
     /// Converte un blocco; `pos` è la posizione del prossimo campione d'uscita rispetto
     /// all'inizio del blocco (-1..0 = tra l'ultimo campione del blocco precedente e il primo).
-    fn push(&mut self, input: &[f32], out: &mut VecDeque<f32>) {
+    pub fn push(&mut self, input: &[f32], out: &mut VecDeque<f32>) {
         let n = input.len() as f64;
         let last = self.last;
         let get = |i: isize| if i < 0 { last } else { input[i as usize] };

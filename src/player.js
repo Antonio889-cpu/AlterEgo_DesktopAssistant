@@ -1,0 +1,204 @@
+// Lettore musicale: stato dal backend (music-state), spettro e cambi di sprite (music-spectrum).
+const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
+const win = window.__TAURI__.window.getCurrentWindow();
+const $ = (id) => document.getElementById(id);
+
+const BANDS = 24;
+let st = null;
+let stAt = 0; // performance.now() quando è arrivato lo stato
+let seeking = false;
+
+// ---------- barre dello spettro ----------
+const bars = [];
+for (let i = 0; i < BANDS; i++) {
+  const b = document.createElement("span");
+  $("viz").appendChild(b);
+  bars.push(b);
+}
+function drawBands(bands) {
+  bars.forEach((b, i) => { b.style.height = Math.max(2, (bands[i] || 0) * 0.52) + "px"; });
+}
+
+// ---------- sprite ----------
+const face = $("face");
+const imgs = {};
+let current = null;
+async function loadSprites() {
+  let user = {};
+  try { user = await invoke("load_user_sprites"); } catch {}
+  const files = window.SPRITES.files;
+  for (const name of Object.keys(files)) {
+    const img = new Image();
+    img.src = user[name] || `assets/sprites/${files[name]}`;
+    img.alt = "";
+    face.appendChild(img);
+    imgs[name] = img;
+  }
+  showSprite("idle");
+}
+function showSprite(name) {
+  if (!imgs[name] || name === current) return;
+  current = name;
+  for (const [n, img] of Object.entries(imgs)) img.classList.toggle("on", n === name);
+}
+let beatTimer = null;
+function beat() {
+  face.classList.add("beat");
+  clearTimeout(beatTimer);
+  beatTimer = setTimeout(() => face.classList.remove("beat"), 110);
+}
+
+// ---------- stato ----------
+const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+function position() {
+  if (!st) return 0;
+  let p = st.position;
+  if (st.playing && !st.paused) p += (performance.now() - stAt) / 1000;
+  return st.duration ? Math.min(p, st.duration) : p;
+}
+
+function applyState(s) {
+  st = s;
+  stAt = performance.now();
+  const t = s.track;
+  const title = $("title");
+  if (s.status) {
+    title.textContent = s.status;
+    title.classList.add("status");
+    $("artist").textContent = t ? `${t.title} — ${t.artist}` : "";
+  } else {
+    title.classList.remove("status");
+    title.textContent = t ? t.title : "—";
+    $("artist").textContent = t ? t.artist : "";
+  }
+  document.body.classList.toggle("paused", !s.playing || s.paused);
+  $("b-shuffle").classList.toggle("on", s.shuffle);
+  $("b-repeat").classList.toggle("on", s.repeat !== "off");
+  $("b-repeat").classList.toggle("one", s.repeat === "one");
+  $("b-repeat").title = { off: "Ripeti: no", all: "Ripeti: tutta la coda", one: "Ripeti: questo brano" }[s.repeat];
+  $("dur").textContent = fmt(s.duration);
+  if (document.activeElement !== $("volume")) setVolumeUi(s.volume);
+  if (!s.reactive_sprite) showSprite("idle");
+  render();
+}
+
+function setVolumeUi(v) {
+  $("volume").value = v;
+  $("volume").style.setProperty("--v", `${Math.round(v * 100)}%`);
+  $("vol-w1").style.opacity = v > 0.05 ? 1 : 0.2;
+  $("vol-w2").style.opacity = v > 0.5 ? 1 : 0.2;
+}
+
+function lyricLines(pos) {
+  const ly = st?.track?.lyrics;
+  if (!ly || !ly.length) return null;
+  let i = 0;
+  while (i + 1 < ly.length && ly[i + 1][0] <= pos + 0.25) i++;
+  if (ly[0][0] > pos + 0.25) i = -1; // prima della prima riga
+  const at = (k) => (k < 0 ? "♪" : k < ly.length ? ly[k][1] || "♪" : "");
+  return [at(i), at(i + 1), at(i + 2)];
+}
+
+let lastLyric = "";
+function render() {
+  if (!st) return;
+  const pos = seeking ? seeking : position();
+  const pct = st.duration ? (pos / st.duration) * 100 : 0;
+  $("fill").style.width = pct + "%";
+  $("knob").style.left = pct + "%";
+  $("pos").textContent = fmt(pos);
+  const lines = lyricLines(pos);
+  const key = lines ? lines.join("|") : "none";
+  if (key !== lastLyric) {
+    lastLyric = key;
+    const els = $("lines").children;
+    const show = lines || [st.track ? "♪ ♪ ♪" : "", st.track ? "testo non disponibile" : "", ""];
+    for (let k = 0; k < 3; k++) els[k].textContent = show[k];
+    $("lyrics").classList.toggle("none", !lines);
+  }
+}
+(function loop() { render(); requestAnimationFrame(loop); })();
+
+// ---------- comandi ----------
+$("b-play").onclick = () => invoke("music_toggle");
+$("b-next").onclick = () => invoke("music_next");
+$("b-prev").onclick = () => invoke("music_prev");
+$("b-shuffle").onclick = () => invoke("music_shuffle");
+$("b-repeat").onclick = () => invoke("music_repeat");
+$("close").onclick = () => invoke("music_stop");
+let volTimer = null;
+$("volume").oninput = (e) => {
+  const v = +e.target.value;
+  setVolumeUi(v);
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => invoke("music_volume", { volume: v }), 60);
+};
+
+// seek: clic o trascinamento sulla barra
+const bar = $("bar");
+function seekAt(e) {
+  const r = bar.getBoundingClientRect();
+  const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  return f * (st?.duration || 0);
+}
+bar.addEventListener("pointerdown", (e) => {
+  if (!st?.duration) return;
+  e.stopPropagation();
+  bar.setPointerCapture(e.pointerId);
+  seeking = seekAt(e) || 0.001;
+});
+bar.addEventListener("pointermove", (e) => { if (seeking) seeking = seekAt(e) || 0.001; });
+bar.addEventListener("pointerup", (e) => {
+  if (!seeking) return;
+  const t = seekAt(e);
+  seeking = false;
+  st.position = t;
+  stAt = performance.now();
+  invoke("music_seek", { secs: t });
+});
+
+// spostamento della finestra (fuori dai comandi)
+$("screen").addEventListener("mousedown", (e) => {
+  if (e.button !== 0 || e.target.closest("button, input, #bar")) return;
+  win.startDragging();
+});
+window.addEventListener("contextmenu", (e) => e.preventDefault());
+window.addEventListener("keydown", (e) => {
+  if (e.key === " ") { e.preventDefault(); invoke("music_toggle"); }
+  else if (e.key === "ArrowRight") invoke("music_seek", { secs: position() + 5 });
+  else if (e.key === "ArrowLeft") invoke("music_seek", { secs: Math.max(0, position() - 5) });
+});
+
+// ---------- accensione / spegnimento "TV" ----------
+const panel = $("panel");
+function tvOn() {
+  panel.classList.remove("tv-off", "tv-off-anim");
+  void panel.offsetWidth;
+  panel.classList.add("tv-on-anim");
+  setTimeout(() => panel.classList.remove("tv-on-anim"), 650);
+}
+function tvOff() {
+  panel.classList.remove("tv-on-anim");
+  panel.classList.add("tv-off-anim");
+  setTimeout(() => { panel.classList.add("tv-off"); invoke("player_closed"); }, 440);
+}
+
+// ---------- eventi ----------
+listen("music-state", (e) => applyState(e.payload));
+listen("music-spectrum", (e) => {
+  const s = e.payload;
+  drawBands(s.bands);
+  if (!st?.reactive_sprite) return;
+  if (s.beat) beat();
+  if (s.sprite) showSprite(s.sprite);
+});
+listen("tv", (e) => (e.payload === "off" ? tvOff() : tvOn()));
+
+(async () => {
+  await document.fonts.load('20px "DotGothic16"');
+  await loadSprites();
+  drawBands([]);
+  try { applyState(await invoke("music_state")); } catch {}
+  tvOn();
+})();
