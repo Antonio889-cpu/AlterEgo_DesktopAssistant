@@ -7,6 +7,7 @@ mod audio;
 mod config;
 mod costs;
 mod hotkeys;
+mod i18n;
 mod keys;
 mod memory;
 mod music;
@@ -63,6 +64,7 @@ pub struct FrontConfig {
     hotkey_errors: Vec<String>,
     user_name: String,
     name_tag: String,
+    ui_language: String,
     background: String,
     bg_intensity: f64,
     dialog_style: String,
@@ -94,6 +96,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         hotkeys: cfg.hotkeys.clone(),
         user_name: cfg.user_name.clone(),
         name_tag: cfg.name_tag.clone(),
+        ui_language: cfg.ui_language.clone(),
         background: cfg.background.clone(),
         bg_intensity: cfg.bg_intensity,
         dialog_style: cfg.dialog_style.clone(),
@@ -131,8 +134,33 @@ fn get_config(app: AppHandle) -> FrontConfig {
 
 #[tauri::command]
 fn resize_window(app: AppHandle, width: f64) -> Result<(), String> {
+    if window::is_compact() {
+        return Ok(()); // durante la musica la dimensione la decide la modalità compatta
+    }
     let win = app.get_webview_window(window::MAIN).ok_or("finestra assente")?;
     window::resize_keep_ratio(&win, width).map_err(|e| e.to_string())
+}
+
+/// Lingua dell'interfaccia scelta nelle impostazioni ("auto", "it", "en").
+#[tauri::command]
+fn set_ui_language(app: AppHandle, lang: String) {
+    let lang = if ["it", "en"].contains(&lang.as_str()) { lang } else { "auto".into() };
+    update_config(&app, |c| c.ui_language = lang);
+}
+
+/// Lingua effettiva (risolta dal frontend per "auto"): menu della tray e messaggi del backend.
+#[tauri::command]
+fn set_resolved_language(app: AppHandle, lang: String) {
+    if i18n::set_en(lang == "en") {
+        tray::refresh(&app);
+    }
+}
+
+/// Modalità compatta della finestra principale (la decide il frontend: musica in corso e Alter Ego inattiva).
+#[tauri::command]
+fn set_compact(app: AppHandle, on: bool) {
+    let enabled = app.state::<AppState>().cfg.lock().unwrap().music.compact;
+    window::set_compact(&app, on && enabled);
 }
 
 #[tauri::command]
@@ -443,6 +471,9 @@ fn main() {
             get_config,
             resize_window,
             set_click_through,
+            set_compact,
+            set_ui_language,
+            set_resolved_language,
             set_opacity,
             set_hotkeys,
             set_general,

@@ -35,13 +35,13 @@ pub fn parse_combo(combo: &str) -> Result<Vec<u16>, String> {
             s if s.starts_with("NUMPAD") && s[6..].parse::<u16>().map(|n| n <= 9).unwrap_or(false) => {
                 0x60 + s[6..].parse::<u16>().unwrap()
             }
-            _ => return Err(format!("tasto non riconosciuto: {part}")),
+            _ => return Err(crate::tr!("tasto non riconosciuto: {part}", "key not recognized: {part}")),
         };
         if key.replace(vk).is_some() {
-            return Err("una combinazione può avere un solo tasto principale".into());
+            return Err(crate::i18n::tr("una combinazione può avere un solo tasto principale", "a combination can have only one main key").into());
         }
     }
-    let key = key.ok_or("manca il tasto principale (es. Ctrl+Shift+S)")?;
+    let key = key.ok_or(crate::i18n::tr("manca il tasto principale (es. Ctrl+Shift+S)", "the main key is missing (e.g. Ctrl+Shift+S)"))?;
     mods.push(key);
     Ok(mods)
 }
@@ -69,7 +69,7 @@ mod imp {
 
     fn send(events: &[INPUT]) -> Result<(), String> {
         let sent = unsafe { SendInput(events.len() as u32, events.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
-        if sent as usize == events.len() { Ok(()) } else { Err("Windows ha bloccato i tasti simulati".into()) }
+        if sent as usize == events.len() { Ok(()) } else { Err(crate::i18n::tr("Windows ha bloccato i tasti simulati", "Windows blocked the simulated keys").into()) }
     }
 
     /// Preme la combinazione: modificatori giù, tasto, poi tutto su (con piccole pause:

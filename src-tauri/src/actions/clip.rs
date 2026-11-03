@@ -41,7 +41,7 @@ pub fn matches(cfg: &ClipConfig, text: &str) -> bool {
 pub fn trigger(cfg: &ClipConfig) -> Result<Vec<String>, String> {
     let active: Vec<_> = cfg.targets.iter().filter(|t| t.enabled && !t.hotkey.trim().is_empty()).collect();
     if active.is_empty() {
-        return Err("nessun programma di clip attivo: sceglilo in Impostazioni → Clip".into());
+        return Err(crate::i18n::tr("nessun programma di clip attivo: sceglilo in Impostazioni → Clip", "no clip program enabled: pick one in Settings → Clips").into());
     }
     let mut ok = Vec::new();
     let mut errors = Vec::new();

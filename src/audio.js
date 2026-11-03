@@ -43,7 +43,7 @@ const Audio2 = (() => {
     if (!text || cfg().tts === "off") return;
     invoke("tts_say", { text, lang }).catch((e) => {
       emitSpeaking(false);
-      Chat.notify("Voce non disponibile: " + e);
+      Chat.notify(t("Voce non disponibile: {err}", { err: e }));
     });
   }
 

@@ -61,7 +61,7 @@ impl Recorder {
             }
             Err(_) => {
                 let _ = self.finish();
-                Err("il microfono non risponde".into())
+                Err(crate::i18n::tr("il microfono non risponde", "the microphone is not responding").into())
             }
         }
     }
@@ -89,11 +89,11 @@ fn capture(name: &str, stop: mpsc::Receiver<()>, ready: mpsc::Sender<Result<(), 
     };
     // microfono scelto; se è scollegato si usa il predefinito
     let Some(device) = crate::audio::find_input(name).or_else(|| cpal::default_host().default_input_device()) else {
-        return fail("nessun microfono trovato".into());
+        return fail(crate::i18n::tr("nessun microfono trovato", "no microphone found").into());
     };
     let config = match device.default_input_config() {
         Ok(c) => c,
-        Err(e) => return fail(format!("microfono non utilizzabile: {e}")),
+        Err(e) => return fail(crate::tr!("microfono non utilizzabile: {e}", "microphone not usable: {e}")),
     };
     let rate = config.sample_rate().0;
     let channels = config.channels() as usize;
@@ -123,10 +123,10 @@ fn capture(name: &str, stop: mpsc::Receiver<()>, ready: mpsc::Sender<Result<(), 
     };
     let stream = match stream {
         Ok(s) => s,
-        Err(e) => return fail(format!("impossibile aprire il microfono: {e}")),
+        Err(e) => return fail(crate::tr!("impossibile aprire il microfono: {e}", "cannot open the microphone: {e}")),
     };
     if let Err(e) = stream.play() {
-        return fail(format!("impossibile avviare il microfono: {e}"));
+        return fail(crate::tr!("impossibile avviare il microfono: {e}", "cannot start the microphone: {e}"));
     }
     let _ = ready.send(Ok(()));
     let _ = stop.recv_timeout(Duration::from_secs(MAX_SECONDS));
@@ -173,12 +173,12 @@ pub async fn transcribe(http: &reqwest::Client, cfg: &SttConfig, wav: Vec<u8>, g
     let (base, keys_list) = match cfg.provider.as_str() {
         "groq" => {
             if groq_keys.is_empty() {
-                return Err("serve una chiave Groq (Impostazioni → AI → Groq)".into());
+                return Err(crate::i18n::tr("serve una chiave Groq (Impostazioni → AI → Groq)", "a Groq key is needed (Settings → AI → Groq)").into());
             }
             ("https://api.groq.com/openai/v1".to_string(), groq_keys.into_iter().map(Some).collect::<Vec<_>>())
         }
         "local" => (cfg.base_url.trim().trim_end_matches('/').to_string(), vec![None]),
-        _ => return Err("riconoscimento vocale disattivato nelle impostazioni".into()),
+        _ => return Err(crate::i18n::tr("riconoscimento vocale disattivato nelle impostazioni", "speech recognition is turned off in the settings").into()),
     };
     let model = if cfg.model.trim().is_empty() { "whisper-large-v3-turbo" } else { cfg.model.trim() };
     let mut last = String::new();
@@ -200,16 +200,16 @@ pub async fn transcribe(http: &reqwest::Client, cfg: &SttConfig, wav: Vec<u8>, g
             req = req.bearer_auth(k);
         }
         let resp = req.send().await.map_err(|e| {
-            if e.is_connect() { "server di trascrizione non raggiungibile".to_string() } else { format!("errore di rete: {e}") }
+            if e.is_connect() { crate::i18n::tr("server di trascrizione non raggiungibile", "transcription server not reachable").to_string() } else { format!("errore di rete: {e}") }
         })?;
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
         if status.is_success() {
-            let v: serde_json::Value = serde_json::from_str(&body).map_err(|_| "risposta di trascrizione non valida".to_string())?;
+            let v: serde_json::Value = serde_json::from_str(&body).map_err(|_| crate::i18n::tr("risposta di trascrizione non valida", "invalid transcription response").to_string())?;
             return Ok(v.get("text").and_then(|t| t.as_str()).unwrap_or("").trim().to_string());
         }
         let detail: String = body.chars().take(200).collect();
-        last = keys::redact(&format!("trascrizione fallita (HTTP {}): {detail}", status.as_u16()), key.as_deref());
+        last = keys::redact(&crate::tr!("trascrizione fallita (HTTP {}): {detail}", "transcription failed (HTTP {}): {detail}", status.as_u16()), key.as_deref());
         if !matches!(status.as_u16(), 401 | 402 | 403 | 429) {
             break; // errore non legato alla chiave: inutile provare le altre
         }

@@ -6,7 +6,7 @@
 const SERVICE: &str = "AlterEgo";
 
 fn entry(account: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(SERVICE, account).map_err(|e| format!("Credential Manager non disponibile: {e}"))
+    keyring::Entry::new(SERVICE, account).map_err(|e| crate::tr!("Credential Manager non disponibile: {e}", "Credential Manager not available: {e}"))
 }
 
 fn account(provider: &str, slot: &str) -> String {

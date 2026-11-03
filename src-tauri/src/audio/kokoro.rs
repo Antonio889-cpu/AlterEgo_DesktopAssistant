@@ -82,7 +82,7 @@ impl Kokoro {
             if cuda {
                 cmd.arg("-Cuda");
             }
-            cmd.creation_flags(CREATE_NEW_CONSOLE).spawn().map(|_| ()).map_err(|e| format!("impossibile avviare l'installazione: {e}"))
+            cmd.creation_flags(CREATE_NEW_CONSOLE).spawn().map(|_| ()).map_err(|e| crate::tr!("impossibile avviare l'installazione: {e}", "cannot start the installation: {e}"))
         }
         #[cfg(not(windows))]
         {
@@ -112,10 +112,10 @@ impl Kokoro {
             return Ok(());
         }
         if !is_local(url) {
-            return Err("l'URL di Kokoro non è locale: il server va avviato a parte".into());
+            return Err(crate::i18n::tr("l'URL di Kokoro non è locale: il server va avviato a parte", "Kokoro's URL is not local: start that server yourself").into());
         }
         if !self.installed() {
-            return Err("Kokoro non è installato (Impostazioni → Voce → Installa Kokoro)".into());
+            return Err(crate::i18n::tr("Kokoro non è installato (Impostazioni → Voce → Installa Kokoro)", "Kokoro is not installed (Settings → Voice → Install Kokoro)").into());
         }
         self.write_files()?;
         let (_, port) = root_and_port(url)?;
@@ -142,7 +142,7 @@ impl Kokoro {
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
-        let child = cmd.spawn().map_err(|e| format!("avvio del server Kokoro non riuscito: {e}"))?;
+        let child = cmd.spawn().map_err(|e| crate::tr!("avvio del server Kokoro non riuscito: {e}", "could not start the Kokoro server: {e}"))?;
         *self.child.lock().unwrap() = Some(child);
         Ok(())
     }
@@ -180,10 +180,10 @@ impl Kokoro {
         let installed = self.installed();
         let running = self.running();
         let (ready, message) = match (running, self.phase()) {
-            (true, Phase::Loading(step)) => (false, format!("caricamento… {}", strip_time(&step))),
+            (true, Phase::Loading(step)) => (false, crate::tr!("caricamento… {}", "loading… {}", strip_time(&step))),
             (true, Phase::Failed(e)) => (false, e),
             _ => match probe(http, url).await {
-                Ok(()) => (true, "pronto".to_string()),
+                Ok(()) => (true, crate::i18n::tr("pronto", "ready").to_string()),
                 Err(e) => (false, e),
             },
         };
@@ -214,10 +214,10 @@ impl Kokoro {
                 Phase::Loading(_) => {}
             }
             if !self.running() {
-                return Err(self.last_log_line().unwrap_or_else(|| "il server Kokoro si è chiuso".into()));
+                return Err(self.last_log_line().unwrap_or_else(|| crate::i18n::tr("il server Kokoro si è chiuso", "the Kokoro server closed").into()));
             }
             if t0.elapsed() > Duration::from_secs(300) {
-                return Err(format!("il server non è pronto dopo 5 minuti (ultimo passo: {})", self.last_log_line().unwrap_or_default()));
+                return Err(crate::tr!("il server non è pronto dopo 5 minuti (ultimo passo: {})", "the server is not ready after 5 minutes (last step: {})", self.last_log_line().unwrap_or_default()));
             }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
@@ -249,15 +249,15 @@ async fn probe(http: &reqwest::Client, url: &str) -> Result<(), String> {
         .await
         .map_err(|e| {
             if e.is_connect() {
-                format!("il server non risponde su {root} ({})", crate::providers::describe_net_error(&e))
+                crate::tr!("il server non risponde su {root} ({})", "the server is not answering on {root} ({})", crate::providers::describe_net_error(&e))
             } else {
                 crate::providers::describe_net_error(&e)
             }
         })?;
     match resp.status().as_u16() {
         200 => Ok(()),
-        503 => Err("modello in caricamento…".into()),
-        c => Err(format!("risposta inattesa (HTTP {c})")),
+        503 => Err(crate::i18n::tr("modello in caricamento…", "loading the model…").into()),
+        c => Err(crate::tr!("risposta inattesa (HTTP {c})", "unexpected answer (HTTP {c})")),
     }
 }
 

@@ -233,11 +233,13 @@ pub struct MusicConfig {
     pub reactive_sprite: bool,
     /// Posizione del lettore (pixel fisici).
     pub player_pos: Option<(i32, i32)>,
+    /// Durante la musica la finestra di Alter Ego si rimpicciolisce (torna grande quando parla o scrivi).
+    pub compact: bool,
 }
 
 impl Default for MusicConfig {
     fn default() -> Self {
-        Self { volume: 0.7, shuffle: false, repeat: "off".into(), lyrics: true, reactive_sprite: true, player_pos: None }
+        Self { volume: 0.7, shuffle: false, repeat: "off".into(), lyrics: true, reactive_sprite: true, player_pos: None, compact: true }
     }
 }
 
@@ -364,6 +366,8 @@ pub struct Config {
     pub user_name: String,
     /// Tag nome mostrato nel box dialogo.
     pub name_tag: String,
+    /// Lingua dell'interfaccia: "auto" (lingua di Windows), "it" o "en".
+    pub ui_language: String,
     /// Sfondo: "scanline", "circuit" o "both".
     pub background: String,
     /// Intensità degli effetti di sfondo, 0.0–1.0.
@@ -379,7 +383,7 @@ pub struct Config {
     /// Attesa (secondi) a pagina completa prima di andare avanti; si aggiunge il tempo di lettura.
     pub auto_advance_secs: f64,
     pub ai: AiConfig,
-    /// Lingua risposte: "it", "it_en" (italiano + traduzione) o "en".
+    /// Lingua risposte: "auto" (come l'interfaccia), "it", "it_en" (italiano + traduzione) o "en".
     pub language: String,
     pub personality: Personality,
     /// Memoria persistente (SQLite). Spenta = si ricorda solo la sessione corrente.
@@ -404,6 +408,7 @@ impl Default for Config {
             autostart: false,
             user_name: String::new(),
             name_tag: "Alter Ego".into(),
+            ui_language: "auto".into(),
             background: "both".into(),
             bg_intensity: 0.6,
             dialog_style: "chiaro".into(),
@@ -412,7 +417,7 @@ impl Default for Config {
             auto_advance: true,
             auto_advance_secs: 3.0,
             ai: AiConfig::default(),
-            language: "it".into(),
+            language: "auto".into(),
             personality: Personality::default(),
             memory_enabled: true,
             stt: SttConfig::default(),
@@ -429,7 +434,7 @@ impl Default for Config {
 
 impl Config {
     pub fn normalize_voice(&mut self) {
-        if !["it", "it_en", "en"].contains(&self.language.as_str()) {
+        if !["auto", "it", "it_en", "en"].contains(&self.language.as_str()) {
             self.language = "it".into();
         }
         self.personality.confidence = self.personality.confidence.clamp(0.0, 1.0);

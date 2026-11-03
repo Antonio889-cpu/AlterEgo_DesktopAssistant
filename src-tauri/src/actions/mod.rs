@@ -385,7 +385,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             if !is_url {
                 return (detail, Err("non è nella lista consentita e non è un URL".into()));
             }
-            if !confirm(app, format!("Aprire questo sito (non è nella lista)?\n{target}")).await {
+            if !confirm(app, crate::tr!("Aprire questo sito (non è nella lista)?\n{target}", "Open this website (not in the list)?\n{target}")).await {
                 return (detail, denied());
             }
             (detail, open_with_system(&target).map(|_| Outcome::text("Sito aperto.")))
@@ -401,10 +401,10 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             };
             let shown = resolved.display().to_string();
             let question = match name {
-                "list_dir" => format!("Leggere l'elenco dei file in\n{shown}?"),
-                "read_file" => format!("Leggere il file\n{shown}?"),
+                "list_dir" => crate::tr!("Leggere l'elenco dei file in\n{shown}?", "Read the list of files in\n{shown}?"),
+                "read_file" => crate::tr!("Leggere il file\n{shown}?", "Read the file\n{shown}?"),
                 "write_file" => format!("{} il file\n{shown}?", if a.get("append").and_then(Value::as_bool).unwrap_or(false) { "Aggiungere testo al" } else { "Scrivere" }),
-                _ => format!("⚠ ELIMINARE definitivamente il file\n{shown}?"),
+                _ => crate::tr!("⚠ ELIMINARE definitivamente il file\n{shown}?", "⚠ Permanently DELETE the file\n{shown}?"),
             };
             if !confirm(app, question).await {
                 return (detail, denied());
@@ -474,7 +474,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
         }
         "read_clipboard" => {
             need!(p.clipboard);
-            if !confirm(app, "Leggere il testo negli appunti?".into()).await {
+            if !confirm(app, crate::i18n::tr("Leggere il testo negli appunti?", "Read the text in the clipboard?").into()).await {
                 return (String::new(), denied());
             }
             let r = arboard::Clipboard::new().and_then(|mut c| c.get_text()).map_err(|e| format!("appunti non leggibili: {e}"));
@@ -488,7 +488,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
         }
         "take_screenshot" => {
             need!(p.screen);
-            if !confirm(app, "Fare uno screenshot dello schermo e mandarlo al modello AI?".into()).await {
+            if !confirm(app, crate::i18n::tr("Fare uno screenshot dello schermo e mandarlo al modello AI?", "Take a screenshot and send it to the AI model?").into()).await {
                 return (String::new(), denied());
             }
             // nasconde Alter Ego per un attimo, così non copre lo schermo
@@ -527,7 +527,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             let Some(cmd) = p.commands.iter().find(|c| c.name == n).cloned() else {
                 return (n.to_string(), Err("comando non nella lista consentita".into()));
             };
-            if !confirm(app, format!("Eseguire il comando «{}»?\n{}", cmd.name, cmd.target)).await {
+            if !confirm(app, crate::tr!("Eseguire il comando «{}»?\n{}", "Run the command “{}”?\n{}", cmd.name, cmd.target)).await {
                 return (cmd.name.clone(), denied());
             }
             #[cfg(windows)]
@@ -555,7 +555,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             }
             let detail = format!("{shell}: {}", short(&command, 200));
             let danger = dangerous_command(&command);
-            let question = format!("{}Eseguire in {shell}?\n{}", if danger { "⚠ Comando potenzialmente distruttivo. " } else { "" }, short(&command, 600));
+            let question = crate::tr!("{}Eseguire in {shell}?\n{}", "{}Run in {shell}?\n{}", if danger { crate::i18n::tr("⚠ Comando potenzialmente distruttivo. ", "⚠ Potentially destructive command. ") } else { "" }, short(&command, 600));
             let ok = if danger {
                 confirm_always(app, question).await
             } else if p.terminal_autonomous {

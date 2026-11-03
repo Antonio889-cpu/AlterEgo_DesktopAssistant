@@ -49,7 +49,7 @@ struct Rgb {
 fn decode_png(bytes: &[u8]) -> Result<Rgb, String> {
     let mut dec = png::Decoder::new(std::io::Cursor::new(bytes));
     dec.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-    let mut reader = dec.read_info().map_err(|_| "il file non è un PNG valido".to_string())?;
+    let mut reader = dec.read_info().map_err(|_| crate::i18n::tr("il file non è un PNG valido", "the file is not a valid PNG").to_string())?;
     let mut buf = vec![0; reader.output_buffer_size()];
     let info = reader.next_frame(&mut buf).map_err(|e| e.to_string())?;
     let (w, h) = (info.width as usize, info.height as usize);
@@ -58,7 +58,7 @@ fn decode_png(bytes: &[u8]) -> Result<Rgb, String> {
         png::ColorType::Rgba => 4,
         png::ColorType::Grayscale => 1,
         png::ColorType::GrayscaleAlpha => 2,
-        _ => return Err("formato colore non supportato".into()),
+        _ => return Err(crate::i18n::tr("formato colore non supportato", "color format not supported").into()),
     };
     let px = (0..w * h)
         .map(|i| {
@@ -106,7 +106,7 @@ fn detect_panels(img: &Rgb) -> Result<Vec<(usize, usize, usize, usize)>, String>
     let xs = panel_ranges(&norm(cols), img.w / 10);
     let ys = panel_ranges(&norm(rows), img.h / 10);
     if xs.is_empty() || ys.is_empty() {
-        return Err("non trovo i riquadri: serve un foglio con cornici chiare (come quello originale 3×3)".into());
+        return Err(crate::i18n::tr("non trovo i riquadri: serve un foglio con cornici chiare (come quello originale 3×3)", "can't find the panels: a sheet with light frames is needed (like the original 3×3)").into());
     }
     // stessa dimensione per tutti (il più piccolo), così l'ancoraggio è uguale
     let pw = xs.iter().map(|r| r.1 - r.0).min().unwrap();
@@ -234,7 +234,7 @@ pub fn import_sheet(data_dir: &Path, png_bytes: &[u8]) -> Result<Vec<String>, St
         }
     }
     if maxx <= minx || maxy <= miny {
-        return Err("nessuna figura trovata nei riquadri".into());
+        return Err(crate::i18n::tr("nessuna figura trovata nei riquadri", "no figure found in the panels").into());
     }
     let (cw, ch) = (maxx - minx, maxy - miny);
     let d = dir(data_dir);

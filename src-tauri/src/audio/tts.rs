@@ -17,7 +17,7 @@ pub struct Pcm {
 /// Legge un WAV PCM 8/16/24/32 bit o float 32. Tollera le lunghezze "in streaming"
 /// (0 o 0xFFFFFFFF) che alcuni server mettono nell'intestazione.
 pub fn decode_wav(b: &[u8]) -> Result<Pcm, String> {
-    let bad = || "audio non valido (serve WAV)".to_string();
+    let bad = || crate::i18n::tr("audio non valido (serve WAV)", "invalid audio (WAV needed)").to_string();
     if b.len() < 12 || &b[0..4] != b"RIFF" || &b[8..12] != b"WAVE" {
         return Err(bad());
     }
@@ -107,28 +107,48 @@ pub struct Voice {
     pub lang: String,
 }
 
-/// Voci Kokoro-82M (VOICES.md del modello). Le italiane sono le prime.
-pub const KOKORO_VOICES: &[(&str, &str, &str)] = &[
-    ("if_sara", "Sara (italiano, F)", "it"),
-    ("im_nicola", "Nicola (italiano, M)", "it"),
-    ("af_heart", "Heart (inglese US, F)", "en"),
-    ("af_bella", "Bella (inglese US, F)", "en"),
-    ("af_nicole", "Nicole (inglese US, F)", "en"),
-    ("af_sky", "Sky (inglese US, F)", "en"),
-    ("am_michael", "Michael (inglese US, M)", "en"),
-    ("am_fenrir", "Fenrir (inglese US, M)", "en"),
-    ("bf_emma", "Emma (inglese UK, F)", "en"),
-    ("bm_george", "George (inglese UK, M)", "en"),
-    ("jf_alpha", "Alpha (giapponese, F)", "ja"),
-    ("jf_tebukuro", "Tebukuro (giapponese, F)", "ja"),
-    ("jm_kumo", "Kumo (giapponese, M)", "ja"),
-    ("ef_dora", "Dora (spagnolo, F)", "es"),
-    ("ff_siwis", "Siwis (francese, F)", "fr"),
-    ("pf_dora", "Dora (portoghese BR, F)", "pt"),
+/// Voci Kokoro-82M (VOICES.md del modello): id, nome, genere, lingua. Le italiane sono le prime.
+pub const KOKORO_VOICES: &[(&str, &str, &str, &str)] = &[
+    ("if_sara", "Sara", "F", "it"),
+    ("im_nicola", "Nicola", "M", "it"),
+    ("af_heart", "Heart", "F", "en-us"),
+    ("af_bella", "Bella", "F", "en-us"),
+    ("af_nicole", "Nicole", "F", "en-us"),
+    ("af_sky", "Sky", "F", "en-us"),
+    ("am_michael", "Michael", "M", "en-us"),
+    ("am_fenrir", "Fenrir", "M", "en-us"),
+    ("bf_emma", "Emma", "F", "en-gb"),
+    ("bm_george", "George", "M", "en-gb"),
+    ("jf_alpha", "Alpha", "F", "ja"),
+    ("jf_tebukuro", "Tebukuro", "F", "ja"),
+    ("jm_kumo", "Kumo", "M", "ja"),
+    ("ef_dora", "Dora", "F", "es"),
+    ("ff_siwis", "Siwis", "F", "fr"),
+    ("pf_dora", "Dora", "F", "pt"),
 ];
 
+fn lang_label(l: &str) -> &'static str {
+    use crate::i18n::tr;
+    match l {
+        "it" => tr("italiano", "Italian"),
+        "en-us" => tr("inglese US", "US English"),
+        "en-gb" => tr("inglese UK", "UK English"),
+        "ja" => tr("giapponese", "Japanese"),
+        "es" => tr("spagnolo", "Spanish"),
+        "fr" => tr("francese", "French"),
+        _ => tr("portoghese BR", "Brazilian Portuguese"),
+    }
+}
+
 pub fn kokoro_voices() -> Vec<Voice> {
-    KOKORO_VOICES.iter().map(|(id, name, lang)| Voice { id: (*id).into(), name: (*name).into(), lang: (*lang).into() }).collect()
+    KOKORO_VOICES
+        .iter()
+        .map(|(id, name, g, lang)| Voice {
+            id: (*id).into(),
+            name: format!("{name} ({}, {g})", lang_label(lang)),
+            lang: lang.split('-').next().unwrap_or(lang).into(),
+        })
+        .collect()
 }
 
 /// Sintetizza `text` col motore scelto.
@@ -152,7 +172,7 @@ pub async fn synth(http: &reqwest::Client, a: &AudioConfig, text: &str, lang: &s
             let voice = if a.tts_voice.is_empty() { "alloy" } else { a.tts_voice.as_str() };
             speech(http, &a.tts_url, &a.tts_model, voice, a.tts_rate, text, tts_key).await
         }
-        _ => Err("voce disattivata".into()),
+        _ => Err(crate::i18n::tr("voce disattivata", "voice turned off").into()),
     }
 }
 
@@ -182,12 +202,12 @@ async fn speech(
     let resp = req
         .send()
         .await
-        .map_err(|e| format!("servizio voce non raggiungibile: {}", crate::providers::describe_net_error(&e)))?;
+        .map_err(|e| crate::tr!("servizio voce non raggiungibile: {}", "voice service not reachable: {}", crate::providers::describe_net_error(&e)))?;
     let status = resp.status();
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     if !status.is_success() {
         let detail: String = String::from_utf8_lossy(&bytes).chars().take(200).collect();
-        return Err(crate::keys::redact(&format!("voce non disponibile (HTTP {}): {detail}", status.as_u16()), key.as_deref()));
+        return Err(crate::keys::redact(&crate::tr!("voce non disponibile (HTTP {}): {detail}", "voice not available (HTTP {}): {detail}", status.as_u16()), key.as_deref()));
     }
     decode_wav(&bytes)
 }
@@ -218,7 +238,7 @@ pub fn windows_voices() -> Result<Vec<Voice>, String> {
 
 #[cfg(not(windows))]
 pub fn windows_voices() -> Result<Vec<Voice>, String> {
-    Err("voci di Windows disponibili solo su Windows".into())
+    Err(crate::i18n::tr("voci di Windows disponibili solo su Windows", "Windows voices are only available on Windows").into())
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -235,7 +255,7 @@ pub fn pick_voice<'a>(voices: &'a [Voice], wanted: &str, lang: &str) -> Option<&
 #[cfg(windows)]
 fn windows_synth(text: &str, voice: &str, lang: &str, rate: f64) -> Result<Vec<u8>, String> {
     use windows::{core::HSTRING, Media::SpeechSynthesis::SpeechSynthesizer, Storage::Streams::DataReader};
-    let err = |e: windows::core::Error| format!("voce di Windows: {e}");
+    let err = |e: windows::core::Error| crate::tr!("voce di Windows: {e}", "Windows voice: {e}");
     winrt_init();
     let synth = SpeechSynthesizer::new().map_err(err)?;
     let voices = windows_voices()?;
@@ -263,7 +283,7 @@ fn windows_synth(text: &str, voice: &str, lang: &str, rate: f64) -> Result<Vec<u
 
 #[cfg(not(windows))]
 fn windows_synth(_text: &str, _voice: &str, _lang: &str, _rate: f64) -> Result<Vec<u8>, String> {
-    Err("voci di Windows disponibili solo su Windows".into())
+    Err(crate::i18n::tr("voci di Windows disponibili solo su Windows", "Windows voices are only available on Windows").into())
 }
 
 #[cfg(test)]

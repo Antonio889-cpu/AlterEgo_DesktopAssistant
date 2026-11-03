@@ -34,7 +34,7 @@ function renderProviders() {
     const badge = li.querySelector(".badge");
     const nKeys = (pc.keys || []).length;
     if (!info.needs_key) { badge.textContent = "locale, senza chiave"; badge.className = "badge ok"; }
-    else if (nKeys) { badge.textContent = nKeys === 1 ? "1 chiave ✓" : `${nKeys} chiavi ✓`; badge.className = "badge ok"; }
+    else if (nKeys) { badge.textContent = nKeys === 1 ? "1 chiave ✓" : t("{n} chiavi ✓", { n: nKeys }); badge.className = "badge ok"; }
     else { badge.textContent = "chiave mancante"; badge.className = "badge missing"; }
 
     const enabled = li.querySelector(".enabled");
@@ -52,7 +52,7 @@ function renderProviders() {
       (pc.keys || []).forEach((k, i) => {
         const row = document.createElement("li");
         const label = document.createElement("span");
-        label.textContent = `${i + 1}. ${k.label} (salvata ✓)`;
+        label.textContent = t("{i}. {label} (salvata ✓)", { i: i + 1, label: k.label });
         const up = Object.assign(document.createElement("button"), { textContent: "▲", title: "Prova prima" });
         const down = Object.assign(document.createElement("button"), { textContent: "▼", title: "Prova dopo" });
         const del = Object.assign(document.createElement("button"), { textContent: "Elimina" });
@@ -61,7 +61,7 @@ function renderProviders() {
         up.onclick = async () => { await invoke("move_api_key", { provider: id, id: k.id, delta: -1 }); await syncKeys(); };
         down.onclick = async () => { await invoke("move_api_key", { provider: id, id: k.id, delta: 1 }); await syncKeys(); };
         del.onclick = async () => {
-          if (!confirm(`Eliminare la chiave "${k.label}" di ${info.label}?`)) return;
+          if (!confirm(t("Eliminare la chiave \"{label}\" di {provider}?", { label: k.label, provider: info.label }))) return;
           try { await invoke("delete_api_key", { provider: id, id: k.id }); } catch (e) { setResult(li, String(e), "bad"); }
           await syncKeys();
         };
@@ -96,7 +96,7 @@ function renderProviders() {
       try {
         const models = await invoke("list_models", { provider: id });
         datalist.innerHTML = models.map((m) => `<option value="${m.replace(/"/g, "&quot;")}">`).join("");
-        setResult(li, `${models.length} modelli trovati: scegli dal campo Modello`, "ok");
+        setResult(li, t("{n} modelli trovati: scegli dal campo Modello", { n: models.length }), "ok");
       } catch (e) { setResult(li, String(e), "bad"); }
       ev.target.disabled = false;
     };
@@ -179,7 +179,7 @@ $("memory-enabled").onchange = (e) => { persona.memoryEnabled = e.target.checked
 $("open-data").onclick = () => invoke("open_data_dir").catch((e) => alert(e));
 
 // ---------- memoria ----------
-const fmtDate = (ts) => new Date(ts * 1000).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" });
+const fmtDate = (ts) => new Date(ts * 1000).toLocaleString(I18N.lang(), { dateStyle: "short", timeStyle: "short" });
 function listItems(ul, items, onDelete) {
   ul.innerHTML = "";
   if (!items.length) { ul.innerHTML = '<li class="empty">nessuno</li>'; return; }
@@ -204,7 +204,7 @@ function memResult(text, cls = "") { const r = $("memory-result"); r.textContent
 async function refreshMemory() {
   try {
     const o = await invoke("memory_overview");
-    $("memory-stats").textContent = `${o.messages} messaggi salvati · file: ${o.db_path}`;
+    $("memory-stats").textContent = t("{n} messaggi salvati · file: {path}", { n: o.messages, path: o.db_path });
     listItems($("facts"), o.facts, async (it) => { await invoke("memory_delete_fact", { id: it.id }); refreshMemory(); });
     listItems($("summaries"), o.summaries);
   } catch (e) { $("memory-stats").textContent = String(e); }
@@ -218,11 +218,11 @@ $("add-fact").onclick = async () => {
   refreshMemory();
 };
 $("export-memory").onclick = async () => {
-  try { memResult("Esportata in " + (await invoke("memory_export")), "ok"); }
+  try { memResult(t("Esportata in {path}", { path: await invoke("memory_export") }), "ok"); }
   catch (e) { memResult(String(e), "bad"); }
 };
 $("forget-all").onclick = async () => {
-  if (!confirm("Cancellare TUTTA la memoria di Alter Ego (conversazioni, riassunti, fatti)? Non si può annullare.")) return;
+  if (!confirm(t("Cancellare TUTTA la memoria di Alter Ego (conversazioni, riassunti, fatti)? Non si può annullare."))) return;
   try { await invoke("memory_forget_all"); memResult("Memoria cancellata.", "ok"); refreshMemory(); }
   catch (e) { memResult(String(e), "bad"); }
 };
@@ -249,7 +249,7 @@ $("stt-test").onclick = async (ev) => {
   clearTimeout(sttTimer);
   await invoke("set_stt", { stt: sttCfg });
   r.className = "result"; r.textContent = "🎙 parla adesso… (4 secondi)";
-  try { r.textContent = "Ho capito: " + (await invoke("stt_test")); r.className = "result ok"; }
+  try { r.textContent = t("Ho capito: {text}", { text: await invoke("stt_test") }); r.className = "result ok"; }
   catch (e) { r.textContent = String(e); r.className = "result bad"; }
   ev.target.disabled = false;
 };
@@ -259,7 +259,7 @@ $("stt-test").onclick = async (ev) => {
 async function spriteStatus() {
   const sprites = await invoke("load_user_sprites");
   const n = Object.keys(sprites || {}).length;
-  $("sprite-status").textContent = n ? `Sprite importati: ${Object.keys(sprites).join(", ")}` : "Nessuno sprite importato: Alter Ego usa il volto segnaposto (o quelli inclusi in una build privata).";
+  $("sprite-status").textContent = n ? t("Sprite importati: {list}", { list: Object.keys(sprites).join(", ") }) : t("Nessuno sprite importato: Alter Ego usa quelli inclusi.");
 }
 function spriteResult(t, cls = "") { const r = $("sprite-result"); r.textContent = t; r.className = "result " + cls; }
 $("sprite-file").onchange = async (e) => {
@@ -267,7 +267,7 @@ $("sprite-file").onchange = async (e) => {
   if (!f) return;
   spriteResult("elaboro…");
   const data = await new Promise((ok, ko) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = ko; r.readAsDataURL(f); });
-  try { const saved = await invoke("import_sprite_sheet", { data }); spriteResult(`importati ${saved.length} sprite ✓`, "ok"); }
+  try { const saved = await invoke("import_sprite_sheet", { data }); spriteResult(t("importati {n} sprite ✓", { n: saved.length }), "ok"); }
   catch (err) { spriteResult(String(err), "bad"); }
   e.target.value = "";
   spriteStatus();
@@ -275,7 +275,7 @@ $("sprite-file").onchange = async (e) => {
 $("sprite-dir").onclick = () => invoke("open_sprite_dir").catch((e) => spriteResult(String(e), "bad"));
 $("sprite-reload").onclick = async () => { await invoke("reload_sprites"); spriteStatus(); spriteResult("ricaricati", "ok"); };
 $("sprite-remove").onclick = async () => {
-  if (!confirm("Rimuovere gli sprite importati?")) return;
+  if (!confirm(t("Rimuovere gli sprite importati?"))) return;
   try { await invoke("remove_user_sprites"); spriteResult("rimossi", "ok"); } catch (err) { spriteResult(String(err), "bad"); }
   spriteStatus();
 };
@@ -300,9 +300,9 @@ async function refreshUsage() {
   try { u = await invoke("ai_usage"); } catch { return; }
   const parts = Object.entries(u).filter(([, v]) => v.requests).map(([id, v]) => {
     const pct = v.input ? Math.round((v.cached / v.input) * 100) : 0;
-    return `${id}: ${v.requests} richieste, ${v.input.toLocaleString("it-IT")} token in ingresso` + (v.cached || id === "deepseek" ? ` (${pct}% dalla cache)` : "");
+    return t("{id}: {n} richieste, {tok} token in ingresso", { id, n: v.requests, tok: v.input.toLocaleString(I18N.lang()) }) + (v.cached || id === "deepseek" ? t(" ({pct}% dalla cache)", { pct }) : "");
   });
-  el.textContent = parts.length ? "Da quando Alter Ego è aperto — " + parts.join(" · ") : "";
+  el.textContent = parts.length ? t("Da quando Alter Ego è aperto — {list}", { list: parts.join(" · ") }) : "";
 }
 document.querySelectorAll("nav#tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
 
@@ -317,6 +317,12 @@ function saveLook() {
   }), 200);
   $("auto-advance-val").textContent = (+$("auto-advance-secs").value).toFixed(1) + " s";
 }
+function applyLang(cfg) {
+  I18N.setLang(I18N.resolve(cfg.ui_language));
+  $("ui-language").value = cfg.ui_language || "auto";
+}
+$("ui-language").onchange = (e) => invoke("set_ui_language", { lang: e.target.value });
+
 function fillLook(cfg) {
   $("look-opacity").value = cfg.opacity;
   $("look-bg").value = cfg.background;
@@ -352,7 +358,7 @@ const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;").repl
 /** Riempie un <select> di dispositivi: "" = predefinito; un dispositivo scollegato resta visibile. */
 function fillDeviceSelect(sel, list, value, defLabel) {
   const opts = [`<option value="">${esc(defLabel)}</option>`].concat(list.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`));
-  if (value && !list.includes(value)) opts.push(`<option value="${esc(value)}">${esc(value)} (non collegato)</option>`);
+  if (value && !list.includes(value)) opts.push(`<option value="${esc(value)}">${esc(t("{name} (non collegato)", { name: value }))}</option>`);
   sel.innerHTML = opts.join("");
   sel.value = value || "";
 }
@@ -360,16 +366,16 @@ async function refreshDevices() {
   try { devices = await invoke("audio_devices"); } catch (e) { $("dev-status").textContent = String(e); return; }
   const outs = devices.outputs.filter((n) => n !== devices.cable_render);
   const ins = devices.inputs.filter((n) => n !== devices.cable_capture);
-  fillDeviceSelect($("out-device"), outs, audio.output_device, `Predefinito di Windows${devices.default_output ? " (" + devices.default_output + ")" : ""}`);
-  fillDeviceSelect($("in-device"), ins, audio.input_device, `Predefinito di Windows${devices.default_input ? " (" + devices.default_input + ")" : ""}`);
+  fillDeviceSelect($("out-device"), outs, audio.output_device, t("Predefinito di Windows{dev}", { dev: devices.default_output ? " (" + devices.default_output + ")" : "" }));
+  fillDeviceSelect($("in-device"), ins, audio.input_device, t("Predefinito di Windows{dev}", { dev: devices.default_input ? " (" + devices.default_input + ")" : "" }));
   fillDeviceSelect($("link-mic"), ins, audio.mic_link.mic_device, "Microfono predefinito di Windows");
-  fillDeviceSelect($("link-cable"), devices.outputs, audio.mic_link.cable_device, `Automatico${devices.cable_render ? " (" + devices.cable_render + ")" : " (nessun cavo trovato)"}`);
+  fillDeviceSelect($("link-cable"), devices.outputs, audio.mic_link.cable_device, t("Automatico{dev}", { dev: devices.cable_render ? " (" + devices.cable_render + ")" : t(" (nessun cavo trovato)") }));
   const d = $("link-driver");
   if (!devices.cable_render) { d.textContent = "VB-CABLE non trovato: installalo (punto 1) e riavvia il PC."; d.className = "result bad"; }
-  else if (!devices.link_named) { d.textContent = `Cavo trovato: ${devices.cable_capture || devices.cable_render}. Rinominalo (punto 2) per vederlo come «AlterEgo Link Audio».`; d.className = "result"; }
-  else { d.textContent = `Pronto: le altre app vedono «${devices.cable_capture}».`; d.className = "result ok"; }
+  else if (!devices.link_named) { d.textContent = t("Cavo trovato: {name}. Rinominalo (punto 2) per vederlo come «AlterEgo Link Audio».", { name: devices.cable_capture || devices.cable_render }); d.className = "result"; }
+  else { d.textContent = t("Pronto: le altre app vedono «{name}».", { name: devices.cable_capture }); d.className = "result ok"; }
   if (devices.default_output && devices.default_output === devices.cable_render) {
-    d.textContent += " ⚠ Il cavo è l'uscita predefinita di Windows: rimetti i tuoi altoparlanti.";
+    d.textContent += t(" ⚠ Il cavo è l'uscita predefinita di Windows: rimetti i tuoi altoparlanti.");
     d.className = "result bad";
   }
 }
@@ -377,12 +383,12 @@ async function refreshAudioStatus() {
   try {
     const st = await invoke("audio_status");
     const ds = $("dev-status");
-    ds.textContent = st.output_error ? "Uscita: " + st.output_error : st.output ? "In uso: " + st.output : "";
+    ds.textContent = st.output_error ? t("Uscita: {err}", { err: st.output_error }) : st.output ? t("In uso: {name}", { name: st.output }) : "";
     ds.className = st.output_error ? "result bad" : "result ok";
     const ls = $("link-status");
     if (!audio.mic_link.enabled) { ls.textContent = "Mic-Link spento"; ls.className = "result"; }
     else if (st.link_active) {
-      ls.textContent = `Attivo: ${st.link_mic || "solo voce"} + voce → ${st.link_cable}` + (st.link_error ? ` (${st.link_error})` : "");
+      ls.textContent = t("Attivo: {mic} + voce → {cable}", { mic: st.link_mic || t("solo voce"), cable: st.link_cable }) + (st.link_error ? ` (${st.link_error})` : "");
       ls.className = st.link_error ? "result bad" : "result ok";
     } else { ls.textContent = st.link_error || "non attivo"; ls.className = "result bad"; }
   } catch {}
@@ -420,7 +426,7 @@ async function refreshKokoro() {
     $("kokoro-stop").disabled = !st.running;
     if (st.ready) { el.textContent = "Kokoro pronto ✓"; el.className = "result ok"; }
     else if (!st.installed) { el.textContent = "Non installato (o installazione in corso nella finestra di PowerShell)."; el.className = "result bad"; }
-    else { el.textContent = st.running ? "Server avviato: " + st.message : "Installato, server fermo (" + st.message + ")"; el.className = "result"; }
+    else { el.textContent = st.running ? t("Server avviato: {msg}", { msg: st.message }) : t("Installato, server fermo ({msg})", { msg: st.message }); el.className = "result"; }
   } catch (e) { el.textContent = String(e); el.className = "result bad"; }
   // aggiorna da solo mentre la scheda è aperta e la voce scelta è Kokoro
   if (audio.tts === "kokoro" && !document.hidden) kokoroTimer = setTimeout(refreshKokoro, 4000);
@@ -497,9 +503,11 @@ $("link-music").onchange = (e) => { audio.mic_link.include_music = e.target.chec
 function fillMusic(cfg) {
   $("music-lyrics").checked = cfg.music.lyrics;
   $("music-reactive").checked = cfg.music.reactive_sprite;
+  $("music-compact").checked = cfg.music.compact !== false;
 }
-const saveMusic = () => invoke("music_settings", { lyrics: $("music-lyrics").checked, reactiveSprite: $("music-reactive").checked });
+const saveMusic = () => invoke("music_settings", { lyrics: $("music-lyrics").checked, reactiveSprite: $("music-reactive").checked, compact: $("music-compact").checked });
 $("music-lyrics").onchange = saveMusic;
+$("music-compact").onchange = saveMusic;
 $("music-reactive").onchange = saveMusic;
 $("music-go").onclick = async () => {
   const q = $("music-query").value.trim();
@@ -514,7 +522,7 @@ $("music-go").onclick = async () => {
 let prices = [];
 let costRows = [];
 const usd = (v) => (v === 0 ? "$0" : v < 0.01 ? "$" + v.toFixed(5) : "$" + v.toFixed(v < 1 ? 4 : 2));
-const num = (n) => (n || 0).toLocaleString("it-IT");
+const num = (n) => (n || 0).toLocaleString(I18N.lang());
 function rowModel(r) {
   if (r.kind === "ricerca web" || r.kind === "pagina web") return "DeepSeek " + r.model;
   return `${r.provider}${r.model ? " / " + r.model : ""}`;
@@ -536,9 +544,9 @@ function renderCosts() {
   const inTok = chat.reduce((a, r) => a + r.input + r.cached, 0);
   const cached = chat.reduce((a, r) => a + r.cached, 0);
   cards.push(["Input dalla cache", null, inTok ? Math.round((cached / inTok) * 100) + "%" : "—"]);
-  $("cost-cards").innerHTML = cards.map(([t, v, n]) => v === null
-    ? `<div class="card"><small>${t}</small><b>${n}</b><small>${num(cached)} di ${num(inTok)} token</small></div>`
-    : `<div class="card"><small>${t}</small><b>${usd(v)}</b><small>${num(n)} richieste</small></div>`).join("");
+  $("cost-cards").innerHTML = cards.map(([label, v, n]) => v === null
+    ? `<div class="card"><small>${t(label)}</small><b>${n}</b><small>${t("{a} di {b} token", { a: num(cached), b: num(inTok) })}</small></div>`
+    : `<div class="card"><small>${t(label)}</small><b>${usd(v)}</b><small>${t("{n} richieste", { n: num(n) })}</small></div>`).join("");
 
   // per servizio e modello
   const groups = new Map();
@@ -557,9 +565,9 @@ function renderCosts() {
   const rows = costRows.filter((r) => !filter || r.kind === filter).slice(0, 500);
   const body = document.querySelector("#cost-table tbody");
   body.innerHTML = rows.map((r) => {
-    const tokIn = r.kind === "trascrizione" ? `${r.audio_secs.toFixed(0)} s audio` : r.calls ? `${r.calls}×` : num(r.input);
+    const tokIn = r.kind === "trascrizione" ? t("{s} s audio", { s: r.audio_secs.toFixed(0) }) : r.calls ? `${r.calls}×` : num(r.input);
     const d = new Date(r.ts * 1000);
-    const when = d.toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const when = d.toLocaleString(I18N.lang(), { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
     return `<tr><td>${when}</td><td>${esc(r.kind)}</td><td>${esc(rowModel(r))}</td><td class="num">${tokIn}</td><td class="num">${r.cached ? num(r.cached) : ""}</td><td class="num">${r.output ? num(r.output) : ""}</td><td class="num">${r.ms ? (r.ms / 1000).toFixed(1) + " s" : ""}</td><td class="num">${usd(r.cost)}${r.reported_cost != null ? " ✓" : ""}</td></tr>`;
   }).join("") || '<tr><td colspan="8" class="note">nessuna richiesta</td></tr>';
 }
@@ -595,14 +603,14 @@ function savePrices(redraw = false) {
   if (redraw) fillPrices({ prices });
 }
 $("price-add").onclick = () => { prices.push({ provider: "", model: "", input: 0, cached: 0, output: 0, per_call: 0, per_hour: 0 }); fillPrices({ prices }); };
-$("price-reset").onclick = async () => { if (confirm("Ripristinare i prezzi predefiniti?")) { await invoke("reset_prices"); fillPrices(await invoke("get_config")); refreshCosts(); } };
+$("price-reset").onclick = async () => { if (confirm(t("Ripristinare i prezzi predefiniti?"))) { await invoke("reset_prices"); fillPrices(await invoke("get_config")); refreshCosts(); } };
 $("cost-filter").onchange = renderCosts;
 $("cost-refresh").onclick = refreshCosts;
 $("cost-export").onclick = async () => {
   const r = $("cost-result");
-  try { r.textContent = "Salvato: " + await invoke("costs_export"); r.className = "result ok"; } catch (e) { r.textContent = String(e); r.className = "result bad"; }
+  try { r.textContent = t("Salvato: {path}", { path: await invoke("costs_export") }); r.className = "result ok"; } catch (e) { r.textContent = String(e); r.className = "result bad"; }
 };
-$("cost-clear").onclick = async () => { if (confirm("Svuotare il registro dei costi?")) { await invoke("costs_clear"); refreshCosts(); } };
+$("cost-clear").onclick = async () => { if (confirm(t("Svuotare il registro dei costi?"))) { await invoke("costs_clear"); refreshCosts(); } };
 setInterval(() => { if (!document.hidden && localStorage.getItem("tab") === "costs") refreshCosts(); }, 5000);
 $("vb-download").onclick = () => invoke("open_vbcable_page").catch((e) => alert(e));
 $("link-rename").onclick = async () => {
@@ -722,7 +730,7 @@ $("clip-test").onclick = async (ev) => {
   ev.target.disabled = true;
   clearTimeout(clipTimer);
   await invoke("set_clip", { clip });
-  for (let i = 3; i > 0; i--) { r.textContent = `torna al gioco… ${i}`; r.className = "result"; await new Promise((ok) => setTimeout(ok, 1000)); }
+  for (let i = 3; i > 0; i--) { r.textContent = t("torna al gioco… {i}", { i }); r.className = "result"; await new Promise((ok) => setTimeout(ok, 1000)); }
   try { r.textContent = await invoke("test_clip"); r.className = "result ok"; }
   catch (e) { r.textContent = String(e); r.className = "result bad"; }
   ev.target.disabled = false;
@@ -746,11 +754,11 @@ function renderList(div) {
       row.append(inp);
     } else {
       const n = Object.assign(document.createElement("input"), { value: item.name, placeholder: cols[0] });
-      const t = Object.assign(document.createElement("input"), { value: item.target, placeholder: cols[1] });
-      n.style.flex = "1"; t.style.flex = "2";
+      const tgt = Object.assign(document.createElement("input"), { value: item.target, placeholder: cols[1] });
+      n.style.flex = "1"; tgt.style.flex = "2";
       n.oninput = () => { item.name = n.value.trim(); savePerms(); };
-      t.oninput = () => { item.target = t.value.trim(); savePerms(); };
-      row.append(n, t);
+      tgt.oninput = () => { item.target = tgt.value.trim(); savePerms(); };
+      row.append(n, tgt);
     }
     const del = Object.assign(document.createElement("button"), { textContent: "✕" });
     del.onclick = () => { items.splice(i, 1); renderList(div); savePerms(); };
@@ -765,7 +773,7 @@ function fillPerms(cfg) {
   perms = structuredClone(cfg.permissions);
   $("auto-approve").checked = !!perms.auto_approve;
   $("auto-approve").onchange = (e) => {
-    if (e.target.checked && !confirm("Alter Ego eseguirà le azioni attivate senza chiederti conferma. Continuare?")) { e.target.checked = false; return; }
+    if (e.target.checked && !confirm(t("Alter Ego eseguirà le azioni attivate senza chiederti conferma. Continuare?"))) { e.target.checked = false; return; }
     perms.auto_approve = e.target.checked; savePerms();
   };
   document.querySelectorAll("input[data-perm]").forEach((c) => {
@@ -793,10 +801,11 @@ async function refreshLog() {
   }
 }
 $("log-refresh").onclick = refreshLog;
-$("log-clear").onclick = async () => { if (confirm("Svuotare il registro delle azioni?")) { await invoke("clear_actions_log"); refreshLog(); } };
+$("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle azioni?"))) { await invoke("clear_actions_log"); refreshLog(); } };
 
 (async () => {
   const cfg = await invoke("get_config");
+  applyLang(cfg);
   fillLook(cfg);
   fillAudio(cfg);
   fillHotkeys(cfg);
@@ -819,6 +828,7 @@ $("log-clear").onclick = async () => { if (confirm("Svuotare il registro delle a
   // aggiornamenti da altre parti dell'app (non sovrascrive ciò che si sta scrivendo)
   listen("config", (e) => {
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName)) return;
+    applyLang(e.payload);
     fillGeneral(e.payload);
     fillLook(e.payload);
   });

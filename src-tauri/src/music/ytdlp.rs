@@ -80,12 +80,12 @@ pub async fn ensure(http: &reqwest::Client, data_dir: &Path, status: impl Fn(&st
     }
     let ytdlp = dir.join("yt-dlp.exe");
     if !ytdlp.exists() {
-        status("Scarico yt-dlp (solo la prima volta)…");
+        status(crate::i18n::tr("Scarico yt-dlp (solo la prima volta)…", "Downloading yt-dlp (first time only)…"));
         download(http, YTDLP_URL, &ytdlp).await?;
     }
     let deno = dir.join("deno.exe");
     if !deno.exists() {
-        status("Scarico Deno, serve a yt-dlp per YouTube (solo la prima volta)…");
+        status(crate::i18n::tr("Scarico Deno, serve a yt-dlp per YouTube (solo la prima volta)…", "Downloading Deno, yt-dlp needs it for YouTube (first time only)…"));
         let zip = dir.join("deno.zip");
         match download(http, DENO_URL, &zip).await {
             Ok(()) => {
@@ -134,21 +134,43 @@ pub async fn fetch(tools: &Tools, query: &str, cache: &Path) -> Result<(Info, Pa
     c.arg(&target);
     let out = tokio::time::timeout(Duration::from_secs(180), c.output())
         .await
-        .map_err(|_| "yt-dlp non ha finito entro 3 minuti".to_string())?
-        .map_err(|e| format!("impossibile avviare yt-dlp: {e}"))?;
+        .map_err(|_| crate::i18n::tr("yt-dlp non ha finito entro 3 minuti", "yt-dlp didn't finish within 3 minutes").to_string())?
+        .map_err(|e| crate::tr!("impossibile avviare yt-dlp: {e}", "cannot start yt-dlp: {e}"))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let info: Option<Info> = stdout.lines().rev().find_map(|l| serde_json::from_str(l.trim()).ok());
     if !out.status.success() || info.is_none() {
         let err = String::from_utf8_lossy(&out.stderr);
         let line = err.lines().rev().find(|l| l.contains("ERROR")).unwrap_or(err.trim());
-        return Err(if line.is_empty() { "nessun risultato".into() } else { line.chars().take(300).collect() });
+        return Err(if line.is_empty() { crate::i18n::tr("nessun risultato", "no results").into() } else { line.chars().take(300).collect() });
     }
     let info = info.unwrap();
     let file = cache.join(format!("{}.{}", info.id, if info.ext.is_empty() { "m4a" } else { &info.ext }));
     if !file.exists() {
-        return Err("yt-dlp non ha scaricato il file audio".into());
+        return Err(crate::i18n::tr("yt-dlp non ha scaricato il file audio", "yt-dlp didn't download the audio file").into());
     }
     Ok((info, file))
+}
+
+/// Sottotitoli caricati a mano sul video (VTT), usati come testo se le altre fonti non hanno niente.
+pub async fn subtitles(tools: &Tools, url: &str, dir: &Path) -> Option<String> {
+    let _ = std::fs::create_dir_all(dir);
+    let mut c = command(&tools.ytdlp);
+    c.args(["--skip-download", "--write-subs", "--no-warnings", "--no-playlist"])
+        .args(["--sub-langs", "ja,en,it,ja.*,en.*,it.*", "--sub-format", "vtt"])
+        .arg("-o")
+        .arg(dir.join("%(id)s"));
+    if let Some(d) = &tools.deno {
+        c.arg("--js-runtimes").arg(format!("deno:{}", d.display()));
+    }
+    c.arg(url);
+    let _ = tokio::time::timeout(Duration::from_secs(60), c.output()).await.ok()?.ok()?;
+    let mut files: Vec<PathBuf> = std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|e| e == "vtt")).collect();
+    files.sort();
+    let text = files.first().and_then(|p| std::fs::read_to_string(p).ok());
+    for f in files {
+        let _ = std::fs::remove_file(f);
+    }
+    text
 }
 
 /// Tiene solo i `keep` file più recenti nella cache.

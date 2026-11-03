@@ -283,7 +283,7 @@ fn keys_for(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<Vec<(usize, Option<Stri
     let ids = cfg.providers.get(id).map(|p| p.key_ids()).unwrap_or_default();
     let list: Vec<_> = ai.key_order(id, &ids).into_iter().map(|(i, k)| (i, Some(k))).collect();
     if list.is_empty() {
-        Err("chiave API mancante".into())
+        Err(crate::i18n::tr("chiave API mancante", "API key missing").into())
     } else {
         Ok(list)
     }
@@ -307,7 +307,7 @@ pub async fn chat(
         .cloned()
         .collect();
     if enabled.is_empty() {
-        return Err("nessun provider attivo: aprili in Impostazioni".into());
+        return Err(crate::i18n::tr("nessun provider attivo: aprili in Impostazioni", "no active provider: enable one in Settings").into());
     }
     let has_image = messages.iter().any(|m| m.image.is_some());
     let mut failures = Vec::new();
@@ -315,7 +315,7 @@ pub async fn chat(
     'providers: for id in enabled {
         let pc = cfg.providers.get(&id).cloned().unwrap_or_default();
         if has_image && !pc.vision {
-            failures.push(format!("{id}: visione non abilitata"));
+            failures.push(crate::tr!("{id}: visione non abilitata", "{id}: vision not enabled"));
             continue;
         }
         let fail = |failures: &mut Vec<String>, msg: String| {
@@ -344,7 +344,7 @@ pub async fn chat(
                         target.model = model.clone();
                     }
                     Ok(_) => {
-                        fail(&mut failures, "nessun modello disponibile".into());
+                        fail(&mut failures, crate::i18n::tr("nessun modello disponibile", "no model available").into());
                         continue 'providers;
                     }
                     Err(e) => {
@@ -375,7 +375,7 @@ pub async fn chat(
                         if e.key_problem && more_keys {
                             let _ = events.send(StreamEvent::Fallback {
                                 from: format!("{id} (chiave {})", k_pos + 1),
-                                reason: format!("{last_msg} → provo la chiave successiva"),
+                                reason: crate::tr!("{last_msg} → provo la chiave successiva", "{last_msg} → trying the next key"),
                             });
                             break; // chiave successiva
                         }
@@ -420,7 +420,7 @@ pub async fn test(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<String, String> {
     let msg = ChatMessage::new("user", "Rispondi solo con la parola: ok");
     chat(ai, one, "Sei un test di connessione.".into(), vec![msg], None, ch)
         .await
-        .map(|r| format!("{} risponde ({}): {}", r.provider, r.model, r.text.trim()))
+        .map(|r| crate::tr!("{} risponde ({}): {}", "{} answers ({}): {}", r.provider, r.model, r.text.trim()))
 }
 
 #[cfg(test)]

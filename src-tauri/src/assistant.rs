@@ -192,7 +192,9 @@ fn do_clip(app: &AppHandle, clip: &config::ClipConfig) -> Result<String, String>
     match actions::clip::trigger(clip) {
         Ok(names) => {
             actions::log(app, "clip", &names.join(", "), "ok");
-            Ok(if clip.reply.trim().is_empty() { "Clip salvata!".into() } else { clip.reply.trim().to_string() })
+            // risposta predefinita (o vuota) nella lingua dell'interfaccia
+            let r = clip.reply.trim();
+            Ok(if r.is_empty() || r == "Clip salvata!" { crate::i18n::tr("Clip salvata!", "Clip saved!").into() } else { r.to_string() })
         }
         Err(e) => {
             actions::log(app, "clip", "", &e);
@@ -224,7 +226,7 @@ pub fn set_stt(app: AppHandle, stt: config::SttConfig) {
 // ---------- memoria ----------
 
 fn memory_or_err<'a>(conv: &'a Conversation) -> Result<&'a Memory, String> {
-    conv.memory.as_ref().ok_or_else(|| conv.memory_error.clone().unwrap_or_else(|| "memoria non disponibile".into()))
+    conv.memory.as_ref().ok_or_else(|| conv.memory_error.clone().unwrap_or_else(|| crate::i18n::tr("memoria non disponibile", "memory not available").into()))
 }
 
 #[tauri::command]
@@ -255,7 +257,7 @@ pub fn memory_export(app: AppHandle, conv: State<Conversation>) -> Result<String
     let dir = app.path().document_dir().unwrap_or_else(|_| conv.data_dir.clone());
     let path = dir.join(format!("AlterEgo-memoria-{}.json", memory::now()));
     std::fs::write(&path, serde_json::to_vec_pretty(&data).map_err(|e| e.to_string())?)
-        .map_err(|e| format!("esportazione fallita: {e}"))?;
+        .map_err(|e| crate::tr!("esportazione fallita: {e}", "export failed: {e}"))?;
     Ok(path.display().to_string())
 }
 
@@ -286,7 +288,7 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
             return;
         }
         if provider == "off" {
-            emit_stt(app, stt::SttEvent::Error { message: "riconoscimento vocale disattivato nelle impostazioni".into() });
+            emit_stt(app, stt::SttEvent::Error { message: crate::i18n::tr("riconoscimento vocale disattivato nelle impostazioni", "speech recognition is turned off in the settings").into() });
             return;
         }
         // l'apertura del microfono può richiedere un attimo: non bloccare il thread delle hotkey
@@ -366,7 +368,7 @@ pub async fn stt_test(app: AppHandle) -> Result<String, String> {
     let mic = app.state::<AppState>().cfg.lock().unwrap().audio.input_device.clone();
     conv.recorder.start(&mic)?;
     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
-    let wav = conv.recorder.finish()?.ok_or("nessun audio registrato")?;
+    let wav = conv.recorder.finish()?.ok_or(crate::i18n::tr("nessun audio registrato", "no audio recorded"))?;
     let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
     let http = app.state::<AppState>().ai.client_for(if cfg.provider == "local" { &cfg.base_url } else { "https://api.groq.com" }).clone();
     let secs = wav_seconds(&wav);
@@ -374,7 +376,7 @@ pub async fn stt_test(app: AppHandle) -> Result<String, String> {
     let res = stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await;
     log_stt_cost(&app, &cfg, secs, t0, res.is_ok());
     let text = res?;
-    Ok(if text.is_empty() { "(silenzio: nessuna parola riconosciuta)".into() } else { text })
+    Ok(if text.is_empty() { crate::i18n::tr("(silenzio: nessuna parola riconosciuta)", "(silence: no words recognized)").into() } else { text })
 }
 
 // ---------- permessi / clip / audio / avvio ----------
@@ -436,7 +438,7 @@ pub async fn import_sprite_sheet(app: AppHandle, data: String) -> Result<Vec<Str
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(data.split(',').next_back().unwrap_or(""))
-        .map_err(|_| "file non valido".to_string())?;
+        .map_err(|_| crate::i18n::tr("file non valido", "invalid file").to_string())?;
     let dir = app.state::<Conversation>().data_dir.clone();
     let saved = tauri::async_runtime::spawn_blocking(move || crate::sprites::import_sheet(&dir, &bytes))
         .await

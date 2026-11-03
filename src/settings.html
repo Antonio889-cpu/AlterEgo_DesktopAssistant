@@ -24,6 +24,9 @@
       <h2>Generale</h2>
       <label>Il tuo nome <input id="user-name" maxlength="40" placeholder="es. Makoto" /></label>
       <label>Tag nome nel dialogo <input id="name-tag" maxlength="24" placeholder="Alter Ego" /></label>
+      <label>Lingua dell'interfaccia
+        <select id="ui-language"><option value="auto">Automatica (lingua di Windows)</option><option value="it">Italiano</option><option value="en">English</option></select>
+      </label>
       <button id="save-general">Salva</button>
       <h3>Aspetto</h3>
       <label>Opacità <input id="look-opacity" type="range" min="0.2" max="1" step="0.05" /></label>
@@ -63,6 +66,7 @@
       <h2>Personalità e lingua</h2>
       <label>Lingua delle risposte
         <select id="language">
+          <option value="auto">Automatica (come l'interfaccia)</option>
           <option value="it">Solo italiano</option>
           <option value="it_en">Italiano + traduzione inglese</option>
           <option value="en">Solo inglese</option>
@@ -75,7 +79,7 @@
         vale dal messaggio successivo.</p>
       <button id="open-data">Apri cartella dati</button>
       <h3>Sprite</h3>
-      <p class="note">Gli sprite di Alter Ego non sono inclusi nell'app (sono © Spike Chunsoft). Importa il tuo foglio 3×3
+      <p class="note">Gli sprite di Alter Ego sono già inclusi. Per sostituirli importa un altro foglio 3×3
         (riquadri con cornice chiara, come quello originale): l'app ritaglia le espressioni e toglie lo sfondo.
         Oppure copia a mano dei PNG trasparenti chiamati <code>idle.png</code>, <code>happy.png</code>, <code>embarrassed.png</code>,
         <code>worried.png</code>, <code>thinking.png</code>, <code>sad.png</code>, <code>surprised.png</code>, <code>error.png</code>
@@ -185,6 +189,7 @@
         Mentre parla, la musica si abbassa da sola.</p>
       <label class="inline"><input type="checkbox" id="music-lyrics" /> Testi sincronizzati (LRCLIB)</label>
       <label class="inline"><input type="checkbox" id="music-reactive" /> Il volto di Alter Ego nel lettore cambia a tempo di musica</label>
+      <label class="inline"><input type="checkbox" id="music-compact" /> Durante la musica rimpicciolisci Alter Ego (torna grande quando parla o le scrivi)</label>
       <div class="actions"><input id="music-query" placeholder="Prova: titolo e artista" /> <button id="music-go">Cerca e suona</button> <span id="music-result" class="result"></span></div>
     </section>
 
@@ -325,6 +330,7 @@
     </li>
   </template>
 
+  <script src="i18n.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>

@@ -10,6 +10,12 @@ let config = null;
 // ---------- aspetto ----------
 function applyConfig(cfg) {
   config = cfg;
+  const lang = I18N.resolve(cfg.ui_language);
+  if (lang !== I18N.lang() || !applyConfig.done) {
+    I18N.setLang(lang);
+    invoke("set_resolved_language", { lang }); // tray e messaggi del backend
+    applyConfig.done = true;
+  }
   window.appConfig = cfg;
   root.style.opacity = cfg.opacity;
   document.documentElement.style.setProperty("--intensity", cfg.bg_intensity);
@@ -20,7 +26,7 @@ function applyConfig(cfg) {
   body.classList.toggle("click-through", cfg.click_through);
   Dialog.setName(cfg.name_tag);
   $("errors").textContent = cfg.hotkey_errors.length
-    ? "Hotkey non registrate: " + cfg.hotkey_errors.join("; ")
+    ? t("Hotkey non registrate: {list}", { list: cfg.hotkey_errors.join("; ") })
     : "";
 }
 
@@ -36,8 +42,8 @@ async function demo() {
     State.setEmotion(e);
     await new Promise((r) => setTimeout(r, 450));
   }
-  await Dialog.say(`Ciao${name ? ", " + name : ""}! Sono Alter Ego... sono solo un programma di intelligenza artificiale, però farò del mio meglio.`);
-  await Dialog.say("Questo è un messaggio lungo per provare le pagine del box dialogo. Quando il testo non entra in due righe continua nella pagina successiva: clicca qui sopra, oppure premi Invio, per andare avanti.");
+  await Dialog.say(t("Ciao{name}! Sono Alter Ego... sono solo un programma di intelligenza artificiale, però farò del mio meglio.", { name: name ? ", " + name : "" }));
+  await Dialog.say(t("Questo è un messaggio lungo per provare le pagine del box dialogo. Quando il testo non entra in due righe continua nella pagina successiva: clicca qui sopra, oppure premi Invio, per andare avanti."));
   await Dialog.say("あなたは何者？");
 }
 
@@ -136,7 +142,7 @@ listen("reminder", async (e) => {
   State.setEmotion("surprised");
   State.setMode("speaking");
   Audio2.speak(e.payload.text);
-  await Dialog.say("⏰ Promemoria: " + e.payload.text);
+  await Dialog.say(t("⏰ Promemoria: {text}", { text: e.payload.text }));
   State.settle();
 });
 
@@ -163,6 +169,29 @@ function tvOff() {
 }
 listen("tv", (e) => (e.payload === "on" ? tvOn() : tvOff()));
 
+// ---------- modalità compatta durante la musica ----------
+// Mentre suona un brano la finestra si rimpicciolisce; torna normale quando Alter Ego parla,
+// pensa, ascolta o quando apri il box di testo / una conferma.
+let musicOn = false;
+let compact = false;
+let wantSince = 0;
+listen("music-state", (e) => { musicOn = !!(e.payload.playing && !e.payload.paused); });
+function alterEgoBusy() {
+  return Dialog.isOpen() || !$("prompt").classList.contains("hidden") || !$("confirm").classList.contains("hidden")
+    || ["thinking", "listening", "speaking"].includes(State.mode()) || Audio2.isSpeaking();
+}
+setInterval(() => {
+  const want = musicOn && config?.music?.compact !== false && !alterEgoBusy();
+  if (!want) {
+    wantSince = 0;
+    if (compact) { compact = false; invoke("set_compact", { on: false }); }
+    return;
+  }
+  // si rimpicciolisce dopo un attimo di calma, così non "salta" tra una frase e l'altra
+  if (!wantSince) wantSince = Date.now();
+  if (!compact && Date.now() - wantSince > 1500) { compact = true; invoke("set_compact", { on: true }); }
+}, 250);
+
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 (async () => {
@@ -172,6 +201,6 @@ window.addEventListener("contextmenu", (e) => e.preventDefault());
   const name = config.user_name.trim();
   State.setEmotion("happy");
   State.setMode("speaking");
-  await Dialog.say(`Ciao${name ? ", " + name : ""}! Scrivimi con Ctrl+Alt+T, oppure tieni premuto Ctrl+Alt+Spazio e parla.`);
+  await Dialog.say(t("Ciao{name}! Scrivimi con Ctrl+Alt+T, oppure tieni premuto Ctrl+Alt+Spazio e parla.", { name: name ? ", " + name : "" }));
   State.settle();
 })();

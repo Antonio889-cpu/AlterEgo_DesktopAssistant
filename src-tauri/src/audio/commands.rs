@@ -51,7 +51,7 @@ pub async fn tts_say(app: AppHandle, text: String, lang: Option<String>) -> Resu
         app.state::<Kokoro>()
             .ensure_ready(&http, &a.kokoro_url, a.kokoro_autostart)
             .await
-            .map_err(|e| format!("Kokoro non pronto: {e}"))?;
+            .map_err(|e| crate::tr!("Kokoro non pronto: {e}", "Kokoro not ready: {e}"))?;
     }
     let key = if a.tts == "openai" { crate::keys::get_slot("tts", "1") } else { None };
     let text: String = text.chars().take(2000).collect();
@@ -129,12 +129,12 @@ pub async fn mic_link_rename(app: AppHandle) -> Result<String, String> {
         let engine = app.state::<AudioEngine>();
         engine.configure(&crate::config::AudioConfig { mic_link: Default::default(), ..a.clone() });
         engine.configure(&a);
-        Ok(format!("Fatto: nelle altre app scegli «{}» come microfono.", super::LINK_NAME))
+        Ok(crate::tr!("Fatto: nelle altre app scegli «{}» come microfono.", "Done: in other apps pick “{}” as the microphone.", super::LINK_NAME))
     }
     #[cfg(not(windows))]
     {
         let _ = app;
-        Err("disponibile solo su Windows".into())
+        Err(crate::i18n::tr("disponibile solo su Windows", "only available on Windows").into())
     }
 }
 

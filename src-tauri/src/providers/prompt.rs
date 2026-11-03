@@ -68,7 +68,13 @@ pub fn system(cfg: &Config, persona: &str, mem: &MemoryContext) -> String {
 - Poi il testo: breve (2-4 frasi), va in un box di dialogo. Niente markdown, niente elenchi lunghi.\n",
         EMOTIONS.join("|")
     ));
-    match cfg.language.as_str() {
+    // "auto": come la lingua dell'interfaccia
+    let lang = match cfg.language.as_str() {
+        "auto" if crate::i18n::en() => "en",
+        "auto" => "it",
+        l => l,
+    };
+    match lang {
         "en" => s.push_str("- Rispondi in inglese.\nEsempio:\n[happy]\nHi! I'm so glad to hear from you.\n"),
         "it_en" => s.push_str(
             "- Rispondi in italiano, poi una riga con solo ---EN--- e sotto la traduzione inglese.\n\

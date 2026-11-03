@@ -35,12 +35,12 @@ pub fn status_error(status: reqwest::StatusCode, body: &str, sent_tools: bool) -
         .unwrap_or_else(|| body.chars().take(200).collect());
     let code = status.as_u16();
     let what = match code {
-        401 | 403 => "chiave non valida o senza permessi",
-        402 => "credito esaurito",
-        404 => "modello o endpoint non trovato",
-        429 => "limite di richieste raggiunto",
-        500..=599 => "errore del server",
-        _ => "richiesta rifiutata",
+        401 | 403 => crate::i18n::tr("chiave non valida o senza permessi", "invalid key or no permission"),
+        402 => crate::i18n::tr("credito esaurito", "credit exhausted"),
+        404 => crate::i18n::tr("modello o endpoint non trovato", "model or endpoint not found"),
+        429 => crate::i18n::tr("limite di richieste raggiunto", "rate limit reached"),
+        500..=599 => crate::i18n::tr("errore del server", "server error"),
+        _ => crate::i18n::tr("richiesta rifiutata", "request rejected"),
     };
     let lower = detail.to_lowercase();
     ProviderError {
@@ -53,11 +53,11 @@ pub fn status_error(status: reqwest::StatusCode, body: &str, sent_tools: bool) -
 
 fn net_error(e: reqwest::Error) -> ProviderError {
     let msg = if e.is_connect() {
-        "connessione impossibile".to_string()
+        crate::i18n::tr("connessione impossibile", "cannot connect").to_string()
     } else if e.is_timeout() {
         "tempo scaduto".to_string()
     } else {
-        format!("errore di rete: {}", super::describe_net_error(&e))
+        crate::tr!("errore di rete: {}", "network error: {}", super::describe_net_error(&e))
     };
     ProviderError::new(msg, true)
 }
@@ -170,7 +170,7 @@ pub async fn stream_chat(
         let send = request(ai.client_for(&t.base), t, reqwest::Method::POST, "/chat/completions").json(&body).send();
         let resp = tokio::time::timeout(first_timeout, send)
             .await
-            .map_err(|_| ProviderError::new("tempo scaduto in attesa della risposta", true))?
+            .map_err(|_| ProviderError::new(crate::i18n::tr("tempo scaduto in attesa della risposta", "timed out waiting for the answer"), true))?
             .map_err(net_error)?;
         if resp.status().is_success() {
             break resp;
@@ -201,7 +201,7 @@ pub async fn stream_chat(
         }
         let wait = if first { first_timeout } else { idle_timeout };
         let chunk = match tokio::time::timeout(wait, stream.next()).await {
-            Err(_) => return Err(ProviderError::new("lo streaming si è interrotto (timeout)", true)),
+            Err(_) => return Err(ProviderError::new(crate::i18n::tr("lo streaming si è interrotto (timeout)", "the stream stopped (timeout)"), true)),
             Ok(None) => break,
             Ok(Some(Err(e))) => return Err(net_error(e)),
             Ok(Some(Ok(c))) => c,
@@ -218,7 +218,7 @@ pub async fn stream_chat(
             }
             let Ok(v) = serde_json::from_str::<Value>(data) else { continue };
             if let Some(err) = v.get("error") {
-                let msg = err.get("message").and_then(Value::as_str).unwrap_or("errore dal provider").to_string();
+                let msg = err.get("message").and_then(Value::as_str).unwrap_or(crate::i18n::tr("errore dal provider", "provider error")).to_string();
                 let lower = msg.to_lowercase();
                 return Err(ProviderError {
                     key_problem: lower.contains("quota") || lower.contains("rate limit"),
@@ -245,7 +245,7 @@ pub async fn stream_chat(
     // anche senza `usage` la richiesta va nel registro (token sconosciuti = 0)
     ai.record_usage(&t.id, &t.model, usage.as_ref().unwrap_or(&json!({})), started.elapsed().as_millis() as u64);
     if full.trim().is_empty() && tool_calls.is_empty() {
-        return Err(ProviderError::new("risposta vuota", true));
+        return Err(ProviderError::new(crate::i18n::tr("risposta vuota", "empty answer"), true));
     }
     Ok(Reply { text: full, tool_calls })
 }

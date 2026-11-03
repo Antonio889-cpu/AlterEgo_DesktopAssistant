@@ -71,7 +71,7 @@ async fn call(app: &AppHandle, what: &str, body: Value) -> Result<Value, String>
     };
     let keys = state.ai.key_order("deepseek", &ids);
     if keys.is_empty() {
-        return Err("la ricerca web usa le API di DeepSeek: aggiungi una chiave DeepSeek in Impostazioni → AI e chiavi".into());
+        return Err(crate::i18n::tr("la ricerca web usa le API di DeepSeek: aggiungi una chiave DeepSeek in Impostazioni → AI e chiavi", "web search uses the DeepSeek API: add a DeepSeek key in Settings → AI & keys").into());
     }
     let url = format!("{base}/v1/tools/{what}");
     let mut last = String::new();
@@ -116,7 +116,7 @@ async fn call(app: &AppHandle, what: &str, body: Value) -> Result<Value, String>
 pub async fn search(app: &AppHandle, query: &str, count: u64) -> Result<Vec<Hit>, String> {
     let q: String = query.trim().chars().take(128).collect();
     if q.is_empty() {
-        return Err("ricerca vuota".into());
+        return Err(crate::i18n::tr("ricerca vuota", "empty search").into());
     }
     let v = call(app, "search", json!({ "query": q, "count": count.clamp(1, 10) })).await?;
     Ok(parse_search(&v))
@@ -125,12 +125,12 @@ pub async fn search(app: &AppHandle, query: &str, count: u64) -> Result<Vec<Hit>
 pub async fn fetch(app: &AppHandle, url: &str) -> Result<Page, String> {
     let u = reqwest::Url::parse(url.trim()).map_err(|_| "URL non valido".to_string())?;
     if !matches!(u.scheme(), "http" | "https") || !u.username().is_empty() || u.password().is_some() {
-        return Err("si possono leggere solo pagine http/https senza credenziali".into());
+        return Err(crate::i18n::tr("si possono leggere solo pagine http/https senza credenziali", "only http/https pages without credentials can be read").into());
     }
     let v = call(app, "fetch", json!({ "url": u.as_str() })).await?;
     let p = parse_fetch(&v);
     if p.content.is_empty() {
-        return Err("la pagina non ha contenuto leggibile".into());
+        return Err(crate::i18n::tr("la pagina non ha contenuto leggibile", "the page has no readable content").into());
     }
     Ok(p)
 }

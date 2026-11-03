@@ -26,9 +26,15 @@ const Chat = (() => {
     toastTimer = setTimeout(() => toast.classList.remove("on"), 5000);
   }
 
+  /** Lingua delle risposte: "auto" segue la lingua dell'interfaccia. */
+  function answerLang() {
+    const l = window.appConfig?.language || "it";
+    return l === "auto" ? I18N.lang() : l;
+  }
+
   /** Testo da mostrare secondo la lingua scelta (solo IT / IT+EN / solo EN). */
   function displayText(reply) {
-    const lang = window.appConfig?.language || "it";
+    const lang = answerLang();
     if (lang === "it_en" && reply.en) return `${reply.it}\n\n${reply.en}`;
     return reply.it || reply.en || "…";
   }
@@ -52,7 +58,7 @@ const Chat = (() => {
       State.setMode("speaking");
       busy = false;
       const shown = displayText(reply);
-      Audio2.speak(window.appConfig?.language === "en" ? reply.it : reply.it || reply.en, window.appConfig?.language === "en" ? "en" : "it");
+      Audio2.speak(reply.it || reply.en, answerLang() === "en" ? "en" : "it");
       if (res.model === "clip") Audio2.chime();
       await Dialog.say(shown);
     } catch (err) {
@@ -60,7 +66,7 @@ const Chat = (() => {
       State.setEmotion("error");
       State.setMode("speaking");
       const name = window.appConfig?.user_name?.trim();
-      await Dialog.say(`Ah… scusa${name ? ", " + name : ""}, non riesco a collegarmi. Sono solo un programma, ma ce la sto mettendo tutta…\n\n(${err})`);
+      await Dialog.say(t("Ah… scusa{name}, non riesco a collegarmi. Sono solo un programma, ma ce la sto mettendo tutta…\n\n({err})", { name: name ? ", " + name : "", err }));
     }
     State.settle();
   }
@@ -71,30 +77,30 @@ const Chat = (() => {
       case "recording":
         if (busy) return;
         State.setMode("listening");
-        Dialog.pending("🎙 Ti ascolto");
+        Dialog.pending(t("🎙 Ti ascolto"));
         break;
       case "transcribing":
         State.setMode("thinking");
-        Dialog.pending("✎ Trascrivo");
+        Dialog.pending(t("✎ Trascrivo"));
         break;
       case "done":
-        notify(`Hai detto: “${ev.text}”`);
+        notify(t("Hai detto: “{text}”", { text: ev.text }));
         ask(ev.text);
         break;
       case "clip":
         State.setEmotion(ev.ok ? "happy" : "worried");
         State.setMode("speaking");
         if (ev.ok) Audio2.chime();
-        Dialog.say(ev.ok ? ev.message : `Non sono riuscita a fare la clip… (${ev.message})`).then(() => State.settle());
+        Dialog.say(ev.ok ? ev.message : t("Non sono riuscita a fare la clip… ({msg})", { msg: ev.message })).then(() => State.settle());
         break;
       case "empty":
         State.settle(true);
-        Dialog.say("Ehm… non ho sentito niente. Tieni premuto il tasto mentre parli.");
+        Dialog.say(t("Ehm… non ho sentito niente. Tieni premuto il tasto mentre parli."));
         break;
       case "error":
         State.setEmotion("worried");
         State.setMode("speaking");
-        Dialog.say(`Non riesco a sentirti… (${ev.message})`).then(() => State.settle(true));
+        Dialog.say(t("Non riesco a sentirti… ({msg})", { msg: ev.message })).then(() => State.settle(true));
         break;
     }
   }
@@ -134,9 +140,10 @@ const Chat = (() => {
     const labels = { open_target: "apro", list_dir: "guardo la cartella", read_file: "leggo il file", write_file: "scrivo il file",
       delete_file: "elimino il file", set_reminder: "imposto il promemoria", list_reminders: "controllo i promemoria",
       cancel_reminder: "annullo il promemoria", read_clipboard: "leggo gli appunti", write_clipboard: "copio negli appunti",
-      take_screenshot: "guardo lo schermo", set_volume: "regolo il volume", set_brightness: "regolo la luminosità", run_command: "eseguo il comando" };
+      take_screenshot: "guardo lo schermo", set_volume: "regolo il volume", set_brightness: "regolo la luminosità", run_command: "eseguo il comando",
+      run_shell: "uso il terminale", web_search: "cerco sul web", web_fetch: "leggo la pagina", play_music: "cerco la musica", music_control: "controllo la musica" };
     State.setMode("thinking");
-    Dialog.pending("⚙ " + names.map((n) => labels[n] || n).join(", "));
+    Dialog.pending("⚙ " + names.map((n) => t(labels[n] || n)).join(", "));
   }
 
   return { onToolUse, ask, openInput, closeInput, parseReply, notify, onStt };

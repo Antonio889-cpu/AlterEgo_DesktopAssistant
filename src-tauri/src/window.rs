@@ -2,7 +2,10 @@
 
 use crate::{config::Geometry, AppState};
 use std::{
-    sync::atomic::{AtomicU8, Ordering},
+    sync::{
+        atomic::{AtomicBool, AtomicU8, Ordering},
+        Mutex,
+    },
     thread,
     time::Duration,
 };
@@ -103,24 +106,22 @@ fn initial_geometry(app: &AppHandle) -> Geometry {
 
 /// Chiamata a ogni Moved/Resized: aggiorna la geometria del monitor corrente.
 pub fn record_geometry(win: &tauri::Window) {
-    if !win.is_visible().unwrap_or(false) {
+    save_geometry(win.app_handle(), win.is_visible().unwrap_or(false), win.outer_position().ok(), win.inner_size().ok(), win.current_monitor().ok().flatten());
+}
+
+fn save_geometry(app: &AppHandle, visible: bool, pos: Option<PhysicalPosition<i32>>, size: Option<PhysicalSize<u32>>, mon: Option<Monitor>) {
+    // in modalità compatta (musica) la geometria salvata resta quella normale
+    if !visible || COMPACT.load(Ordering::SeqCst) || ANIMATING.load(Ordering::SeqCst) {
         return;
     }
-    let (Ok(pos), Ok(size), Ok(Some(mon))) =
-        (win.outer_position(), win.inner_size(), win.current_monitor())
-    else {
-        return;
-    };
+    let (Some(pos), Some(size), Some(mon)) = (pos, size, mon) else { return };
     if pos.x <= -30000 || size.width == 0 {
         return; // finestra minimizzata
     }
-    let state = win.state::<AppState>();
+    let state = app.state::<AppState>();
     let name = monitor_name(&mon);
     let mut cfg = state.cfg.lock().unwrap();
-    cfg.geometry.insert(
-        name.clone(),
-        Geometry { x: pos.x, y: pos.y, width: size.width, height: size.height },
-    );
+    cfg.geometry.insert(name.clone(), Geometry { x: pos.x, y: pos.y, width: size.width, height: size.height });
     cfg.last_monitor = Some(name);
     state.dirty.store(true, Ordering::Relaxed);
 }
@@ -145,6 +146,96 @@ pub fn resize_keep_ratio(win: &WebviewWindow, width: f64) -> tauri::Result<()> {
         .unwrap_or(3840.0);
     let w = width.clamp(MIN_WIDTH_LOGICAL * scale, max_w);
     win.set_size(PhysicalSize::new(w.round() as u32, (w / RATIO).round() as u32))
+}
+
+// ---------- modalità compatta (durante la musica) ----------
+
+/// La finestra è rimpicciolita.
+static COMPACT: AtomicBool = AtomicBool::new(false);
+/// Animazione di ridimensionamento in corso.
+static ANIMATING: AtomicBool = AtomicBool::new(false);
+/// Richiesta arrivata durante un'animazione: 0 nessuna, 1 compatta, 2 normale.
+static PENDING_COMPACT: AtomicU8 = AtomicU8::new(0);
+/// Dimensione normale (pixel fisici) da ripristinare.
+static NORMAL_SIZE: Mutex<Option<(u32, u32)>> = Mutex::new(None);
+/// Larghezza compatta: 45% di quella normale, minimo 220 px logici.
+const COMPACT_RATIO: f64 = 0.45;
+const COMPACT_MIN_LOGICAL: f64 = 220.0;
+
+pub fn is_compact() -> bool {
+    COMPACT.load(Ordering::SeqCst)
+}
+
+/// Angolo a cui restare "attaccati": quello del monitor più vicino al centro della finestra.
+fn anchor(win: &WebviewWindow, pos: PhysicalPosition<i32>, size: PhysicalSize<u32>) -> (bool, bool) {
+    let Ok(Some(m)) = win.current_monitor() else { return (true, true) };
+    let a = m.work_area();
+    let cx = pos.x + size.width as i32 / 2;
+    let cy = pos.y + size.height as i32 / 2;
+    (cx > a.position.x + a.size.width as i32 / 2, cy > a.position.y + a.size.height as i32 / 2)
+}
+
+/// Ridimensiona in ~180 ms tenendo fermo l'angolo `(right, bottom)`.
+fn animate_to(win: WebviewWindow, from: (PhysicalPosition<i32>, PhysicalSize<u32>), to_size: PhysicalSize<u32>, (right, bottom): (bool, bool), done: impl FnOnce() + Send + 'static) {
+    ANIMATING.store(true, Ordering::SeqCst);
+    thread::spawn(move || {
+        let (p0, s0) = from;
+        let (ax, ay) = (if right { p0.x + s0.width as i32 } else { p0.x }, if bottom { p0.y + s0.height as i32 } else { p0.y });
+        const STEPS: u32 = 9;
+        for i in 1..=STEPS {
+            let t = i as f64 / STEPS as f64;
+            let e = 1.0 - (1.0 - t).powi(3); // ease-out
+            let w = (s0.width as f64 + (to_size.width as f64 - s0.width as f64) * e).round() as u32;
+            let h = (s0.height as f64 + (to_size.height as f64 - s0.height as f64) * e).round() as u32;
+            let x = if right { ax - w as i32 } else { ax };
+            let y = if bottom { ay - h as i32 } else { ay };
+            let _ = win.set_size(PhysicalSize::new(w, h));
+            let _ = win.set_position(PhysicalPosition::new(x, y));
+            thread::sleep(Duration::from_millis(20));
+        }
+        ANIMATING.store(false, Ordering::SeqCst);
+        done();
+        // richiesta arrivata durante l'animazione (es. Alter Ego ha iniziato a parlare)
+        match PENDING_COMPACT.swap(0, Ordering::SeqCst) {
+            1 => set_compact(win.app_handle(), true),
+            2 => set_compact(win.app_handle(), false),
+            _ => {}
+        }
+    });
+}
+
+/// Rimpicciolisce (on) o riporta alla dimensione normale la finestra principale.
+pub fn set_compact(app: &AppHandle, on: bool) {
+    let Some(win) = app.get_webview_window(MAIN) else { return };
+    if ANIMATING.load(Ordering::SeqCst) {
+        PENDING_COMPACT.store(if on { 1 } else { 2 }, Ordering::SeqCst);
+        return;
+    }
+    if COMPACT.load(Ordering::SeqCst) == on || !win.is_visible().unwrap_or(false) {
+        return;
+    }
+    let (Ok(pos), Ok(size), Ok(scale)) = (win.outer_position(), win.inner_size(), win.scale_factor()) else { return };
+    let corner = anchor(&win, pos, size);
+    if on {
+        *NORMAL_SIZE.lock().unwrap() = Some((size.width, size.height));
+        let w = (size.width as f64 * COMPACT_RATIO).max(COMPACT_MIN_LOGICAL * scale).min(size.width as f64);
+        let _ = win.set_min_size(Some(tauri::LogicalSize::new(COMPACT_MIN_LOGICAL, COMPACT_MIN_LOGICAL / RATIO)));
+        COMPACT.store(true, Ordering::SeqCst);
+        let target = PhysicalSize::new(w.round() as u32, (w / RATIO).round() as u32);
+        animate_to(win, (pos, size), target, corner, || {});
+    } else {
+        let Some((w, h)) = NORMAL_SIZE.lock().unwrap().take() else {
+            COMPACT.store(false, Ordering::SeqCst);
+            return;
+        };
+        let w2 = win.clone();
+        animate_to(win, (pos, size), PhysicalSize::new(w, h), corner, move || {
+            COMPACT.store(false, Ordering::SeqCst);
+            let _ = w2.set_min_size(Some(tauri::LogicalSize::new(MIN_WIDTH_LOGICAL, MIN_WIDTH_LOGICAL / RATIO)));
+            // salva la posizione finale (la finestra può essere stata spostata da compatta)
+            save_geometry(w2.app_handle(), true, w2.outer_position().ok(), w2.inner_size().ok(), w2.current_monitor().ok().flatten());
+        });
+    }
 }
 
 pub fn toggle_visibility(app: &AppHandle) {

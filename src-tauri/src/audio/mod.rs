@@ -378,7 +378,7 @@ fn run(rx: mpsc::Receiver<Setup>, sh: Arc<Shared>) {
         if let Some((mic, cable)) = &setup.link {
             let cable_name = if cable.is_empty() { devices().cable_render } else { Some(cable.clone()) };
             match cable_name {
-                None => status.link_error = Some("cavo virtuale non trovato: installa VB-CABLE (vedi Impostazioni → Voce)".into()),
+                None => status.link_error = Some(crate::i18n::tr("cavo virtuale non trovato: installa VB-CABLE (vedi Impostazioni → Voce)", "virtual cable not found: install VB-CABLE (see Settings → Voice)").into()),
                 Some(cable_name) => match open_output(&cable_name, sh.clone(), true) {
                     Err(e) => status.link_error = Some(e),
                     Ok((cable_name, out)) => {
@@ -386,7 +386,7 @@ fn run(rx: mpsc::Receiver<Setup>, sh: Arc<Shared>) {
                         match open_mic(mic, rate, sh.clone()) {
                             Ok((mic_name, inp)) if is_cable_capture(&mic_name) => {
                                 drop(inp);
-                                status.link_error = Some("il microfono scelto è il cavo stesso: scegli il microfono vero".into());
+                                status.link_error = Some(crate::i18n::tr("il microfono scelto è il cavo stesso: scegli il microfono vero", "the chosen microphone is the cable itself: pick your real microphone").into());
                             }
                             Ok((mic_name, inp)) => {
                                 streams.push(out);
@@ -400,7 +400,7 @@ fn run(rx: mpsc::Receiver<Setup>, sh: Arc<Shared>) {
                                 streams.push(out);
                                 status.link_active = true;
                                 status.link_cable = Some(cable_name);
-                                status.link_error = Some(format!("microfono: {e}"));
+                                status.link_error = Some(crate::tr!("microfono: {e}", "microphone: {e}"));
                             }
                         }
                     }
@@ -421,7 +421,7 @@ fn open_output(name: &str, sh: Arc<Shared>, link: bool) -> Result<(String, cpal:
         // dispositivo scollegato: si torna al predefinito
         device = cpal::default_host().default_output_device();
     }
-    let device = device.ok_or_else(|| format!("dispositivo di uscita non trovato: {name}"))?;
+    let device = device.ok_or_else(|| crate::tr!("dispositivo di uscita non trovato: {name}", "output device not found: {name}"))?;
     let dev_name = device.name().unwrap_or_default();
     let config = device.default_output_config().map_err(|e| format!("{dev_name}: {e}"))?;
     let rate = config.sample_rate().0;
@@ -534,7 +534,7 @@ impl Resampler {
 }
 
 fn open_mic(name: &str, link_rate: u32, sh: Arc<Shared>) -> Result<(String, cpal::Stream), String> {
-    let device = find_input(name).ok_or_else(|| format!("microfono non trovato: {name}"))?;
+    let device = find_input(name).ok_or_else(|| crate::tr!("microfono non trovato: {name}", "microphone not found: {name}"))?;
     let dev_name = device.name().unwrap_or_default();
     let config = device.default_input_config().map_err(|e| format!("{dev_name}: {e}"))?;
     let rate = config.sample_rate().0;

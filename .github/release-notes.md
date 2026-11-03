@@ -1,3 +1,36 @@
+## Alter Ego 1.2.0
+
+⚠ **Contains the original Alter Ego sprites (© Spike Chunsoft): personal use only, do not distribute.**
+
+### 🇬🇧 English
+**New**
+- **English interface**: window, settings, music player, tray menu and messages. Automatic from the Windows language or chosen in Settings → General. Alter Ego's answers can follow the interface language (Personality → Answer language → Automatic, default for new installs).
+- **Compact mode while music plays**: Alter Ego's window shrinks (anchored to the nearest corner) and grows back when she talks, thinks, listens or you open the text box. Can be turned off in Voice & audio → Music.
+- **More lyrics sources**: LRCLIB exact match, LRCLIB search with several title variants, NetEase Cloud Music, the YouTube video's subtitles and, as a last resort, plain lyrics with estimated timing. Hover the lyrics to see the source.
+
+**Fixes**
+- Closing the music player no longer turns off Alter Ego's main window (and hiding Alter Ego no longer closes the player).
+- Lyrics: a failed request no longer stops the whole search; `[offset:]` tags in LRC files are applied.
+
+### 🇮🇹 Italiano
+**Novità**
+- **Interfaccia in inglese**: finestra, impostazioni, lettore, menu della tray e messaggi. Automatica in base alla lingua di Windows o a scelta in Impostazioni → Generale. Le risposte possono seguire la lingua dell'interfaccia (Personalità → Lingua delle risposte → Automatica, predefinita nelle nuove installazioni).
+- **Modalità compatta durante la musica**: la finestra di Alter Ego si rimpicciolisce (ancorata all'angolo più vicino) e torna grande quando parla, pensa, ti ascolta o apri il box di testo. Si disattiva in Voce e audio → Musica.
+- **Più fonti per i testi**: LRCLIB esatto, ricerca LRCLIB con più varianti del titolo, NetEase Cloud Music, sottotitoli del video YouTube e, come ultima risorsa, testo semplice con tempi stimati.
+
+**Correzioni**
+- Chiudere il lettore musicale non spegne più la finestra principale di Alter Ego (e nascondere Alter Ego non chiude più il lettore).
+- Testi: una richiesta fallita non interrompe più tutta la ricerca; applicato il tag `[offset:]` dei file LRC.
+
+### Files
+- `AlterEgo_1.2.0_setup.exe`: installer (updates older versions keeping settings, keys and memory).
+- `AlterEgo_1.2.0_portable.zip`: extract and run `alter-ego.exe`.
+- `SHA256SUMS.txt`: file checksums.
+
+Unsigned build: SmartScreen may ask for *More info → Run anyway*.
+
+---
+
 ## Alter Ego 1.1.0
 
 ⚠ **Contiene gli sprite originali di Alter Ego (© Spike Chunsoft): solo per uso personale, non distribuire.**
@@ -49,9 +82,3 @@
 - Tutto l'audio (voce, blip, jingle) ora passa dal backend: esce dal dispositivo scelto e può andare in Mic-Link.
 - Voci di Windows tramite le API di sistema (WinRT), con scelta automatica della voce per la lingua.
 
-### File
-- `AlterEgo_1.1.0_setup.exe`: installer (aggiorna le versioni precedenti mantenendo impostazioni, chiavi e memoria).
-- `AlterEgo_1.1.0_portable.zip`: estrai e avvia `alter-ego.exe`.
-- `SHA256SUMS.txt`: impronte dei file.
-
-Build non firmata: SmartScreen può chiedere *Ulteriori informazioni → Esegui comunque*.

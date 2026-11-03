@@ -61,22 +61,22 @@ function position() {
 function applyState(s) {
   st = s;
   stAt = performance.now();
-  const t = s.track;
+  const trk = s.track;
   const title = $("title");
   if (s.status) {
     title.textContent = s.status;
     title.classList.add("status");
-    $("artist").textContent = t ? `${t.title} — ${t.artist}` : "";
+    $("artist").textContent = trk ? `${trk.title} — ${trk.artist}` : "";
   } else {
     title.classList.remove("status");
-    title.textContent = t ? t.title : "—";
-    $("artist").textContent = t ? t.artist : "";
+    title.textContent = trk ? trk.title : "—";
+    $("artist").textContent = trk ? trk.artist : "";
   }
   document.body.classList.toggle("paused", !s.playing || s.paused);
   $("b-shuffle").classList.toggle("on", s.shuffle);
   $("b-repeat").classList.toggle("on", s.repeat !== "off");
   $("b-repeat").classList.toggle("one", s.repeat === "one");
-  $("b-repeat").title = { off: "Ripeti: no", all: "Ripeti: tutta la coda", one: "Ripeti: questo brano" }[s.repeat];
+  $("b-repeat").title = t({ off: "Ripeti: no", all: "Ripeti: tutta la coda", one: "Ripeti: questo brano" }[s.repeat]);
   $("dur").textContent = fmt(s.duration);
   if (document.activeElement !== $("volume")) setVolumeUi(s.volume);
   if (!s.reactive_sprite) showSprite("idle");
@@ -113,9 +113,12 @@ function render() {
   if (key !== lastLyric) {
     lastLyric = key;
     const els = $("lines").children;
-    const show = lines || [st.track ? "♪ ♪ ♪" : "", st.track ? "testo non disponibile" : "", ""];
+    const trk = st.track;
+    const why = !trk ? "" : trk.lyrics_source == null ? t("cerco il testo…") : t("testo non trovato");
+    const show = lines || [trk ? "♪ ♪ ♪" : "", why, ""];
     for (let k = 0; k < 3; k++) els[k].textContent = show[k];
     $("lyrics").classList.toggle("none", !lines);
+    $("lyrics").title = st.track?.lyrics_source ? `${t("Testo")}: ${st.track.lyrics_source}${st.track.lyrics_synced ? "" : " — " + t("tempi stimati")}` : "";
   }
 }
 (function loop() { render(); requestAnimationFrame(loop); })();
@@ -151,11 +154,11 @@ bar.addEventListener("pointerdown", (e) => {
 bar.addEventListener("pointermove", (e) => { if (seeking) seeking = seekAt(e) || 0.001; });
 bar.addEventListener("pointerup", (e) => {
   if (!seeking) return;
-  const t = seekAt(e);
+  const to = seekAt(e);
   seeking = false;
-  st.position = t;
+  st.position = to;
   stAt = performance.now();
-  invoke("music_seek", { secs: t });
+  invoke("music_seek", { secs: to });
 });
 
 // spostamento della finestra (fuori dai comandi)
@@ -193,9 +196,11 @@ listen("music-spectrum", (e) => {
   if (s.beat) beat();
   if (s.sprite) showSprite(s.sprite);
 });
-listen("tv", (e) => (e.payload === "off" ? tvOff() : tvOn()));
+// NB: listen() riceve anche gli eventi mandati ad altre finestre: il lettore ha i suoi nomi
+listen("player-tv", (e) => (e.payload === "off" ? tvOff() : tvOn()));
 
 (async () => {
+  try { I18N.setLang(I18N.resolve((await invoke("get_config")).ui_language)); } catch {}
   await document.fonts.load('20px "DotGothic16"');
   await loadSprites();
   drawBands([]);

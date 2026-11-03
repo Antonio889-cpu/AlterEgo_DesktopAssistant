@@ -36,6 +36,10 @@ pub struct Track {
     pub file: PathBuf,
     /// Testo sincronizzato: (secondi, riga).
     pub lyrics: Option<Vec<(f64, String)>>,
+    /// Fonte del testo (LRCLIB, NetEase, YouTube…).
+    pub lyrics_source: Option<String>,
+    /// false = tempi stimati.
+    pub lyrics_synced: bool,
 }
 
 #[derive(Default)]
@@ -122,7 +126,8 @@ pub fn state(app: &AppHandle) -> State {
 }
 
 pub fn emit_state(app: &AppHandle) {
-    let _ = app.emit_to(PLAYER, "music-state", state(app));
+    // a tutte le finestre: la principale lo usa per rimpicciolirsi durante la musica
+    let _ = app.emit("music-state", state(app));
 }
 
 fn set_status(app: &AppHandle, s: &str) {
@@ -169,7 +174,8 @@ fn open_player(app: &AppHandle) {
 /// Chiude il lettore con l'animazione "TV" (la finestra la esegue e poi chiama `player_closed`).
 fn close_player(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(PLAYER) {
-        let _ = app.emit_to(PLAYER, "tv", "off");
+        // nome proprio del lettore: "tv" è della finestra principale
+        let _ = app.emit_to(PLAYER, "player-tv", "off");
         let w = w.clone();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(1200));
@@ -244,7 +250,7 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
                 Ok(decode::End::Stopped) => {}
                 Err(e) => {
                     eprintln!("musica: {e}");
-                    set_status(&app, &format!("Errore: {e}"));
+                    set_status(&app, &crate::tr!("Errore: {e}", "Error: {e}"));
                     advance(&app, true);
                 }
             }
@@ -306,23 +312,23 @@ fn stop(app: &AppHandle) {
 pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String, String> {
     let query = query.trim();
     if query.is_empty() {
-        return Err("cosa devo cercare?".into());
+        return Err(crate::i18n::tr("cosa devo cercare?", "what should I look for?").into());
     }
     let m = app.state::<Music>();
     let _guard = m.busy.lock().await;
     open_player(app);
-    set_status(app, &format!("Cerco «{query}»…"));
+    set_status(app, &crate::tr!("Cerco «{query}»…", "Searching “{query}”…"));
     let http = app.state::<AppState>().ai.http.clone();
     let app2 = app.clone();
     let result = async {
         let tools = ytdlp::ensure(&http, &m.data_dir, |s| set_status(&app2, s)).await?;
         let cache = m.data_dir.join("music_cache");
-        set_status(app, &format!("Scarico «{query}» da YouTube…"));
+        set_status(app, &crate::tr!("Scarico «{query}» da YouTube…", "Downloading “{query}” from YouTube…"));
         let r = match ytdlp::fetch(&tools, query, &cache).await {
             Ok(r) => r,
             Err(e) if cfg!(windows) && std::env::var_os("ALTEREGO_YTDLP").is_none() => {
                 // YouTube cambia spesso: si aggiorna yt-dlp e si riprova una volta
-                set_status(app, "Aggiorno yt-dlp e riprovo…");
+                set_status(app, crate::i18n::tr("Aggiorno yt-dlp e riprovo…", "Updating yt-dlp and retrying…"));
                 ytdlp::update(&tools).await.map_err(|u| format!("{e} (aggiornamento non riuscito: {u})"))?;
                 ytdlp::fetch(&tools, query, &cache).await?
             }
@@ -335,7 +341,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
     let (info, file) = match result {
         Ok(r) => r,
         Err(e) => {
-            set_status(app, &format!("Non trovato: {e}"));
+            set_status(app, &crate::tr!("Non trovato: {e}", "Not found: {e}"));
             if !m.inner.lock().unwrap().playing {
                 close_player(app);
             }
@@ -353,6 +359,8 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
         url: info.webpage_url.clone(),
         file,
         lyrics: None,
+        lyrics_source: None,
+        lyrics_synced: false,
     };
     let (index, now) = {
         let mut i = m.inner.lock().unwrap();
@@ -377,24 +385,45 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
     if app.state::<AppState>().cfg.lock().unwrap().music.lyrics {
         let app = app.clone();
         let id = info.id.clone();
+        let raw = info.title.clone();
+        let url = info.webpage_url.clone().unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", info.id));
         let (title, artist) = (title.clone(), artist.clone());
         tauri::async_runtime::spawn(async move {
             let http = app.state::<AppState>().ai.http.clone();
-            if let Some(lines) = lyrics::find(&http, &title, &artist, duration).await {
-                let m = app.state::<Music>();
-                for t in m.inner.lock().unwrap().queue.iter_mut().filter(|t| t.id == id) {
-                    t.lyrics = Some(lines.clone());
+            let mut found = lyrics::find(&http, &title, &raw, &artist, duration, None).await;
+            // niente testo sincronizzato: prova i sottotitoli del video
+            if !found.as_ref().is_some_and(|l| l.synced) {
+                let data_dir = app.state::<Music>().data_dir.clone();
+                if let Ok(tools) = ytdlp::ensure(&http, &data_dir, |_| {}).await {
+                    if let Some(vtt) = ytdlp::subtitles(&tools, &url, &data_dir.join("music_cache").join("subs")).await {
+                        if let Some(l) = lyrics::find(&http, "", "", "", 0.0, Some(vtt)).await.filter(|l| l.synced) {
+                            found = Some(l);
+                        }
+                    }
                 }
-                emit_state(&app);
             }
+            let m = app.state::<Music>();
+            let mut i = m.inner.lock().unwrap();
+            for t in i.queue.iter_mut().filter(|t| t.id == id) {
+                match &found {
+                    Some(l) => {
+                        t.lyrics = Some(l.lines.clone());
+                        t.lyrics_source = Some(l.source.clone());
+                        t.lyrics_synced = l.synced;
+                    }
+                    None => t.lyrics_source = Some(String::new()), // cercato, non trovato
+                }
+            }
+            drop(i);
+            emit_state(&app);
         });
     }
     let s = state(app);
     let t = s.track.clone().unwrap_or_default();
     Ok(if now {
-        format!("In riproduzione: «{}» di {} ({}).", t.title, t.artist, fmt_time(t.duration))
+        crate::tr!("In riproduzione: «{}» di {} ({}).", "Now playing: “{}” by {} ({}).", t.title, t.artist, fmt_time(t.duration))
     } else {
-        format!("Aggiunto in coda (posizione {}): «{title}» di {artist}.", index + 1)
+        crate::tr!("Aggiunto in coda (posizione {}): «{title}» di {artist}.", "Added to the queue (position {}): “{title}” by {artist}.", index + 1)
     })
 }
 
@@ -420,40 +449,40 @@ pub fn toggle_pause(app: &AppHandle) {
 /// Comandi dal modello (strumento music_control).
 pub async fn control(app: &AppHandle, action: &str, value: Option<f64>) -> Result<String, String> {
     let s = state(app);
-    let need_track = || if s.playing { Ok(()) } else { Err("non sta suonando niente".to_string()) };
+    let need_track = || if s.playing { Ok(()) } else { Err(crate::i18n::tr("non sta suonando niente", "nothing is playing").to_string()) };
     match action {
         "pause" => {
             need_track()?;
             if !s.paused {
                 toggle_pause(app);
             }
-            Ok("In pausa.".into())
+            Ok(crate::i18n::tr("In pausa.", "Paused.").into())
         }
         "resume" => {
             need_track()?;
             if s.paused {
                 toggle_pause(app);
             }
-            Ok("Riprendo.".into())
+            Ok(crate::i18n::tr("Riprendo.", "Resuming.").into())
         }
         "next" => {
             need_track()?;
             advance(app, false);
-            Ok(format!("Ora suona: {}", state(app).track.map(|t| t.title).unwrap_or_default()))
+            Ok(crate::tr!("Ora suona: {}", "Now playing: {}", state(app).track.map(|t| t.title).unwrap_or_default()))
         }
         "previous" => {
             need_track()?;
             previous(app);
-            Ok(format!("Ora suona: {}", state(app).track.map(|t| t.title).unwrap_or_default()))
+            Ok(crate::tr!("Ora suona: {}", "Now playing: {}", state(app).track.map(|t| t.title).unwrap_or_default()))
         }
         "stop" => {
             stop(app);
-            Ok("Musica fermata.".into())
+            Ok(crate::i18n::tr("Musica fermata.", "Music stopped.").into())
         }
         "volume" => {
             let v = (value.unwrap_or(70.0) / 100.0).clamp(0.0, 1.0);
             set_volume(app, v);
-            Ok(format!("Volume musica al {}%.", (v * 100.0).round()))
+            Ok(crate::tr!("Volume musica al {}%.", "Music volume at {}%.", (v * 100.0).round()))
         }
         _ => Ok(match s.track {
             Some(t) if s.playing => format!(
@@ -466,7 +495,7 @@ pub async fn control(app: &AppHandle, action: &str, value: Option<f64>) -> Resul
                 s.index + 1,
                 s.queue_len
             ),
-            _ => "Non sta suonando niente.".into(),
+            _ => crate::i18n::tr("Non sta suonando niente.", "Nothing is playing.").into(),
         }),
     }
 }
@@ -594,10 +623,16 @@ pub async fn music_play(app: AppHandle, query: String) -> Result<String, String>
 }
 
 #[tauri::command]
-pub fn music_settings(app: AppHandle, lyrics: bool, reactive_sprite: bool) {
+pub fn music_settings(app: AppHandle, lyrics: bool, reactive_sprite: bool, compact: Option<bool>) {
     update_config(&app, |c| {
         c.music.lyrics = lyrics;
         c.music.reactive_sprite = reactive_sprite;
+        if let Some(v) = compact {
+            c.music.compact = v;
+        }
     });
+    if compact == Some(false) {
+        crate::window::set_compact(&app, false);
+    }
     emit_state(&app);
 }

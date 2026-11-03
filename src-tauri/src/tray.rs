@@ -10,6 +10,8 @@ use tauri::{
     AppHandle, Emitter, Manager, Wry,
 };
 
+use crate::i18n::tr;
+
 fn pct(v: f64) -> String {
     ((v * 100.0).round() as u32).to_string()
 }
@@ -29,27 +31,27 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let cfg = state.cfg.lock().unwrap().clone();
     let click_on = state.click_through.load(Ordering::Relaxed);
 
-    let show = MenuItem::with_id(app, "toggle", "Mostra / nascondi", true, None::<&str>)?;
-    let talk = MenuItem::with_id(app, "talk", "Scrivi ad Alter Ego…", true, None::<&str>)?;
-    let settings = MenuItem::with_id(app, "settings", "Impostazioni…", true, None::<&str>)?;
-    let demo = MenuItem::with_id(app, "demo", "Messaggio di prova", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "toggle", tr("Mostra / nascondi", "Show / hide"), true, None::<&str>)?;
+    let talk = MenuItem::with_id(app, "talk", tr("Scrivi ad Alter Ego…", "Write to Alter Ego…"), true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", tr("Impostazioni…", "Settings…"), true, None::<&str>)?;
+    let demo = MenuItem::with_id(app, "demo", tr("Messaggio di prova", "Test message"), true, None::<&str>)?;
     let click = CheckMenuItem::with_id(app, "click", "Click-through", true, click_on, None::<&str>)?;
-    let opacity = radio(app, "Opacità", "op", &[("100", "100%"), ("90", "90%"), ("75", "75%"), ("60", "60%"), ("45", "45%")], &pct(cfg.opacity))?;
+    let opacity = radio(app, tr("Opacità", "Opacity"), "op", &[("100", "100%"), ("90", "90%"), ("75", "75%"), ("60", "60%"), ("45", "45%")], &pct(cfg.opacity))?;
     let look = Submenu::with_items(
         app,
-        "Aspetto",
+        tr("Aspetto", "Look"),
         true,
         &[
-            &radio(app, "Sfondo", "bg", &[("scanline", "Scanline"), ("circuit", "Circuiti"), ("both", "Entrambi")], &cfg.background)?,
-            &radio(app, "Intensità sfondo", "int", &[("100", "100%"), ("75", "75%"), ("60", "60%"), ("50", "50%"), ("25", "25%")], &pct(cfg.bg_intensity))?,
-            &radio(app, "Box dialogo", "dlg", &[("chiaro", "Chiaro (come screenshot)"), ("scuro", "Scuro")], &cfg.dialog_style)?,
-            &CheckMenuItem::with_id(app, "fx", "Effetti animati (flicker)", true, cfg.effects, None::<&str>)?,
+            &radio(app, tr("Sfondo", "Background"), "bg", &[("scanline", "Scanline"), ("circuit", tr("Circuiti", "Circuits")), ("both", tr("Entrambi", "Both"))], &cfg.background)?,
+            &radio(app, tr("Intensità sfondo", "Background intensity"), "int", &[("100", "100%"), ("75", "75%"), ("60", "60%"), ("50", "50%"), ("25", "25%")], &pct(cfg.bg_intensity))?,
+            &radio(app, tr("Box dialogo", "Dialogue box"), "dlg", &[("chiaro", tr("Chiaro (come screenshot)", "Light (like the screenshot)")), ("scuro", tr("Scuro", "Dark"))], &cfg.dialog_style)?,
+            &CheckMenuItem::with_id(app, "fx", tr("Effetti animati (flicker)", "Animated effects (flicker)"), true, cfg.effects, None::<&str>)?,
         ],
     )?;
-    let sound = radio(app, "Suoni dialogo", "blip", &[("dr", "Blip stile Danganronpa"), ("soft", "Blip morbidi"), ("off", "Muto")], &cfg.audio.blips)?;
-    let voice = CheckMenuItem::with_id(app, "tts", "Voce (TTS)", true, cfg.audio.tts != "off", None::<&str>)?;
-    let reset = MenuItem::with_id(app, "reset", "Reimposta posizione", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Esci", true, None::<&str>)?;
+    let sound = radio(app, tr("Suoni dialogo", "Dialogue sounds"), "blip", &[("dr", tr("Blip stile Danganronpa", "Danganronpa-style blips")), ("soft", tr("Blip morbidi", "Soft blips")), ("off", tr("Muto", "Muted"))], &cfg.audio.blips)?;
+    let voice = CheckMenuItem::with_id(app, "tts", tr("Voce (TTS)", "Voice (TTS)"), true, cfg.audio.tts != "off", None::<&str>)?;
+    let reset = MenuItem::with_id(app, "reset", tr("Reimposta posizione", "Reset position"), true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", tr("Esci", "Quit"), true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
