@@ -130,6 +130,9 @@ impl Kokoro {
             .stderr(log)
             // niente richieste a Hugging Face a ogni avvio se il modello è già in cache
             .env("HF_HUB_DISABLE_TELEMETRY", "1")
+            // modello e voci sono già in cache (li scarica l'installazione): niente rete all'avvio,
+            // così un proxy o una connessione lenta non bloccano il caricamento
+            .env("HF_HUB_OFFLINE", "1")
             .env("PYTHONIOENCODING", "utf-8");
         #[cfg(windows)]
         {
@@ -149,30 +152,46 @@ impl Kokoro {
         }
     }
 
+    fn log_text(&self) -> String {
+        std::fs::read_to_string(self.dir.join("server.log")).unwrap_or_default()
+    }
+
     fn last_log_line(&self) -> Option<String> {
-        let text = std::fs::read_to_string(self.dir.join("server.log")).ok()?;
+        let text = self.log_text();
         text.lines().rev().find(|l| !l.trim().is_empty()).map(|l| l.chars().take(200).collect())
+    }
+
+    /// Fase del server avviato da noi, letta dal suo log (senza interrogarlo mentre carica:
+    /// durante l'import di PyTorch Python non accetta connessioni).
+    fn phase(&self) -> Phase {
+        let log = self.log_text();
+        if let Some(l) = log.lines().rev().find(|l| l.contains("Errore nel caricamento")) {
+            return Phase::Failed(l.chars().take(240).collect());
+        }
+        if log.contains("Kokoro pronto") {
+            return Phase::Ready;
+        }
+        Phase::Loading(self.last_log_line().unwrap_or_else(|| "avvio di Python…".into()))
     }
 
     pub async fn status(&self, http: &reqwest::Client, url: &str) -> KokoroStatus {
         let installed = self.installed();
         let running = self.running();
-        let (ready, message) = match probe(http, url).await {
-            Ok(()) => (true, "pronto".to_string()),
-            // server avviato ma non pronto: l'ultima riga del suo log dice perché (caricamento, errore…)
-            Err(e) if running => (false, match self.last_log_line() {
-                Some(l) => format!("{e} — log: {l}"),
-                None => e,
-            }),
-            Err(e) => (false, e),
+        let (ready, message) = match (running, self.phase()) {
+            (true, Phase::Loading(step)) => (false, format!("caricamento… {}", strip_time(&step))),
+            (true, Phase::Failed(e)) => (false, e),
+            _ => match probe(http, url).await {
+                Ok(()) => (true, "pronto".to_string()),
+                Err(e) => (false, e),
+            },
         };
         KokoroStatus { installed, running, ready, message, dir: self.dir.display().to_string() }
     }
 
     /// Attende che il server sia pronto (avviandolo se serve e se consentito).
     pub async fn ensure_ready(&self, http: &reqwest::Client, url: &str, autostart: bool) -> Result<(), String> {
-        if probe(http, url).await.is_ok() {
-            return Ok(());
+        if !self.running() && probe(http, url).await.is_ok() {
+            return Ok(()); // server esterno (es. Kokoro-FastAPI) già attivo
         }
         if autostart && is_local(url) && self.installed() {
             self.start(url)?;
@@ -180,18 +199,40 @@ impl Kokoro {
         if !self.running() {
             return probe(http, url).await;
         }
-        // il primo caricamento del modello può richiedere qualche decina di secondi
+        // il primo avvio (import di PyTorch + modello) può richiedere qualche minuto
         let t0 = Instant::now();
         loop {
-            tokio::time::sleep(Duration::from_millis(500)).await;
-            match probe(http, url).await {
-                Ok(()) => return Ok(()),
-                Err(e) if t0.elapsed() > Duration::from_secs(90) || !self.running() => {
-                    return Err(self.last_log_line().unwrap_or(e));
+            match self.phase() {
+                Phase::Ready => {
+                    if probe(http, url).await.is_ok() {
+                        return Ok(());
+                    }
                 }
-                Err(_) => {}
+                Phase::Failed(e) => return Err(e),
+                Phase::Loading(_) => {}
             }
+            if !self.running() {
+                return Err(self.last_log_line().unwrap_or_else(|| "il server Kokoro si è chiuso".into()));
+            }
+            if t0.elapsed() > Duration::from_secs(300) {
+                return Err(format!("il server non è pronto dopo 5 minuti (ultimo passo: {})", self.last_log_line().unwrap_or_default()));
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
         }
+    }
+}
+
+enum Phase {
+    Loading(String),
+    Ready,
+    Failed(String),
+}
+
+/// "[12:00:01] Carico PyTorch…" → "Carico PyTorch…"
+fn strip_time(line: &str) -> &str {
+    match line.strip_prefix('[').and_then(|r| r.split_once("] ")) {
+        Some((_, rest)) => rest,
+        None => line,
     }
 }
 
@@ -234,6 +275,8 @@ mod tests {
         assert_eq!(root_and_port("http://localhost/v1").unwrap().1, 80);
         assert!(is_local("http://localhost:8880/v1"));
         assert!(!is_local("https://api.example.com/v1"));
+        assert_eq!(strip_time("[12:00:01] Carico PyTorch…"), "Carico PyTorch…");
+        assert_eq!(strip_time("In ascolto"), "In ascolto");
     }
 
     /// Richiede tools/mock_openai.py in esecuzione.

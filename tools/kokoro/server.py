@@ -34,17 +34,30 @@ VOICES = [
     "pf_dora", "pm_alex", "pm_santa",
 ]
 
+# voci scaricate dall'installazione, così dopo funzionano anche senza internet
+PRELOAD = ["if_sara", "im_nicola", "af_heart", "af_bella", "af_nicole", "af_sky", "am_michael", "am_fenrir", "bf_emma", "bm_george"]
+
 state = {"model": None, "pipes": {}, "device": "cpu", "ready": False, "error": None}
 lock = threading.Lock()
 
 
+def log(msg: str, err: bool = False):
+    import time
+
+    print(f"[{time.strftime('%H:%M:%S')}] {msg}", file=sys.stderr if err else sys.stdout, flush=True)
+
+
 def load(device: str):
+    log("Carico PyTorch (al primo avvio può volerci più di un minuto)…")
     import torch
+
+    log("Carico la libreria kokoro…")
     from kokoro import KModel
 
     if device == "auto":
         device = "cuda" if torch.cuda.is_available() else "cpu"
     state["device"] = device
+    log(f"Carico il modello Kokoro-82M ({device})…")
     state["model"] = KModel(repo_id=REPO).to(device).eval()
 
 
@@ -123,7 +136,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": {"message": "testo vuoto"}})
             if voice not in VOICES and "+" not in voice:
                 return self._json(400, {"error": {"message": f"voce sconosciuta: {voice}"}})
-            pcm = synth(text, voice, speed)
+            try:
+                pcm = synth(text, voice, speed)
+            except Exception as e:  # noqa: BLE001
+                if os.environ.get("HF_HUB_OFFLINE") == "1" and ("offline" in str(e).lower() or "LocalEntryNotFound" in type(e).__name__):
+                    return self._json(404, {"error": {"message": f"voce {voice} non scaricata: Impostazioni → Voce e audio → Reinstalla / aggiorna"}})
+                raise
             if fmt == "pcm":
                 return self._send(200, pcm, "audio/pcm")
             if fmt != "wav":
@@ -145,23 +163,33 @@ def main():
 
     if args.warmup:
         load("cpu")
-        for voice in ("if_sara", "af_heart"):
-            print(f"Prova voce {voice}…", flush=True)
+        for voice in PRELOAD:
+            log(f"Scarico e provo la voce {voice}…")
             synth("Ciao, sono Alter Ego." if voice[0] == "i" else "Hi, I'm Alter Ego.", voice, 1.0)
-        print("Kokoro pronto.", flush=True)
+        log("Kokoro pronto.")
         return
 
-    srv = ThreadingHTTPServer((args.host, args.port), Handler)
+    class Server(ThreadingHTTPServer):
+        # coda di connessioni ampia: mentre Python carica PyTorch il thread che accetta le
+        # connessioni può restare fermo a lungo, e su Windows una coda piena = "connessione rifiutata"
+        request_queue_size = 128
+        daemon_threads = True
+
+    srv = Server((args.host, args.port), Handler)
 
     def loader():
         try:
             load(args.device)
+            log("Preparo la voce italiana…")
             pipeline("i")
             state["ready"] = True
-            print(f"Kokoro pronto su http://{args.host}:{args.port} ({state['device']})", flush=True)
+            log(f"Kokoro pronto su http://{args.host}:{args.port} ({state['device']})")
         except Exception as e:  # noqa: BLE001
+            import traceback
+
             state["error"] = f"{type(e).__name__}: {e}"
-            print("Errore nel caricamento:", state["error"], file=sys.stderr, flush=True)
+            traceback.print_exc()
+            log("Errore nel caricamento: " + state["error"], err=True)
 
     threading.Thread(target=loader, daemon=True).start()
     if args.exit_with_parent:
@@ -174,7 +202,7 @@ def main():
             os._exit(0)
 
         threading.Thread(target=watch_parent, daemon=True).start()
-    print(f"In ascolto su http://{args.host}:{args.port} (caricamento del modello…)", flush=True)
+    log(f"In ascolto su http://{args.host}:{args.port} (caricamento del modello…)")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
