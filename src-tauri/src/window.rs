@@ -1,7 +1,11 @@
 //! Finestra principale: creazione, geometria per monitor, click-through.
 
 use crate::{config::Geometry, AppState};
-use std::{sync::atomic::Ordering, thread, time::Duration};
+use std::{
+    sync::atomic::{AtomicU8, Ordering},
+    thread,
+    time::Duration,
+};
 use tauri::{
     AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder,
@@ -145,12 +149,70 @@ pub fn resize_keep_ratio(win: &WebviewWindow, width: f64) -> tauri::Result<()> {
 
 pub fn toggle_visibility(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(MAIN) {
-        if win.is_visible().unwrap_or(false) {
-            let _ = win.hide();
+        if win.is_visible().unwrap_or(false) && PENDING.load(Ordering::SeqCst) == 0 {
+            hide_main(app, false);
         } else {
-            let _ = win.show(); // nessun set_focus: non rubiamo il focus
+            show_main(app);
         }
     }
+}
+
+// ---------- animazione "vecchia TV" ----------
+// Nascondere/uscire: il frontend fa spegnere lo schermo e poi chiama `tv_done`.
+// Se non risponde (webview bloccata) si procede comunque dopo un attimo.
+
+/// 0 = niente in corso, 1 = nascondi, 2 = esci.
+static PENDING: AtomicU8 = AtomicU8::new(0);
+const TV_FALLBACK: Duration = Duration::from_millis(1500);
+
+/// Mostra la finestra (se era nascosta) e fa accendere lo schermo.
+pub fn show_main(app: &AppHandle) {
+    let Some(win) = app.get_webview_window(MAIN) else { return };
+    if PENDING.swap(0, Ordering::SeqCst) == 2 {
+        PENDING.store(2, Ordering::SeqCst); // l'uscita non si annulla
+        return;
+    }
+    if !win.is_visible().unwrap_or(true) {
+        let _ = win.show(); // nessun set_focus: non rubiamo il focus
+    }
+    let _ = app.emit_to(MAIN, "tv", "on");
+}
+
+/// Nasconde la finestra (o esce dall'app) dopo l'animazione di spegnimento.
+pub fn hide_main(app: &AppHandle, quit: bool) {
+    let anim = app.state::<AppState>().cfg.lock().unwrap().tv_animation;
+    let visible = app.get_webview_window(MAIN).is_some_and(|w| w.is_visible().unwrap_or(false));
+    PENDING.store(if quit { 2 } else { 1 }, Ordering::SeqCst);
+    if !anim || !visible {
+        return tv_finish(app);
+    }
+    let _ = app.emit_to(MAIN, "tv", if quit { "quit" } else { "off" });
+    let app = app.clone();
+    thread::spawn(move || {
+        thread::sleep(TV_FALLBACK);
+        tv_finish(&app);
+    });
+}
+
+fn tv_finish(app: &AppHandle) {
+    match PENDING.swap(0, Ordering::SeqCst) {
+        1 => {
+            if let Some(w) = app.get_webview_window(MAIN) {
+                let _ = w.hide();
+            }
+        }
+        2 => {
+            crate::flush_config(app);
+            app.exit(0);
+        }
+        _ => {}
+    }
+}
+
+/// Il frontend ha finito l'animazione di spegnimento.
+#[tauri::command]
+pub fn tv_done(app: AppHandle) {
+    tv_finish(&app);
 }
 
 pub fn set_click_through(app: &AppHandle, on: bool) {

@@ -115,6 +115,11 @@ impl Memory {
         Ok(v)
     }
 
+    pub fn count(&self) -> R<usize> {
+        let c = self.conn.lock().unwrap();
+        c.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get::<_, i64>(0)).map(|n| n as usize).map_err(e)
+    }
+
     pub fn latest_summary(&self) -> R<Option<(i64, String)>> {
         let c = self.conn.lock().unwrap();
         c.query_row("SELECT upto_id, content FROM summaries ORDER BY id DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?)))

@@ -140,11 +140,35 @@ listen("reminder", async (e) => {
   State.settle();
 });
 
+// ---------- accensione / spegnimento "vecchia TV" (vedi window.rs) ----------
+let tvTimer = null;
+function tvOn() {
+  clearTimeout(tvTimer);
+  root.classList.remove("tv-off", "tv-off-anim", "tv-on-anim");
+  if (!config?.tv_animation) return;
+  void root.offsetWidth; // riavvia l'animazione
+  root.classList.add("tv-on-anim");
+  tvTimer = setTimeout(() => root.classList.remove("tv-on-anim"), 700);
+}
+function tvOff() {
+  clearTimeout(tvTimer);
+  Audio2.stop();
+  root.classList.remove("tv-on-anim");
+  root.classList.add("tv-off-anim");
+  tvTimer = setTimeout(() => {
+    root.classList.add("tv-off");
+    root.classList.remove("tv-off-anim");
+    invoke("tv_done");
+  }, 470);
+}
+listen("tv", (e) => (e.payload === "on" ? tvOn() : tvOff()));
+
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 (async () => {
   applyConfig(await invoke("get_config"));
   await document.fonts.load('5vh "DotGothic16"');
+  tvOn();
   const name = config.user_name.trim();
   State.setEmotion("happy");
   State.setMode("speaking");

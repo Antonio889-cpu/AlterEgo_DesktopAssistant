@@ -1,4 +1,4 @@
-// Sprite inclusi nella build (solo build private: assets/sprites/ non è nella repo) e
+// Sprite inclusi nella build (src/assets/sprites/, repo privata) e
 // alias per gli stati senza sprite proprio (vedi docs/MANCANTI.md).
 // Gli sprite importati dall'utente (%APPDATA%\AlterEgo\sprites) hanno la precedenza: vedi face.js.
 window.SPRITES = {

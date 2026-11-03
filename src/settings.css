@@ -81,3 +81,9 @@ input.hotkey.capturing { outline: 2px solid var(--warn); }
 #log-table td.bad { color: var(--bad); }
 label.button-like { display: inline-block; margin: 0; background: #1d4a1f; border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
 label.button-like:hover { border-color: var(--accent); }
+.steps { margin: 4px 0 8px 20px; padding: 0; list-style: decimal; }
+.steps li { margin: 4px 0; }
+.steps button { padding: 1px 8px; font-size: 12px; margin-left: 6px; }
+.danger-zone { border: 1px solid #7a5a22; border-radius: 6px; padding: 8px 10px; background: #2a2210; margin-bottom: 6px; }
+.danger-zone .note { margin-left: 26px; }
+a { color: var(--accent); }

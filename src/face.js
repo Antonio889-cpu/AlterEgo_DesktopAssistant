@@ -1,6 +1,6 @@
 // Volto di Alter Ego. Sorgenti, in ordine:
 // 1. sprite importati in %APPDATA%\AlterEgo\sprites (Impostazioni → Personalità → Sprite);
-// 2. sprite inclusi nella build (solo build private: non sono nella repo);
+// 2. sprite inclusi nella build (src/assets/sprites/);
 // 3. volto segnaposto originale (kaomoji), così l'app funziona anche senza sprite.
 // Parlato: talk_open/talk_closed se esistono, altrimenti un leggero sobbalzo.
 // Blink: solo se esiste lo sprite "blink".

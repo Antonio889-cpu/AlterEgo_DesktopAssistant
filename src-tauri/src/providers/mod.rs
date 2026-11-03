@@ -125,6 +125,18 @@ pub struct Ai {
     pub generation: AtomicU64,
     /// Ultima chiave funzionante per provider: si riparte da lì.
     sticky: Mutex<HashMap<String, usize>>,
+    /// Token usati per provider da quando l'app è aperta (cache compresa).
+    usage: Mutex<HashMap<String, Usage>>,
+}
+
+/// Contatori dei token (dai campi `usage` delle risposte).
+#[derive(Serialize, Clone, Default, Debug, PartialEq)]
+pub struct Usage {
+    pub requests: u64,
+    pub input: u64,
+    /// Token di input letti dalla cache del provider (più economici e veloci).
+    pub cached: u64,
+    pub output: u64,
 }
 
 impl Ai {
@@ -134,7 +146,27 @@ impl Ai {
             .user_agent("AlterEgo/1.0")
             .build()
             .expect("client HTTP");
-        Self { http, generation: AtomicU64::new(0), sticky: Mutex::new(HashMap::new()) }
+        Self { http, generation: AtomicU64::new(0), sticky: Mutex::new(HashMap::new()), usage: Mutex::new(HashMap::new()) }
+    }
+
+    /// Registra il blocco `usage` di una risposta. DeepSeek usa `prompt_cache_hit_tokens` /
+    /// `prompt_cache_miss_tokens`, OpenAI e compatibili `prompt_tokens_details.cached_tokens`.
+    pub fn record_usage(&self, provider: &str, u: &Value) {
+        let n = |p: &str| u.pointer(p).and_then(Value::as_u64);
+        let hit = n("/prompt_cache_hit_tokens").or_else(|| n("/prompt_tokens_details/cached_tokens")).unwrap_or(0);
+        let input = n("/prompt_tokens")
+            .or_else(|| n("/prompt_cache_miss_tokens").map(|m| m + hit))
+            .unwrap_or(hit);
+        let mut all = self.usage.lock().unwrap();
+        let e = all.entry(provider.to_string()).or_default();
+        e.requests += 1;
+        e.input += input;
+        e.cached += hit;
+        e.output += n("/completion_tokens").unwrap_or(0);
+    }
+
+    pub fn usage(&self) -> HashMap<String, Usage> {
+        self.usage.lock().unwrap().clone()
     }
 
     /// Chiavi del provider in ordine di prova (partendo dall'ultima che ha funzionato).
@@ -305,6 +337,21 @@ pub async fn test(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<String, String> {
     chat(ai, one, "Sei un test di connessione.".into(), vec![msg], None, ch)
         .await
         .map(|r| format!("{} risponde ({}): {}", r.provider, r.model, r.text.trim()))
+}
+
+#[cfg(test)]
+mod usage_tests {
+    use super::*;
+
+    #[test]
+    fn usage_deepseek_and_openai() {
+        let ai = Ai::new();
+        ai.record_usage("deepseek", &serde_json::json!({"prompt_tokens": 1000, "prompt_cache_hit_tokens": 900, "prompt_cache_miss_tokens": 100, "completion_tokens": 50}));
+        ai.record_usage("openrouter", &serde_json::json!({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 4}, "completion_tokens": 2}));
+        let u = ai.usage();
+        assert_eq!(u["deepseek"], Usage { requests: 1, input: 1000, cached: 900, output: 50 });
+        assert_eq!(u["openrouter"].cached, 4);
+    }
 }
 
 #[cfg(test)]

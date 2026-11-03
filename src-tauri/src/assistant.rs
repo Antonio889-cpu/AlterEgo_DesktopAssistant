@@ -68,11 +68,14 @@ pub async fn chat(
     }
     let mem = conv.mem(cfg.memory_enabled);
 
-    // contesto: ultimi N messaggi + riassunto + fatti
+    // contesto: ultimi N messaggi (finestra "a scatti", vedi prompt::window_start) + riassunto + fatti
+    let max = cfg.ai.max_history;
     let (mut history, user_id, summary, facts) = match mem {
         Some(m) => {
             let id = m.add_message("user", &text)?;
-            let recent = m.recent(cfg.ai.max_history)?.into_iter().map(|x| msg(&x.role, &x.content)).collect::<Vec<_>>();
+            let total = m.count()?;
+            let take = total - providers::prompt::window_start(total, max);
+            let recent = m.recent(take)?.into_iter().map(|x| msg(&x.role, &x.content)).collect::<Vec<_>>();
             let summary = m.latest_summary()?.map(|s| s.1);
             let facts = m.facts()?.into_iter().map(|f| f.content).collect::<Vec<_>>();
             (recent, Some(id), summary, facts)
@@ -80,10 +83,14 @@ pub async fn chat(
         None => {
             let mut s = conv.session.lock().unwrap();
             s.push(msg("user", &text));
-            let start = s.len().saturating_sub(cfg.ai.max_history);
+            let start = providers::prompt::window_start(s.len(), max);
             (s[start..].to_vec(), None, None, Vec::new())
         }
     };
+    // la cronologia deve iniziare con una domanda dell'utente
+    while history.len() > 1 && history[0].role != "user" {
+        history.remove(0);
+    }
     if let (Some(img), Some(last)) = (image, history.last_mut()) {
         last.image = Some(img);
     }
@@ -286,7 +293,8 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
         let app = app.clone();
         std::thread::spawn(move || {
             let conv = app.state::<Conversation>();
-            match conv.recorder.start() {
+            let mic = app.state::<AppState>().cfg.lock().unwrap().audio.input_device.clone();
+            match conv.recorder.start(&mic) {
                 Ok(()) => emit_stt(&app, stt::SttEvent::Recording),
                 Err(e) => emit_stt(&app, stt::SttEvent::Error { message: e }),
             }
@@ -328,7 +336,8 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
 #[tauri::command]
 pub async fn stt_test(app: AppHandle) -> Result<String, String> {
     let conv = app.state::<Conversation>();
-    conv.recorder.start()?;
+    let mic = app.state::<AppState>().cfg.lock().unwrap().audio.input_device.clone();
+    conv.recorder.start(&mic)?;
     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
     let wav = conv.recorder.finish()?.ok_or("nessun audio registrato")?;
     let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
@@ -365,6 +374,7 @@ pub fn set_audio(app: AppHandle, audio: config::AudioConfig) {
         c.audio = audio;
         c.normalize_voice();
     });
+    crate::audio::commands::apply(&app);
 }
 
 /// Chiave per il servizio TTS remoto (facoltativa). Vuota = cancella.
@@ -380,38 +390,6 @@ pub fn set_tts_key(key: String) -> Result<(), String> {
 #[tauri::command]
 pub fn has_tts_key() -> bool {
     crate::keys::get_slot("tts", "1").is_some()
-}
-
-/// Sintesi vocale con un endpoint compatibile OpenAI `/audio/speech`
-/// (es. Kokoro/Piper locali, o un servizio cloud). Restituisce l'audio in base64.
-#[tauri::command]
-pub async fn tts_speak(app: AppHandle, text: String) -> Result<String, String> {
-    use base64::Engine;
-    let audio = app.state::<AppState>().cfg.lock().unwrap().audio.clone();
-    let http = app.state::<AppState>().ai.http.clone();
-    let text: String = text.chars().take(2000).collect();
-    let mut req = http
-        .post(format!("{}/audio/speech", audio.tts_url.trim().trim_end_matches('/')))
-        .timeout(std::time::Duration::from_secs(60))
-        .json(&serde_json::json!({
-            "model": audio.tts_model,
-            "input": text,
-            "voice": if audio.tts_voice.is_empty() { "alloy" } else { audio.tts_voice.as_str() },
-            "response_format": "mp3",
-            "speed": audio.tts_rate,
-        }));
-    let key = crate::keys::get_slot("tts", "1");
-    if let Some(k) = &key {
-        req = req.bearer_auth(k);
-    }
-    let resp = req.send().await.map_err(|e| if e.is_connect() { "servizio voce non raggiungibile".to_string() } else { e.to_string() })?;
-    let status = resp.status();
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
-    if !status.is_success() {
-        let detail: String = String::from_utf8_lossy(&bytes).chars().take(200).collect();
-        return Err(crate::keys::redact(&format!("voce non disponibile (HTTP {}): {detail}", status.as_u16()), key.as_deref()));
-    }
-    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 
 // ---------- sprite (fuori dall'exe) ----------

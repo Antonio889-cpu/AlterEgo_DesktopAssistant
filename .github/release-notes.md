@@ -1,35 +1,24 @@
-**Alter Ego – Desktop Assistant** per Windows 10/11. Compilata automaticamente da GitHub Actions su Windows.
+## Alter Ego 1.0.1
 
-## Download
+⚠ **Contiene gli sprite originali di Alter Ego (© Spike Chunsoft): solo per uso personale, non distribuire.**
 
-| File | Cosa |
-|---|---|
-| `AlterEgo_<versione>_setup.exe` | Installer (consigliato) |
-| `AlterEgo_<versione>_portable.zip` | Versione portable: estrai e avvia `alter-ego.exe` |
-| `SHA256SUMS.txt` | Checksum per verificare i file |
+### Novità
+- **Sprite inclusi** direttamente nella versione principale (resta possibile importarne altri dalle impostazioni).
+- **Voce locale Kokoro-82M**: installazione con un clic (Impostazioni → Voce e audio), voci italiane Sara e Nicola, offline dopo il primo download. Il server parte e si chiude insieme ad Alter Ego.
+- **Mic-Link**: microfono virtuale **AlterEgo Link Audio** con il tuo microfono + la voce di Alter Ego, per Discord, OBS e giochi (richiede il driver gratuito VB-CABLE; rinomina automatica del dispositivo).
+- **Scelta dei dispositivi audio**: uscita per voce e suoni, microfono per il push-to-talk.
+- **Dialogo automatico**: se non clicchi, il testo va avanti da solo (aspetta anche la fine della voce). Regolabile in Generale.
+- **Animazione da vecchia TV** all'apertura e alla chiusura della finestra.
+- **Non chiedere conferma**: opzione (spenta di default) per eseguire subito le azioni che chiedevano l'approvazione manuale.
+- **DeepSeek più economico**: prompt e cronologia costruiti per sfruttare la cache del prefisso; statistiche della cache in AI e chiavi.
 
-L'app non è firmata: Windows SmartScreen può avvisare (*Ulteriori informazioni → Esegui comunque*).
-Dopo l'avvio l'icona compare nella **system tray**.
+### Modifiche
+- Tutto l'audio (voce, blip, jingle) ora passa dal backend: esce dal dispositivo scelto e può andare in Mic-Link.
+- Voci di Windows tramite le API di sistema (WinRT), con scelta automatica della voce per la lingua.
 
-## Novità
+### File
+- `AlterEgo_1.0.1_setup.exe`: installer (aggiorna la 1.0.0 mantenendo impostazioni, chiavi e memoria).
+- `AlterEgo_1.0.1_portable.zip`: estrai e avvia `alter-ego.exe`.
+- `SHA256SUMS.txt`: impronte dei file.
 
-- Finestra in stile Alter Ego (CRT, scanline, glow, box dialogo pixel), sempre in primo piano, click-through opzionale.
-- 5 servizi AI (Gemini, OpenRouter, Groq, DeepSeek, Ollama) con fallback e **più chiavi API per servizio** a rotazione.
-- Push-to-talk con Whisper, anche con i **tasti laterali del mouse**.
-- **Clip vocali** ("Alter Ego clippa") per AMD Adrenalin, NVIDIA App e Medal, senza passare dall'AI.
-- Azioni sul PC con permessi (tutto spento di default), conferme e registro.
-- Memoria locale con riassunti e fatti, personalità regolabile, risposte IT / IT+EN / EN.
-- Voce (voci di Windows o servizio compatibile OpenAI) e blip del dialogo.
-
-## Importante: sprite
-
-Gli sprite originali di Alter Ego sono © Spike Chunsoft e **non sono inclusi**. Senza sprite l'app usa un volto segnaposto;
-puoi importare il tuo foglio sprite da *Impostazioni → Personalità → Sprite*.
-
-## Da sapere
-
-Sviluppata e testata su Linux, compilazione per Windows inclusa. Su Windows reali vanno ancora verificati:
-tasti simulati per le clip, push-to-talk col mouse, notifiche, avvio con Windows, screenshot e consumi.
-Segnala i problemi nelle Issues.
-
-Guida completa nel [README](https://github.com/Antonio889-cpu/AlterEgo_DesktopAssistant#readme).
+Build non firmata: SmartScreen può chiedere *Ulteriori informazioni → Esegui comunque*.

@@ -171,6 +171,9 @@ pub struct Permissions {
     pub volume: bool,
     pub shell: bool,
     pub commands: Vec<Named>,
+    /// Esegue senza chiedere le azioni che di solito chiedono conferma
+    /// (restano valide le autorizzazioni per tipo di azione e le cartelle consentite).
+    pub auto_approve: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -206,13 +209,36 @@ impl Default for ClipConfig {
     }
 }
 
+/// Mic-Link: microfono + voce di Alter Ego mixati in un cavo audio virtuale (VB-CABLE),
+/// che le altre app (Discord, OBS, giochi…) vedono come microfono "AlterEgo Link Audio".
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct MicLink {
+    pub enabled: bool,
+    /// Microfono da mixare ("" = predefinito di Windows).
+    pub mic_device: String,
+    /// Lato "riproduzione" del cavo virtuale ("" = trova da solo CABLE Input).
+    pub cable_device: String,
+    pub mic_volume: f64,
+    pub voice_volume: f64,
+    /// Anche i blip del dialogo finiscono nel microfono virtuale.
+    pub include_blips: bool,
+}
+
+impl Default for MicLink {
+    fn default() -> Self {
+        Self { enabled: false, mic_device: String::new(), cable_device: String::new(), mic_volume: 1.0, voice_volume: 0.9, include_blips: false }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct AudioConfig {
     /// Suoni del dialogo: "dr" (stile Danganronpa, sintetizzato), "soft" (originale), "off".
     pub blips: String,
     pub blip_volume: f64,
-    /// Voce: "off", "windows" (voci di sistema) o "openai" (endpoint /audio/speech).
+    /// Voce: "off", "windows" (voci di sistema), "kokoro" (Kokoro-82M locale)
+    /// o "openai" (qualsiasi endpoint compatibile /audio/speech).
     pub tts: String,
     pub tts_voice: String,
     pub tts_rate: f64,
@@ -221,6 +247,18 @@ pub struct AudioConfig {
     pub tts_model: String,
     /// Durante la voce i blip tacciono.
     pub mute_blips_with_tts: bool,
+    /// Kokoro-82M: server locale (installato e avviato dall'app, oppure Kokoro-FastAPI).
+    pub kokoro_url: String,
+    pub kokoro_voice: String,
+    pub kokoro_voice_en: String,
+    pub kokoro_speed: f64,
+    /// Avvia il server Kokoro insieme ad Alter Ego (se installato).
+    pub kokoro_autostart: bool,
+    /// Altoparlanti/cuffie per voce e suoni ("" = predefinito di Windows).
+    pub output_device: String,
+    /// Microfono per il push-to-talk ("" = predefinito di Windows).
+    pub input_device: String,
+    pub mic_link: MicLink,
 }
 
 impl Default for AudioConfig {
@@ -235,6 +273,14 @@ impl Default for AudioConfig {
             tts_url: "http://localhost:8880/v1".into(),
             tts_model: "tts-1".into(),
             mute_blips_with_tts: true,
+            kokoro_url: "http://127.0.0.1:8880/v1".into(),
+            kokoro_voice: "if_sara".into(),
+            kokoro_voice_en: "af_heart".into(),
+            kokoro_speed: 1.0,
+            kokoro_autostart: true,
+            output_device: String::new(),
+            input_device: String::new(),
+            mic_link: MicLink::default(),
         }
     }
 }
@@ -259,6 +305,12 @@ pub struct Config {
     pub dialog_style: String,
     /// Flicker e rumore animati (spegnili per CPU minima).
     pub effects: bool,
+    /// Animazione da vecchia TV quando la finestra appare/scompare.
+    pub tv_animation: bool,
+    /// Il dialogo va avanti da solo se non si clicca.
+    pub auto_advance: bool,
+    /// Attesa (secondi) a pagina completa prima di andare avanti; si aggiunge il tempo di lettura.
+    pub auto_advance_secs: f64,
     pub ai: AiConfig,
     /// Lingua risposte: "it", "it_en" (italiano + traduzione) o "en".
     pub language: String,
@@ -287,6 +339,9 @@ impl Default for Config {
             bg_intensity: 0.6,
             dialog_style: "chiaro".into(),
             effects: true,
+            tv_animation: true,
+            auto_advance: true,
+            auto_advance_secs: 3.0,
             ai: AiConfig::default(),
             language: "it".into(),
             personality: Personality::default(),
@@ -315,9 +370,13 @@ impl Config {
         if !["dr", "soft", "off"].contains(&self.audio.blips.as_str()) {
             self.audio.blips = "dr".into();
         }
-        if !["off", "windows", "openai"].contains(&self.audio.tts.as_str()) {
+        if !["off", "windows", "kokoro", "openai"].contains(&self.audio.tts.as_str()) {
             self.audio.tts = "off".into();
         }
+        self.audio.kokoro_speed = self.audio.kokoro_speed.clamp(0.5, 2.0);
+        let ml = &mut self.audio.mic_link;
+        ml.mic_volume = ml.mic_volume.clamp(0.0, 2.0);
+        ml.voice_volume = ml.voice_volume.clamp(0.0, 1.5);
         self.audio.blip_volume = self.audio.blip_volume.clamp(0.0, 1.0);
         self.audio.tts_volume = self.audio.tts_volume.clamp(0.0, 1.0);
         self.audio.tts_rate = self.audio.tts_rate.clamp(0.5, 2.0);
@@ -340,6 +399,7 @@ pub fn load(path: &Path) -> Config {
             cfg.bg_intensity = cfg.bg_intensity.clamp(0.0, 1.0);
             cfg.ai.normalize();
             cfg.normalize_voice();
+            cfg.auto_advance_secs = cfg.auto_advance_secs.clamp(0.5, 30.0);
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {
                 cfg.background = "both".into();
             }

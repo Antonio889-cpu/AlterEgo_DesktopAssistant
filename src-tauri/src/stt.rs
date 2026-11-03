@@ -41,14 +41,16 @@ impl Recorder {
     }
 
     /// Avvia la registrazione in un thread dedicato (lo stream cpal non è Send).
-    pub fn start(&self) -> Result<(), String> {
+    /// `device`: nome del microfono ("" = predefinito di Windows).
+    pub fn start(&self, device: &str) -> Result<(), String> {
         let mut worker = self.worker.lock().unwrap();
         if worker.is_some() {
             return Ok(());
         }
         let (tx, rx) = mpsc::channel::<()>();
         let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
-        *worker = Some(std::thread::spawn(move || capture(rx, ready_tx)));
+        let device = device.to_string();
+        *worker = Some(std::thread::spawn(move || capture(&device, rx, ready_tx)));
         *self.stop.lock().unwrap() = Some(tx);
         drop(worker);
         match ready_rx.recv_timeout(Duration::from_secs(5)) {
@@ -80,13 +82,13 @@ impl Recorder {
     }
 }
 
-fn capture(stop: mpsc::Receiver<()>, ready: mpsc::Sender<Result<(), String>>) -> Captured {
+fn capture(name: &str, stop: mpsc::Receiver<()>, ready: mpsc::Sender<Result<(), String>>) -> Captured {
     let fail = |msg: String| {
         let _ = ready.send(Err(msg.clone()));
         Err(msg)
     };
-    let host = cpal::default_host();
-    let Some(device) = host.default_input_device() else {
+    // microfono scelto; se è scollegato si usa il predefinito
+    let Some(device) = crate::audio::find_input(name).or_else(|| cpal::default_host().default_input_device()) else {
         return fail("nessun microfono trovato".into());
     };
     let config = match device.default_input_config() {

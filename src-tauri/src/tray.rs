@@ -89,10 +89,7 @@ fn on_menu(app: &AppHandle, id: &str) {
             c.audio.tts = if c.audio.tts == "off" { "windows".into() } else { "off".into() };
         }),
         "reset" => window::reset_geometry(app),
-        "quit" => {
-            crate::flush_config(app);
-            app.exit(0);
-        }
+        "quit" => window::hide_main(app, true),
         _ => {
             let Some((prefix, value)) = id.split_once(':') else { return };
             let num = value.parse::<f64>().unwrap_or(100.0) / 100.0;

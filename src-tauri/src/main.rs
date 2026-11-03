@@ -3,6 +3,7 @@
 
 mod actions;
 mod assistant;
+mod audio;
 mod config;
 mod hotkeys;
 mod keys;
@@ -63,6 +64,9 @@ pub struct FrontConfig {
     bg_intensity: f64,
     dialog_style: String,
     effects: bool,
+    tv_animation: bool,
+    auto_advance: bool,
+    auto_advance_secs: f64,
     ai: config::AiConfig,
     language: String,
     personality: config::Personality,
@@ -89,6 +93,9 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         bg_intensity: cfg.bg_intensity,
         dialog_style: cfg.dialog_style.clone(),
         effects: cfg.effects,
+        tv_animation: cfg.tv_animation,
+        auto_advance: cfg.auto_advance,
+        auto_advance_secs: cfg.auto_advance_secs,
         ai: cfg.ai.clone(),
         language: cfg.language.clone(),
         personality: cfg.personality.clone(),
@@ -164,8 +171,8 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
 /// Dà il focus alla finestra principale (serve per scrivere nell'input di testo).
 #[tauri::command]
 fn focus_main(app: AppHandle) {
+    window::show_main(&app);
     if let Some(w) = app.get_webview_window(window::MAIN) {
-        let _ = w.show();
         let _ = w.set_focus();
     }
 }
@@ -238,6 +245,12 @@ async fn list_models(app: AppHandle, provider: String) -> Result<Vec<String>, St
     providers::list_models(&state.ai, &cfg, &provider).await
 }
 
+/// Token usati per provider da quando l'app è aperta (con la parte letta dalla cache).
+#[tauri::command]
+fn ai_usage(app: AppHandle) -> HashMap<String, providers::Usage> {
+    app.state::<AppState>().ai.usage()
+}
+
 #[tauri::command]
 async fn test_provider(app: AppHandle, provider: String) -> Result<String, String> {
     let state = app.state::<AppState>();
@@ -247,7 +260,18 @@ async fn test_provider(app: AppHandle, provider: String) -> Result<String, Strin
 
 /// Aspetto dalla finestra Impostazioni (lo stesso della tray).
 #[tauri::command]
-fn set_look(app: AppHandle, opacity: f64, background: String, bg_intensity: f64, dialog_style: String, effects: bool) {
+#[allow(clippy::too_many_arguments)]
+fn set_look(
+    app: AppHandle,
+    opacity: f64,
+    background: String,
+    bg_intensity: f64,
+    dialog_style: String,
+    effects: bool,
+    tv_animation: Option<bool>,
+    auto_advance: Option<bool>,
+    auto_advance_secs: Option<f64>,
+) {
     update_config(&app, |c| {
         c.opacity = opacity.clamp(0.2, 1.0);
         if ["scanline", "circuit", "both"].contains(&background.as_str()) {
@@ -258,6 +282,15 @@ fn set_look(app: AppHandle, opacity: f64, background: String, bg_intensity: f64,
             c.dialog_style = dialog_style;
         }
         c.effects = effects;
+        if let Some(v) = tv_animation {
+            c.tv_animation = v;
+        }
+        if let Some(v) = auto_advance {
+            c.auto_advance = v;
+        }
+        if let Some(v) = auto_advance_secs {
+            c.auto_advance_secs = v.clamp(0.5, 30.0);
+        }
     });
 }
 
@@ -272,13 +305,14 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<(), String> {
 }
 
 fn main() {
+    // processo elevato avviato da Impostazioni → Voce → Mic-Link: rinomina il cavo ed esce
+    #[cfg(windows)]
+    if std::env::args().any(|a| a == audio::rename::ARG) {
+        std::process::exit(audio::rename::run_elevated());
+    }
     tauri::Builder::default()
         // Seconda istanza: mostra quella già aperta ed esce.
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(w) = app.get_webview_window(window::MAIN) {
-                let _ = w.show();
-            }
-        }))
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| window::show_main(app)))
         .plugin(hotkeys::plugin())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
@@ -288,6 +322,8 @@ fn main() {
             app.manage(actions::Actions::new(&data_dir));
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
+            app.manage(audio::kokoro::Kokoro::new(&data_dir));
+            app.manage(audio::AudioEngine::new());
             app.manage(assistant::Conversation::new(data_dir));
             let mut cfg = config::load(&cfg_path);
             // migrazione: chiave singola delle versioni precedenti → slot "1"
@@ -316,6 +352,7 @@ fn main() {
                 ai: providers::Ai::new(),
             });
             let handle = app.handle().clone();
+            audio::commands::apply(&handle);
             window::create_main(&handle)?;
             tray::create(&handle)?;
             for e in hotkeys::register(&handle, &hk) {
@@ -333,7 +370,7 @@ fn main() {
             // Alt+F4 nasconde invece di chiudere: si esce solo dalla tray.
             WindowEvent::CloseRequested { api, .. } if win.label() == window::MAIN => {
                 api.prevent_close();
-                let _ = win.hide();
+                window::hide_main(win.app_handle(), false);
             }
             _ => {}
         })
@@ -353,6 +390,7 @@ fn main() {
             move_api_key,
             list_models,
             test_provider,
+            ai_usage,
             assistant::chat,
             assistant::set_persona_options,
             assistant::set_stt,
@@ -369,18 +407,36 @@ fn main() {
             assistant::set_audio,
             assistant::set_tts_key,
             assistant::has_tts_key,
-            assistant::tts_speak,
+            audio::commands::audio_devices,
+            audio::commands::audio_status,
+            audio::commands::audio_sfx,
+            audio::commands::audio_stop,
+            audio::commands::tts_say,
+            audio::commands::tts_voices,
+            audio::commands::kokoro_status,
+            audio::commands::kokoro_install,
+            audio::commands::kokoro_start,
+            audio::commands::kokoro_stop,
+            audio::commands::mic_link_rename,
+            audio::commands::open_vbcable_page,
             actions::confirm_action,
             actions::actions_log,
             actions::clear_actions_log,
             set_autostart,
             set_look,
+            window::tv_done,
             assistant::load_user_sprites,
             assistant::import_sprite_sheet,
             assistant::remove_user_sprites,
             assistant::open_sprite_dir,
             assistant::reload_sprites
         ])
-        .run(tauri::generate_context!())
-        .expect("errore all'avvio di Alter Ego");
+        .build(tauri::generate_context!())
+        .expect("errore all'avvio di Alter Ego")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // il server Kokoro avviato da noi si chiude con l'app
+                app.state::<audio::kokoro::Kokoro>().stop();
+            }
+        });
 }

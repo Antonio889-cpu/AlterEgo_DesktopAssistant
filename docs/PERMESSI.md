@@ -28,3 +28,16 @@ Tutte le azioni sono **spente di default**. Si attivano in *Impostazioni → Per
 
 Le clip non passano dal modello AI: la frase viene riconosciuta in locale e Alter Ego preme la scorciatoia
 dei programmi attivi in *Impostazioni → Clip*. Anche queste finiscono nel Registro.
+
+## Non chiedere conferma
+
+In cima a *Impostazioni → Permessi* c'è **Non chiedere conferma** (spento di default). Se lo attivi:
+
+- le azioni ⚠ partono senza la finestra *Consenti / Nega*;
+- restano attivi tutti gli altri limiti: ogni tipo di azione va abilitato, i file solo nelle cartelle autorizzate,
+  i comandi solo dalla lista e scelti per nome, i siti fuori lista solo se "Aprire programmi e siti" è attivo;
+- nel Registro ogni azione approvata così compare con l'esito "approvata in automatico" (riga `conferma`), seguita dall'esito dell'azione.
+
+Rischio: il modello può essere spinto da un testo letto (file, appunti, schermo, pagina web) a chiedere un'azione; senza conferma
+non la vedi prima che parta. Il prompt di sistema dice di trattare quei testi come dati, ma non è una garanzia:
+attivalo solo con azioni, cartelle e comandi che ti va bene far eseguire in automatico.

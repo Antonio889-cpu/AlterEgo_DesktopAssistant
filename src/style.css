@@ -442,3 +442,39 @@ body.click-through #screen, body.click-through #dialog { cursor: default; }
   z-index: 25;
   pointer-events: none;
 }
+
+/* ---------- accensione / spegnimento "vecchia TV" ---------- */
+/* Lo schermo si accende da una linea orizzontale luminosa e si spegne collassando in una
+   linea e poi in un punto, sullo sfondo trasparente della finestra. */
+#root { transform-origin: 50% 50%; }
+#root.tv-off { visibility: hidden; }
+#root.tv-on-anim { animation: tv-on .62s cubic-bezier(.2, .7, .3, 1) both; }
+#root.tv-off-anim { animation: tv-off .46s cubic-bezier(.55, 0, .8, .4) both; pointer-events: none; }
+#tv-flash { display: none; }
+#root.tv-on-anim #tv-flash,
+#root.tv-off-anim #tv-flash {
+  display: block; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+  background: radial-gradient(ellipse at center, #fff 0%, rgba(210, 255, 240, .85) 35%, rgba(120, 255, 200, 0) 75%);
+  mix-blend-mode: screen;
+  animation: tv-flash .62s ease-out both;
+}
+#root.tv-off-anim #tv-flash { animation: tv-flash-off .46s ease-in both; }
+@keyframes tv-on {
+  0%   { transform: scale(.02, .004); filter: brightness(5) saturate(0); opacity: 0; }
+  10%  { transform: scale(.05, .004); opacity: 1; }
+  38%  { transform: scale(1, .012); filter: brightness(5) saturate(0); }
+  66%  { transform: scale(1, 1.05); filter: brightness(2) saturate(.5); }
+  82%  { transform: scale(1, .985); filter: brightness(1.2) saturate(.9); }
+  100% { transform: none; filter: none; }
+}
+@keyframes tv-flash { 0%, 40% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tv-off {
+  0%   { transform: none; filter: none; opacity: 1; }
+  40%  { transform: scale(1, .012); filter: brightness(5) saturate(0); }
+  70%  { transform: scale(.03, .012); filter: brightness(7) saturate(0); opacity: 1; }
+  100% { transform: scale(0, 0); filter: brightness(9); opacity: 0; }
+}
+@keyframes tv-flash-off { 0% { opacity: 0; } 35%, 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #root.tv-on-anim, #root.tv-off-anim { animation-duration: .01s; }
+}

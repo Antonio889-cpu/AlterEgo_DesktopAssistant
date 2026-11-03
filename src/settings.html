@@ -34,6 +34,11 @@
         <select id="look-dlg"><option value="chiaro">Chiaro (come screenshot)</option><option value="scuro">Scuro</option></select>
       </label>
       <label class="inline"><input type="checkbox" id="look-fx" /> Effetti animati (flicker e rumore; spegnili per CPU minima)</label>
+      <label class="inline"><input type="checkbox" id="look-tv" /> Animazione da vecchia TV quando la finestra si apre e si chiude</label>
+      <h3>Dialogo</h3>
+      <label class="inline"><input type="checkbox" id="auto-advance" /> Vai avanti da solo se non clicco</label>
+      <label>Attesa a pagina completa <input id="auto-advance-secs" type="range" min="0.5" max="15" step="0.5" /> <output id="auto-advance-val"></output></label>
+      <p class="note">Al tempo scelto si aggiunge il tempo di lettura della pagina; se la voce sta ancora parlando, aspetta che finisca.</p>
       <h3>Avvio</h3>
       <label class="inline"><input type="checkbox" id="autostart" /> Avvia Alter Ego all'accesso a Windows</label>
       <span id="autostart-result" class="result"></span>
@@ -49,6 +54,7 @@
         <label>Messaggi di contesto <input id="max-history" type="number" min="2" max="50" /></label>
       </div>
       <ol id="providers"></ol>
+      <p class="note" id="ai-usage"></p>
       <p class="note privacy"><b>Cosa esce dal PC:</b> solo il prompt di sistema e gli ultimi messaggi della conversazione,
         inviati al provider che risponde. Con Ollama tutto resta sul tuo computer.</p>
     </section>
@@ -101,6 +107,13 @@
     </section>
 
     <section data-tab="voice">
+      <h2>Dispositivi audio</h2>
+      <label>Uscita (voce e suoni) <select id="out-device"></select></label>
+      <label>Microfono (push-to-talk) <select id="in-device"></select></label>
+      <div class="actions"><button id="dev-refresh">Aggiorna elenco</button> <span id="dev-status" class="result"></span></div>
+    </section>
+
+    <section data-tab="voice">
       <h2>Riconoscimento vocale (push-to-talk)</h2>
       <p class="note">Tieni premuto il tasto push-to-talk (scheda <b>Tasti</b>) mentre parli, poi rilascia. L'audio va solo al servizio scelto qui.</p>
       <label>Servizio
@@ -130,11 +143,28 @@
       <label>Voce
         <select id="tts">
           <option value="off">Spenta</option>
-          <option value="windows">Voci di Windows</option>
+          <option value="windows">Voci di Windows (offline)</option>
+          <option value="kokoro">Kokoro-82M (locale, offline, più naturale)</option>
           <option value="openai">Servizio compatibile OpenAI (/audio/speech)</option>
         </select>
       </label>
       <label id="tts-voice-row">Voce di Windows <select id="tts-voice"></select></label>
+      <div id="tts-kokoro">
+        <p class="note"><b>Kokoro-82M</b> (hexgrad, licenza Apache-2.0) gira sul tuo PC: niente chiavi, niente internet dopo il primo download.
+          L'installazione crea un ambiente Python dedicato in <code>%APPDATA%\AlterEgo\kokoro</code> (~2 GB con PyTorch, modello ~330 MB).</p>
+        <div class="actions"><span id="kokoro-state" class="result">…</span></div>
+        <div class="actions">
+          <button id="kokoro-install">Installa Kokoro</button>
+          <label class="inline" style="margin:0"><input type="checkbox" id="kokoro-cuda" /> con GPU NVIDIA (CUDA)</label>
+          <button id="kokoro-start">Avvia server</button> <button id="kokoro-stop">Ferma</button>
+        </div>
+        <label class="inline"><input type="checkbox" id="kokoro-autostart" /> Avvia il server insieme ad Alter Ego</label>
+        <label>Voce italiana <select id="kokoro-voice"></select></label>
+        <label>Voce inglese <select id="kokoro-voice-en"></select></label>
+        <label>Velocità Kokoro <input id="kokoro-speed" type="range" min="0.5" max="2" step="0.05" /></label>
+        <label>URL server <input id="kokoro-url" placeholder="http://127.0.0.1:8880/v1" /></label>
+        <p class="note">Hai già <b>Kokoro-FastAPI</b>? Metti il suo URL e spegni "Avvia il server insieme ad Alter Ego".</p>
+      </div>
       <p class="note" id="tts-voice-note">Per una voce italiana: Impostazioni di Windows → Ora e lingua → Voce → Aggiungi voci (es. Elsa, Cosimo).</p>
       <div id="tts-openai">
         <label>URL <input id="tts-url" placeholder="http://localhost:8880/v1" /></label>
@@ -142,10 +172,32 @@
         <label>Voce <input id="tts-remote-voice" placeholder="es. alloy, if_sara" /></label>
         <label>Chiave (facoltativa) <input id="tts-key" type="password" placeholder="vuoto = nessuna" /> <button id="tts-key-save">Salva chiave</button></label>
       </div>
-      <label>Velocità <input id="tts-rate" type="range" min="0.5" max="2" step="0.05" /></label>
+      <label id="tts-rate-row">Velocità <input id="tts-rate" type="range" min="0.5" max="2" step="0.05" /></label>
       <label>Volume voce <input id="tts-volume" type="range" min="0" max="1" step="0.05" /></label>
       <label class="inline"><input type="checkbox" id="mute-blips" /> Niente blip mentre parla la voce</label>
       <div class="actions"><button id="tts-test">Prova voce</button> <span id="tts-result" class="result"></span></div>
+    </section>
+
+    <section data-tab="voice">
+      <h2>Mic-Link</h2>
+      <p class="note">Crea un microfono virtuale, <b>AlterEgo Link Audio</b>, che contiene <b>il tuo microfono + la voce di Alter Ego</b>.
+        Sceglilo come microfono in Discord, OBS, giochi… e gli altri sentiranno anche lei.</p>
+      <ol class="steps">
+        <li>Installa il driver gratuito <b>VB-CABLE</b> (VB-Audio, donationware) e riavvia il PC. <button id="vb-download">Apri la pagina di VB-CABLE</button></li>
+        <li>Rinomina il cavo in «AlterEgo Link Audio» (chiede i permessi di amministratore). <button id="link-rename">Rinomina</button></li>
+        <li>Attiva Mic-Link qui sotto e scegli il tuo microfono.</li>
+        <li>Nelle altre app scegli <b>AlterEgo Link Audio</b> come microfono.</li>
+      </ol>
+      <div class="actions"><span id="link-driver" class="result"></span></div>
+      <label class="inline"><input type="checkbox" id="link-enabled" /> Mic-Link attivo</label>
+      <label>Microfono da mixare <select id="link-mic"></select></label>
+      <label>Cavo virtuale (lato uscita) <select id="link-cable"></select></label>
+      <label>Volume microfono <input id="link-mic-vol" type="range" min="0" max="2" step="0.05" /></label>
+      <label>Volume voce di Alter Ego <input id="link-voice-vol" type="range" min="0" max="1.5" step="0.05" /></label>
+      <label class="inline"><input type="checkbox" id="link-blips" /> Anche i blip del dialogo</label>
+      <div class="actions"><span id="link-status" class="result"></span></div>
+      <p class="note">Il microfono resta usabile anche dal push-to-talk. Se dopo l'installazione di VB-CABLE non senti più niente,
+        Windows lo ha messo come uscita predefinita: rimetti i tuoi altoparlanti in Impostazioni → Sistema → Audio.</p>
     </section>
 
     <section data-tab="hotkeys">
@@ -179,6 +231,9 @@
       <h2>Permessi delle azioni sul PC</h2>
       <p class="note">Tutto è <b>spento di default</b>. Alter Ego può usare solo ciò che attivi qui; le azioni con ⚠ chiedono
         conferma ogni volta nella sua finestra. Ogni azione finisce nel Registro.</p>
+      <div class="perm danger-zone"><label class="inline"><input type="checkbox" id="auto-approve" /> <b>Non chiedere conferma</b> (esegui subito le azioni ⚠)</label>
+        <p class="note">Le azioni restano limitate a quelle attivate qui sotto e alle cartelle e ai comandi in lista, e finiscono comunque nel Registro.
+          <b>Rischio:</b> un testo letto da file, schermo o web potrebbe spingere il modello a usare un'azione senza che tu la veda prima.</p></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="open" /> <b>Aprire programmi e siti</b></label>
         <p class="note">Senza conferma quelli della lista; ⚠ conferma per altri siti. Nome = come lo chiami a voce; destinazione = percorso .exe, collegamento o URL.</p>
         <div class="list" data-list="open_allowlist" data-cols="Nome|Percorso o URL"></div></div>

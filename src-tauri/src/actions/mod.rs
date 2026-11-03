@@ -129,14 +129,19 @@ struct ConfirmRequest {
 
 /// Chiede conferma all'utente nella finestra principale. Nessuna risposta in 60 s = no.
 pub async fn confirm(app: &AppHandle, text: String) -> bool {
+    // "Non chiedere conferma": l'azione deve comunque essere abilitata nei permessi.
+    if app.state::<AppState>().cfg.lock().unwrap().permissions.auto_approve {
+        log(app, "conferma", &short(&text.replace('\n', " "), 120), "approvata in automatico");
+        return true;
+    }
     let actions = app.state::<Actions>();
     let id = actions.next_id.fetch_add(1, Ordering::SeqCst);
     let (tx, rx) = oneshot::channel();
     actions.pending.lock().unwrap().insert(id, tx);
     let state = app.state::<AppState>();
     state.modal.store(true, Ordering::SeqCst);
+    crate::window::show_main(app);
     if let Some(w) = app.get_webview_window(crate::window::MAIN) {
-        let _ = w.show();
         let _ = w.set_ignore_cursor_events(false); // i pulsanti devono essere cliccabili
     }
     let _ = app.emit("confirm", ConfirmRequest { id, text });
@@ -384,7 +389,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
                 return (String::new(), denied());
             }
             // nasconde Alter Ego per un attimo, così non copre lo schermo
-            let win = app.get_webview_window(crate::window::MAIN);
+            let win = app.get_webview_window(crate::window::MAIN).filter(|w| w.is_visible().unwrap_or(false));
             if let Some(w) = &win {
                 let _ = w.hide();
             }

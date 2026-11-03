@@ -68,7 +68,7 @@ dependencies = [
 
 [[package]]
 name = "alter-ego"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "arboard",
  "base64 0.22.1",
@@ -88,6 +88,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
  "tokio",
+ "windows 0.62.2",
  "windows-sys 0.59.0",
 ]
 

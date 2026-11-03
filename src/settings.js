@@ -288,6 +288,20 @@ function showTab(name) {
   if (name === "log") refreshLog();
   if (name === "memory") refreshMemory();
   if (name === "persona") spriteStatus();
+  if (name === "voice" && audio) { refreshDevices().then(refreshAudioStatus); if (audio.tts === "kokoro") refreshKokoro(); }
+  if (name === "ai") refreshUsage();
+}
+
+/** Token e cache dei provider da quando l'app è aperta (DeepSeek riporta la cache). */
+async function refreshUsage() {
+  const el = $("ai-usage");
+  let u = {};
+  try { u = await invoke("ai_usage"); } catch { return; }
+  const parts = Object.entries(u).filter(([, v]) => v.requests).map(([id, v]) => {
+    const pct = v.input ? Math.round((v.cached / v.input) * 100) : 0;
+    return `${id}: ${v.requests} richieste, ${v.input.toLocaleString("it-IT")} token in ingresso` + (v.cached || id === "deepseek" ? ` (${pct}% dalla cache)` : "");
+  });
+  el.textContent = parts.length ? "Da quando Alter Ego è aperto — " + parts.join(" · ") : "";
 }
 document.querySelectorAll("nav#tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
 
@@ -297,8 +311,10 @@ function saveLook() {
   clearTimeout(lookTimer);
   lookTimer = setTimeout(() => invoke("set_look", {
     opacity: +$("look-opacity").value, background: $("look-bg").value, bgIntensity: +$("look-int").value,
-    dialogStyle: $("look-dlg").value, effects: $("look-fx").checked,
+    dialogStyle: $("look-dlg").value, effects: $("look-fx").checked, tvAnimation: $("look-tv").checked,
+    autoAdvance: $("auto-advance").checked, autoAdvanceSecs: +$("auto-advance-secs").value,
   }), 200);
+  $("auto-advance-val").textContent = (+$("auto-advance-secs").value).toFixed(1) + " s";
 }
 function fillLook(cfg) {
   $("look-opacity").value = cfg.opacity;
@@ -306,10 +322,14 @@ function fillLook(cfg) {
   $("look-int").value = cfg.bg_intensity;
   $("look-dlg").value = cfg.dialog_style;
   $("look-fx").checked = cfg.effects;
+  $("look-tv").checked = cfg.tv_animation;
+  $("auto-advance").checked = cfg.auto_advance;
+  $("auto-advance-secs").value = cfg.auto_advance_secs;
+  $("auto-advance-val").textContent = cfg.auto_advance_secs.toFixed(1) + " s";
   $("autostart").checked = cfg.autostart;
 }
-["look-opacity", "look-int"].forEach((id) => ($(id).oninput = saveLook));
-["look-bg", "look-dlg", "look-fx"].forEach((id) => ($(id).onchange = saveLook));
+["look-opacity", "look-int", "auto-advance-secs"].forEach((id) => ($(id).oninput = saveLook));
+["look-bg", "look-dlg", "look-fx", "look-tv", "auto-advance"].forEach((id) => ($(id).onchange = saveLook));
 $("autostart").onchange = async (e) => {
   const r = $("autostart-result");
   try { await invoke("set_autostart", { on: e.target.checked }); r.textContent = e.target.checked ? "attivo" : "disattivato"; r.className = "result ok"; }
@@ -319,19 +339,90 @@ $("autostart").onchange = async (e) => {
 // ---------- audio ----------
 let audio = null;
 let audioTimer = null;
-function saveAudio() { clearTimeout(audioTimer); audioTimer = setTimeout(() => invoke("set_audio", { audio }), 250); }
-function fillVoices() {
-  const sel = $("tts-voice");
-  const voices = window.speechSynthesis?.getVoices() || [];
-  sel.innerHTML = '<option value="">Automatica (italiana se presente)</option>' +
-    voices.map((v) => `<option value="${v.name.replace(/"/g, "&quot;")}">${v.name} (${v.lang})</option>`).join("");
-  if (audio) sel.value = audio.tts_voice;
+let devices = null;
+function saveAudio() {
+  clearTimeout(audioTimer);
+  audioTimer = setTimeout(async () => {
+    await invoke("set_audio", { audio });
+    setTimeout(refreshAudioStatus, 600);
+  }, 250);
 }
-window.speechSynthesis?.addEventListener?.("voiceschanged", fillVoices);
+const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+/** Riempie un <select> di dispositivi: "" = predefinito; un dispositivo scollegato resta visibile. */
+function fillDeviceSelect(sel, list, value, defLabel) {
+  const opts = [`<option value="">${esc(defLabel)}</option>`].concat(list.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`));
+  if (value && !list.includes(value)) opts.push(`<option value="${esc(value)}">${esc(value)} (non collegato)</option>`);
+  sel.innerHTML = opts.join("");
+  sel.value = value || "";
+}
+async function refreshDevices() {
+  try { devices = await invoke("audio_devices"); } catch (e) { $("dev-status").textContent = String(e); return; }
+  const outs = devices.outputs.filter((n) => n !== devices.cable_render);
+  const ins = devices.inputs.filter((n) => n !== devices.cable_capture);
+  fillDeviceSelect($("out-device"), outs, audio.output_device, `Predefinito di Windows${devices.default_output ? " (" + devices.default_output + ")" : ""}`);
+  fillDeviceSelect($("in-device"), ins, audio.input_device, `Predefinito di Windows${devices.default_input ? " (" + devices.default_input + ")" : ""}`);
+  fillDeviceSelect($("link-mic"), ins, audio.mic_link.mic_device, "Microfono predefinito di Windows");
+  fillDeviceSelect($("link-cable"), devices.outputs, audio.mic_link.cable_device, `Automatico${devices.cable_render ? " (" + devices.cable_render + ")" : " (nessun cavo trovato)"}`);
+  const d = $("link-driver");
+  if (!devices.cable_render) { d.textContent = "VB-CABLE non trovato: installalo (punto 1) e riavvia il PC."; d.className = "result bad"; }
+  else if (!devices.link_named) { d.textContent = `Cavo trovato: ${devices.cable_capture || devices.cable_render}. Rinominalo (punto 2) per vederlo come «AlterEgo Link Audio».`; d.className = "result"; }
+  else { d.textContent = `Pronto: le altre app vedono «${devices.cable_capture}».`; d.className = "result ok"; }
+  if (devices.default_output && devices.default_output === devices.cable_render) {
+    d.textContent += " ⚠ Il cavo è l'uscita predefinita di Windows: rimetti i tuoi altoparlanti.";
+    d.className = "result bad";
+  }
+}
+async function refreshAudioStatus() {
+  try {
+    const st = await invoke("audio_status");
+    const ds = $("dev-status");
+    ds.textContent = st.output_error ? "Uscita: " + st.output_error : st.output ? "In uso: " + st.output : "";
+    ds.className = st.output_error ? "result bad" : "result ok";
+    const ls = $("link-status");
+    if (!audio.mic_link.enabled) { ls.textContent = "Mic-Link spento"; ls.className = "result"; }
+    else if (st.link_active) {
+      ls.textContent = `Attivo: ${st.link_mic || "solo voce"} + voce → ${st.link_cable}` + (st.link_error ? ` (${st.link_error})` : "");
+      ls.className = st.link_error ? "result bad" : "result ok";
+    } else { ls.textContent = st.link_error || "non attivo"; ls.className = "result bad"; }
+  } catch {}
+}
+async function fillVoices() {
+  const sel = $("tts-voice");
+  let voices = [];
+  try { voices = await invoke("tts_voices", { engine: "windows" }); } catch {}
+  sel.innerHTML = '<option value="">Automatica (italiana se presente)</option>' +
+    voices.map((v) => `<option value="${esc(v.name)}">${esc(v.name)} (${esc(v.lang)})</option>`).join("");
+  if (audio) sel.value = voices.some((v) => v.name === audio.tts_voice) ? audio.tts_voice : "";
+  const ko = await invoke("tts_voices", { engine: "kokoro" });
+  const opt = (list) => list.map((v) => `<option value="${v.id}">${esc(v.name)} — ${v.id}</option>`).join("");
+  $("kokoro-voice").innerHTML = opt(ko);
+  $("kokoro-voice-en").innerHTML = opt(ko.filter((v) => v.lang === "en"));
+  $("kokoro-voice").value = audio.kokoro_voice;
+  $("kokoro-voice-en").value = audio.kokoro_voice_en;
+}
 function ttsRows() {
   $("tts-voice-row").style.display = audio.tts === "windows" ? "" : "none";
   $("tts-voice-note").style.display = audio.tts === "windows" ? "" : "none";
   $("tts-openai").style.display = audio.tts === "openai" ? "" : "none";
+  $("tts-kokoro").style.display = audio.tts === "kokoro" ? "" : "none";
+  $("tts-rate-row").style.display = audio.tts === "kokoro" ? "none" : "";
+  if (audio.tts === "kokoro") refreshKokoro();
+}
+let kokoroTimer = null;
+async function refreshKokoro() {
+  clearTimeout(kokoroTimer);
+  const el = $("kokoro-state");
+  try {
+    const st = await invoke("kokoro_status");
+    $("kokoro-install").textContent = st.installed ? "Reinstalla / aggiorna" : "Installa Kokoro";
+    $("kokoro-start").disabled = !st.installed || st.running;
+    $("kokoro-stop").disabled = !st.running;
+    if (st.ready) { el.textContent = "Kokoro pronto ✓"; el.className = "result ok"; }
+    else if (!st.installed) { el.textContent = "Non installato (o installazione in corso nella finestra di PowerShell)."; el.className = "result bad"; }
+    else { el.textContent = st.running ? "Server avviato: " + st.message : "Installato, server fermo (" + st.message + ")"; el.className = "result"; }
+  } catch (e) { el.textContent = String(e); el.className = "result bad"; }
+  // aggiorna da solo mentre la scheda è aperta e la voce scelta è Kokoro
+  if (audio.tts === "kokoro" && !document.hidden) kokoroTimer = setTimeout(refreshKokoro, 4000);
 }
 function fillAudio(cfg) {
   audio = structuredClone(cfg.audio);
@@ -344,12 +435,25 @@ function fillAudio(cfg) {
   $("tts-rate").value = audio.tts_rate;
   $("tts-volume").value = audio.tts_volume;
   $("mute-blips").checked = audio.mute_blips_with_tts;
+  $("kokoro-url").value = audio.kokoro_url;
+  $("kokoro-speed").value = audio.kokoro_speed;
+  $("kokoro-autostart").checked = audio.kokoro_autostart;
+  const ml = audio.mic_link;
+  $("link-enabled").checked = ml.enabled;
+  $("link-mic-vol").value = ml.mic_volume;
+  $("link-voice-vol").value = ml.voice_volume;
+  $("link-blips").checked = ml.include_blips;
   fillVoices();
   ttsRows();
+  refreshDevices().then(refreshAudioStatus);
 }
 $("blips").onchange = (e) => { audio.blips = e.target.value; saveAudio(); };
 $("blip-volume").oninput = (e) => { audio.blip_volume = +e.target.value; saveAudio(); };
-$("tts").onchange = (e) => { audio.tts = e.target.value; audio.tts_voice = ""; ttsRows(); fillVoices(); saveAudio(); };
+$("tts").onchange = (e) => {
+  // la voce di Windows e quella del servizio remoto usano lo stesso campo
+  if (audio.tts === "windows" || e.target.value === "windows") audio.tts_voice = "";
+  audio.tts = e.target.value; ttsRows(); saveAudio();
+};
 $("tts-voice").onchange = (e) => { audio.tts_voice = e.target.value; saveAudio(); };
 $("tts-remote-voice").oninput = (e) => { audio.tts_voice = e.target.value.trim(); saveAudio(); };
 $("tts-url").oninput = (e) => { audio.tts_url = e.target.value.trim(); saveAudio(); };
@@ -357,29 +461,56 @@ $("tts-model").oninput = (e) => { audio.tts_model = e.target.value.trim(); saveA
 $("tts-rate").oninput = (e) => { audio.tts_rate = +e.target.value; saveAudio(); };
 $("tts-volume").oninput = (e) => { audio.tts_volume = +e.target.value; saveAudio(); };
 $("mute-blips").onchange = (e) => { audio.mute_blips_with_tts = e.target.checked; saveAudio(); };
+$("kokoro-url").oninput = (e) => { audio.kokoro_url = e.target.value.trim(); saveAudio(); };
+$("kokoro-speed").oninput = (e) => { audio.kokoro_speed = +e.target.value; saveAudio(); };
+$("kokoro-voice").onchange = (e) => { audio.kokoro_voice = e.target.value; saveAudio(); };
+$("kokoro-voice-en").onchange = (e) => { audio.kokoro_voice_en = e.target.value; saveAudio(); };
+$("kokoro-autostart").onchange = (e) => { audio.kokoro_autostart = e.target.checked; saveAudio(); };
+$("kokoro-install").onclick = async () => {
+  const el = $("kokoro-state");
+  try {
+    await invoke("kokoro_install", { cuda: $("kokoro-cuda").checked });
+    el.textContent = "Installazione avviata nella finestra di PowerShell: segui lì l'avanzamento (può volerci un po').";
+    el.className = "result";
+    kokoroTimer = setTimeout(refreshKokoro, 8000);
+  } catch (e) { el.textContent = String(e); el.className = "result bad"; }
+};
+$("kokoro-start").onclick = async () => {
+  try { await invoke("kokoro_start"); } catch (e) { $("kokoro-state").textContent = String(e); $("kokoro-state").className = "result bad"; return; }
+  setTimeout(refreshKokoro, 1500);
+};
+$("kokoro-stop").onclick = async () => { await invoke("kokoro_stop"); setTimeout(refreshKokoro, 500); };
+$("out-device").onchange = (e) => { audio.output_device = e.target.value; saveAudio(); };
+$("in-device").onchange = (e) => { audio.input_device = e.target.value; saveAudio(); };
+$("dev-refresh").onclick = () => refreshDevices().then(refreshAudioStatus);
+$("link-enabled").onchange = (e) => { audio.mic_link.enabled = e.target.checked; saveAudio(); };
+$("link-mic").onchange = (e) => { audio.mic_link.mic_device = e.target.value; saveAudio(); };
+$("link-cable").onchange = (e) => { audio.mic_link.cable_device = e.target.value; saveAudio(); };
+$("link-mic-vol").oninput = (e) => { audio.mic_link.mic_volume = +e.target.value; saveAudio(); };
+$("link-voice-vol").oninput = (e) => { audio.mic_link.voice_volume = +e.target.value; saveAudio(); };
+$("link-blips").onchange = (e) => { audio.mic_link.include_blips = e.target.checked; saveAudio(); };
+$("vb-download").onclick = () => invoke("open_vbcable_page").catch((e) => alert(e));
+$("link-rename").onclick = async () => {
+  const d = $("link-driver");
+  d.textContent = "Conferma la richiesta di Windows (amministratore)…"; d.className = "result";
+  try { d.textContent = await invoke("mic_link_rename"); d.className = "result ok"; setTimeout(refreshDevices, 1000); }
+  catch (e) { d.textContent = String(e); d.className = "result bad"; }
+};
 $("tts-key-save").onclick = async () => {
   try { await invoke("set_tts_key", { key: $("tts-key").value }); $("tts-key").value = ""; $("tts-result").textContent = "chiave salvata"; $("tts-result").className = "result ok"; }
   catch (e) { $("tts-result").textContent = String(e); $("tts-result").className = "result bad"; }
 };
 $("tts-test").onclick = async () => {
   const r = $("tts-result");
-  const text = "Ciao! Sono Alter Ego. Così suona la mia voce.";
   clearTimeout(audioTimer);
   await invoke("set_audio", { audio });
-  r.className = "result"; r.textContent = "";
-  if (audio.tts === "windows") {
-    const u = new SpeechSynthesisUtterance(text);
-    const vs = speechSynthesis.getVoices();
-    u.voice = vs.find((v) => v.name === audio.tts_voice) || vs.find((v) => v.lang?.startsWith("it")) || null;
-    u.lang = u.voice?.lang || "it-IT"; u.rate = audio.tts_rate; u.volume = audio.tts_volume;
-    speechSynthesis.cancel(); speechSynthesis.speak(u);
-    if (!u.voice) { r.textContent = "nessuna voce italiana installata: uso quella predefinita"; r.className = "result bad"; }
-  } else if (audio.tts === "openai") {
-    try {
-      const b64 = await invoke("tts_speak", { text });
-      const el = new Audio("data:audio/mpeg;base64," + b64); el.volume = audio.tts_volume; await el.play();
-    } catch (e) { r.textContent = String(e); r.className = "result bad"; }
-  } else { r.textContent = "la voce è spenta"; }
+  if (audio.tts === "off") { r.textContent = "la voce è spenta"; r.className = "result"; return; }
+  r.textContent = audio.tts === "kokoro" ? "sintetizzo… (la prima volta Kokoro carica il modello)" : "sintetizzo…";
+  r.className = "result";
+  try {
+    await invoke("tts_say", { text: "Ciao! Sono Alter Ego. Così suona la mia voce.", lang: "it" });
+    r.textContent = "ok"; r.className = "result ok";
+  } catch (e) { r.textContent = String(e); r.className = "result bad"; }
 };
 
 // ---------- tasti ----------
@@ -517,6 +648,11 @@ function renderList(div) {
 }
 function fillPerms(cfg) {
   perms = structuredClone(cfg.permissions);
+  $("auto-approve").checked = !!perms.auto_approve;
+  $("auto-approve").onchange = (e) => {
+    if (e.target.checked && !confirm("Alter Ego eseguirà le azioni attivate senza chiederti conferma. Continuare?")) { e.target.checked = false; return; }
+    perms.auto_approve = e.target.checked; savePerms();
+  };
   document.querySelectorAll("input[data-perm]").forEach((c) => {
     c.checked = !!perms[c.dataset.perm];
     c.onchange = () => { perms[c.dataset.perm] = c.checked; savePerms(); };

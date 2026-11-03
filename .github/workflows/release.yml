@@ -1,6 +1,7 @@
 # Compila Alter Ego su Windows e pubblica la release "v<versione>" (versione da tauri.conf.json).
 # Si avvia: con un push sul branch "release", con un tag "v*", oppure a mano (Actions → Release → Run workflow).
-# Se la release esiste già, ne aggiorna i file. La build non contiene sprite (© Spike Chunsoft).
+# Se la release esiste già, ne aggiorna i file.
+# La build CONTIENE gli sprite originali (© Spike Chunsoft): il workflow si ferma se la repo è pubblica.
 name: Release
 
 on:
@@ -16,6 +17,11 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
+      - name: Blocca se la repo è pubblica
+        shell: pwsh
+        run: |
+          if ("${{ github.event.repository.private }}" -ne "true") { Write-Error "La repo è pubblica: niente release con gli sprite."; exit 1 }
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4

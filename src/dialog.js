@@ -1,5 +1,7 @@
 // Box dialogo: typewriter, ▼ lampeggiante, testo spezzato in pagine da 2 righe.
 // Uso: await Dialog.say("testo"); clic o Invio per proseguire.
+// Se "auto_advance" è attivo, a pagina completa va avanti da solo dopo
+// auto_advance_secs + il tempo di lettura (e aspetta che la voce finisca).
 // "\n\n" nel testo forza una nuova pagina.
 
 const Dialog = (() => {
@@ -23,6 +25,32 @@ const Dialog = (() => {
   let listeners = { char: [], talk: [] };
 
   function emit(type, value) { listeners[type].forEach((fn) => fn(value)); }
+
+  // ---------- avanzamento automatico ----------
+  let autoTimer = null;
+  function clearAuto() { clearTimeout(autoTimer); autoTimer = null; }
+  function scheduleAuto() {
+    clearAuto();
+    const c = window.appConfig;
+    if (!c || !c.auto_advance) return;
+    const ms = (c.auto_advance_secs || 3) * 1000 + (pages[page] || "").length * 25;
+    let heldBySpeech = false;
+    const tick = () => {
+      // la voce sta ancora leggendo, o c'è una richiesta di conferma aperta: aspetta
+      const confirmOpen = !document.getElementById("confirm")?.classList.contains("hidden");
+      if (window.Audio2?.isSpeaking() || confirmOpen) {
+        heldBySpeech = true;
+        autoTimer = setTimeout(tick, 300);
+      } else if (heldBySpeech) {
+        heldBySpeech = false;
+        autoTimer = setTimeout(tick, 900); // piccola pausa dopo la fine della voce
+      } else {
+        autoTimer = null;
+        advance();
+      }
+    };
+    autoTimer = setTimeout(tick, ms);
+  }
 
   function fits(text) {
     measureEl.textContent = text;
@@ -68,6 +96,7 @@ const Dialog = (() => {
     if (shown >= full.length) {
       stopTyping();
       box.classList.add("waiting");
+      scheduleAuto();
       return;
     }
     const ch = full[shown++];
@@ -77,6 +106,7 @@ const Dialog = (() => {
   }
 
   function showPage(i) {
+    clearAuto();
     page = i;
     shown = 0;
     textEl.textContent = "";
@@ -86,6 +116,7 @@ const Dialog = (() => {
   }
 
   function finish() {
+    clearAuto();
     box.classList.add("hidden");
     box.classList.remove("waiting");
     const r = resolveCurrent;
@@ -101,6 +132,7 @@ const Dialog = (() => {
       shown = pages[page].length;
       textEl.textContent = pages[page];
       box.classList.add("waiting");
+      scheduleAuto();
     } else if (page < pages.length - 1) {
       showPage(page + 1);
     } else {
@@ -124,6 +156,7 @@ const Dialog = (() => {
   /** Box con "…" animati mentre Alter Ego pensa. Non si chiude col clic. */
   function pending(label = "") {
     stopTyping();
+    clearAuto();
     if (resolveCurrent) { const r = resolveCurrent; resolveCurrent = null; r(); }
     box.classList.remove("hidden", "waiting");
     box.classList.add("pending");

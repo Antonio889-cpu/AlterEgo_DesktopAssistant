@@ -151,6 +151,10 @@ pub async fn stream_chat(
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
     }
+    // DeepSeek: chiede l'uso dei token in fondo allo stream (contiene i token letti dalla cache)
+    if t.id == "deepseek" {
+        body["stream_options"] = json!({ "include_usage": true });
+    }
     // Ollama può impiegare molto a caricare il modello la prima volta.
     let first_timeout = Duration::from_secs(if t.id == "ollama" { 120 } else { 45 });
     let idle_timeout = Duration::from_secs(30);
@@ -202,6 +206,9 @@ pub async fn stream_chat(
                     message: msg,
                     ..Default::default()
                 });
+            }
+            if let Some(u) = v.get("usage").filter(|u| u.is_object()) {
+                ai.record_usage(&t.id, u);
             }
             if let Some(text) = v.pointer("/choices/0/delta/content").and_then(Value::as_str) {
                 if !text.is_empty() {
