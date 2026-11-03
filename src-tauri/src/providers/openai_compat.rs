@@ -57,7 +57,7 @@ fn net_error(e: reqwest::Error) -> ProviderError {
     } else if e.is_timeout() {
         "tempo scaduto".to_string()
     } else {
-        format!("errore di rete: {e}")
+        format!("errore di rete: {}", super::describe_net_error(&e))
     };
     ProviderError::new(msg, true)
 }
@@ -159,7 +159,7 @@ pub async fn stream_chat(
     let first_timeout = Duration::from_secs(if t.id == "ollama" { 120 } else { 45 });
     let idle_timeout = Duration::from_secs(30);
 
-    let send = request(&ai.http, t, reqwest::Method::POST, "/chat/completions").json(&body).send();
+    let send = request(ai.client_for(&t.base), t, reqwest::Method::POST, "/chat/completions").json(&body).send();
     let resp = tokio::time::timeout(first_timeout, send)
         .await
         .map_err(|_| ProviderError::new("tempo scaduto in attesa della risposta", true))?

@@ -84,9 +84,9 @@ Progetto personale e non commerciale. Interfaccia e documentazione in italiano.
 
 ## Installazione
 
-1. Scarica dalla pagina [Releases](../../releases) l'ultima release (**`v1.0.1`**):
-   l'**installer** `AlterEgo_1.0.1_setup.exe` oppure lo **zip portable** (estrai e avvia `alter-ego.exe`).
-   Aggiornando dalla 1.0.0 impostazioni, chiavi e memoria restano.
+1. Scarica dalla pagina [Releases](../../releases) l'ultima release (**`v1.0.2`**):
+   l'**installer** `AlterEgo_1.0.2_setup.exe` oppure lo **zip portable** (estrai e avvia `alter-ego.exe`).
+   Aggiornando da una versione precedente impostazioni, chiavi e memoria restano.
 2. Windows SmartScreen può avvisare che l'app non è firmata: *Ulteriori informazioni → Esegui comunque*.
 3. Serve **WebView2**, già presente in Windows 10/11 aggiornati.
 

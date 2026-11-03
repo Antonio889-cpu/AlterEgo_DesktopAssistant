@@ -1,8 +1,15 @@
-## Alter Ego 1.0.1
+## Alter Ego 1.0.2
 
 ⚠ **Contiene gli sprite originali di Alter Ego (© Spike Chunsoft): solo per uso personale, non distribuire.**
 
-### Novità
+### Correzioni
+- **Kokoro "Server avviato: error sending request"**: le richieste ai servizi su questo PC (Kokoro, Ollama, Whisper locale) non passano più dal proxy di sistema di Windows, che le intercettava anche per 127.0.0.1 (VPN, antivirus, proxy aziendali).
+- Messaggi d'errore di rete completi (con la causa vera) e, se il server Kokoro è avviato ma non pronto, l'ultima riga del suo log.
+- Attesa più lunga per la risposta del server locale (su Windows una porta chiusa risponde dopo ~2 s).
+
+## Novità della 1.0.1
+
+### Funzioni
 - **Sprite inclusi** direttamente nella versione principale (resta possibile importarne altri dalle impostazioni).
 - **Voce locale Kokoro-82M**: installazione con un clic (Impostazioni → Voce e audio), voci italiane Sara e Nicola, offline dopo il primo download. Il server parte e si chiude insieme ad Alter Ego.
 - **Mic-Link**: microfono virtuale **AlterEgo Link Audio** con il tuo microfono + la voce di Alter Ego, per Discord, OBS e giochi (richiede il driver gratuito VB-CABLE; rinomina automatica del dispositivo).
@@ -17,8 +24,8 @@
 - Voci di Windows tramite le API di sistema (WinRT), con scelta automatica della voce per la lingua.
 
 ### File
-- `AlterEgo_1.0.1_setup.exe`: installer (aggiorna la 1.0.0 mantenendo impostazioni, chiavi e memoria).
-- `AlterEgo_1.0.1_portable.zip`: estrai e avvia `alter-ego.exe`.
+- `AlterEgo_1.0.2_setup.exe`: installer (aggiorna le versioni precedenti mantenendo impostazioni, chiavi e memoria).
+- `AlterEgo_1.0.2_portable.zip`: estrai e avvia `alter-ego.exe`.
 - `SHA256SUMS.txt`: impronte dei file.
 
 Build non firmata: SmartScreen può chiedere *Ulteriori informazioni → Esegui comunque*.

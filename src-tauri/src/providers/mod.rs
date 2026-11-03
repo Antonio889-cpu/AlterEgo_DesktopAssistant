@@ -119,8 +119,37 @@ pub struct Target {
     pub temperature: f64,
 }
 
+/// L'URL punta a questo PC (127.0.0.1, localhost, ::1)?
+pub fn is_loopback(url: &str) -> bool {
+    reqwest::Url::parse(url.trim())
+        .ok()
+        .and_then(|u| u.host_str().map(|h| matches!(h, "127.0.0.1" | "localhost" | "::1" | "[::1]")))
+        .unwrap_or(false)
+}
+
+/// Descrive un errore di rete con tutte le cause (reqwest da solo dice solo "error sending request").
+pub fn describe_net_error(e: &reqwest::Error) -> String {
+    let mut parts = vec![e.to_string()];
+    let mut src = std::error::Error::source(e);
+    while let Some(s) = src {
+        let t = s.to_string();
+        if !parts.iter().any(|p| p.contains(&t)) {
+            parts.push(t);
+        }
+        src = s.source();
+    }
+    let mut out = parts.join(": ");
+    if e.is_timeout() {
+        out.push_str(" (tempo scaduto)");
+    }
+    out
+}
+
 pub struct Ai {
     pub http: reqwest::Client,
+    /// Client per i servizi su questo PC (Ollama, Kokoro, Whisper locale): ignora il proxy
+    /// di sistema, che su Windows altrimenti verrebbe usato anche per 127.0.0.1.
+    pub local: reqwest::Client,
     /// Ogni nuova richiesta incrementa il contatore: quelle vecchie si fermano.
     pub generation: AtomicU64,
     /// Ultima chiave funzionante per provider: si riparte da lì.
@@ -146,7 +175,18 @@ impl Ai {
             .user_agent("AlterEgo/1.0")
             .build()
             .expect("client HTTP");
-        Self { http, generation: AtomicU64::new(0), sticky: Mutex::new(HashMap::new()), usage: Mutex::new(HashMap::new()) }
+        let local = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(10))
+            .user_agent("AlterEgo/1.0")
+            .no_proxy()
+            .build()
+            .expect("client HTTP locale");
+        Self { http, local, generation: AtomicU64::new(0), sticky: Mutex::new(HashMap::new()), usage: Mutex::new(HashMap::new()) }
+    }
+
+    /// Client giusto per l'URL: senza proxy per i servizi locali.
+    pub fn client_for(&self, url: &str) -> &reqwest::Client {
+        if is_loopback(url) { &self.local } else { &self.http }
     }
 
     /// Registra il blocco `usage` di una risposta. DeepSeek usa `prompt_cache_hit_tokens` /
@@ -254,7 +294,7 @@ pub async fn chat(
             let mut target = Target { id: id.clone(), base: base.clone(), key, model: model.clone(), temperature: cfg.temperature };
             if target.model.is_empty() {
                 // Ollama senza modello scelto: usa il primo installato.
-                match openai_compat::list_models(&ai.http, &target).await {
+                match openai_compat::list_models(ai.client_for(&target.base), &target).await {
                     Ok(list) if !list.is_empty() => {
                         model = list[0].clone();
                         target.model = model.clone();
@@ -317,7 +357,7 @@ pub async fn list_models(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<Vec<String
     let mut last = String::from("nessuna chiave");
     for (_, key) in keys_for(ai, cfg, id)? {
         let t = Target { id: id.into(), base: base.clone(), key, model: String::new(), temperature: 0.0 };
-        match openai_compat::list_models(&ai.http, &t).await {
+        match openai_compat::list_models(ai.client_for(&t.base), &t).await {
             Ok(v) => return Ok(v),
             Err(e) => last = keys::redact(&e.message, t.key.as_deref()),
         }
@@ -342,6 +382,23 @@ pub async fn test(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<String, String> {
 #[cfg(test)]
 mod usage_tests {
     use super::*;
+
+    #[test]
+    fn local_urls_skip_proxy() {
+        assert!(is_loopback("http://127.0.0.1:8880/v1"));
+        assert!(is_loopback("http://localhost:11434/v1"));
+        assert!(!is_loopback("https://api.deepseek.com/v1"));
+        let ai = Ai::new();
+        assert!(std::ptr::eq(ai.client_for("http://127.0.0.1:8880/v1"), &ai.local));
+        assert!(std::ptr::eq(ai.client_for("https://api.groq.com"), &ai.http));
+    }
+
+    #[tokio::test]
+    async fn net_error_has_cause() {
+        let e = reqwest::Client::new().get("http://127.0.0.1:1/health").send().await.unwrap_err();
+        let d = describe_net_error(&e);
+        assert!(d.len() > e.to_string().len(), "{d}");
+    }
 
     #[test]
     fn usage_deepseek_and_openai() {

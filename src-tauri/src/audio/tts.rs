@@ -182,7 +182,7 @@ async fn speech(
     let resp = req
         .send()
         .await
-        .map_err(|e| if e.is_connect() { "servizio voce non raggiungibile".to_string() } else { e.to_string() })?;
+        .map_err(|e| format!("servizio voce non raggiungibile: {}", crate::providers::describe_net_error(&e)))?;
     let status = resp.status();
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     if !status.is_success() {

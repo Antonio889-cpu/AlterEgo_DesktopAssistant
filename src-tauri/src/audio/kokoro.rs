@@ -38,10 +38,7 @@ pub fn root_and_port(url: &str) -> Result<(String, u16), String> {
 }
 
 fn is_local(url: &str) -> bool {
-    reqwest::Url::parse(url.trim())
-        .ok()
-        .and_then(|u| u.host_str().map(|h| matches!(h, "127.0.0.1" | "localhost" | "::1" | "[::1]")))
-        .unwrap_or(false)
+    crate::providers::is_loopback(url)
 }
 
 impl Kokoro {
@@ -162,7 +159,11 @@ impl Kokoro {
         let running = self.running();
         let (ready, message) = match probe(http, url).await {
             Ok(()) => (true, "pronto".to_string()),
-            Err(e) if running => (false, self.last_log_line().filter(|l| l.contains("Errore")).unwrap_or(e)),
+            // server avviato ma non pronto: l'ultima riga del suo log dice perché (caricamento, errore…)
+            Err(e) if running => (false, match self.last_log_line() {
+                Some(l) => format!("{e} — log: {l}"),
+                None => e,
+            }),
             Err(e) => (false, e),
         };
         KokoroStatus { installed, running, ready, message, dir: self.dir.display().to_string() }
@@ -199,10 +200,17 @@ async fn probe(http: &reqwest::Client, url: &str) -> Result<(), String> {
     let (root, _) = root_and_port(url)?;
     let resp = http
         .get(format!("{root}/health"))
-        .timeout(Duration::from_secs(3))
+        // su Windows una porta chiusa su 127.0.0.1 risponde dopo ~2 s: margine abbondante
+        .timeout(Duration::from_secs(6))
         .send()
         .await
-        .map_err(|e| if e.is_connect() { "server non avviato".to_string() } else { e.to_string() })?;
+        .map_err(|e| {
+            if e.is_connect() {
+                format!("il server non risponde su {root} ({})", crate::providers::describe_net_error(&e))
+            } else {
+                crate::providers::describe_net_error(&e)
+            }
+        })?;
     match resp.status().as_u16() {
         200 => Ok(()),
         503 => Err("modello in caricamento…".into()),

@@ -314,7 +314,7 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
         };
         emit_stt(&app, stt::SttEvent::Transcribing);
         let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
-        let http = app.state::<AppState>().ai.http.clone();
+        let http = app.state::<AppState>().ai.client_for(if cfg.provider == "local" { &cfg.base_url } else { "https://api.groq.com" }).clone();
         match stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await {
             Ok(t) if t.is_empty() => emit_stt(&app, stt::SttEvent::Empty),
             Ok(text) => {
@@ -341,7 +341,7 @@ pub async fn stt_test(app: AppHandle) -> Result<String, String> {
     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
     let wav = conv.recorder.finish()?.ok_or("nessun audio registrato")?;
     let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
-    let http = app.state::<AppState>().ai.http.clone();
+    let http = app.state::<AppState>().ai.client_for(if cfg.provider == "local" { &cfg.base_url } else { "https://api.groq.com" }).clone();
     let text = stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await?;
     Ok(if text.is_empty() { "(silenzio: nessuna parola riconosciuta)".into() } else { text })
 }

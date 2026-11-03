@@ -45,7 +45,8 @@ pub async fn tts_say(app: AppHandle, text: String, lang: Option<String>) -> Resu
         return Ok(());
     }
     let lang = lang.unwrap_or_else(|| "it".into());
-    let http = app.state::<AppState>().ai.http.clone();
+    let url = if a.tts == "kokoro" { &a.kokoro_url } else { &a.tts_url };
+    let http = app.state::<AppState>().ai.client_for(url).clone();
     if a.tts == "kokoro" {
         app.state::<Kokoro>()
             .ensure_ready(&http, &a.kokoro_url, a.kokoro_autostart)
@@ -97,7 +98,7 @@ pub async fn tts_voices(engine: String) -> Result<Vec<tts::Voice>, String> {
 #[tauri::command]
 pub async fn kokoro_status(app: AppHandle) -> Result<super::kokoro::KokoroStatus, String> {
     let url = app.state::<AppState>().cfg.lock().unwrap().audio.kokoro_url.clone();
-    let http = app.state::<AppState>().ai.http.clone();
+    let http = app.state::<AppState>().ai.client_for(&url).clone();
     Ok(app.state::<Kokoro>().status(&http, &url).await)
 }
 
