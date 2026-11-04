@@ -1,7 +1,6 @@
 node_modules/
 src-tauri/target/
 src-tauri/gen/
-# Gli sprite (© Spike Chunsoft) sono inclusi dalla 1.0.1: la repo deve restare privata.
 assets/sfx/dr_*
 *.log
 .env

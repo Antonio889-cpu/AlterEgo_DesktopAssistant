@@ -2,14 +2,11 @@
 
 🇬🇧 [English](README.md) · 🇮🇹 **Italiano**
 
-> ⚠ **Repo privata.** Da 1.0.1 il branch `main` contiene gli sprite originali di Alter Ego (© Spike Chunsoft),
-> inclusi nella repo e nell'app. Non rendere pubblica la repo e non distribuire le build: sono solo per uso personale.
-
 Assistente desktop per **Windows 10/11** ispirato ad *Alter Ego* di Danganronpa: una finestrella in stile laptop CRT,
 sempre in primo piano, con cui parli a voce o per iscritto. Risponde con il proprio carattere, ricorda chi sei,
 può fare clip dei tuoi giochi con una frase e, se glielo permetti, eseguire piccole azioni sul PC.
 
-Progetto personale e non commerciale. Interfaccia in italiano e in inglese.
+Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in inglese.
 
 ![Alter Ego sul desktop](docs/screenshots/main.png)
 
@@ -444,10 +441,10 @@ docs/                     PERMESSI.md, MANCANTI.md, SOURCES.md, screenshots/
 
 I moduli `providers/`, `memory/` e `actions/` sono pensati come punti di innesto per codice esterno.
 
-Gli sprite sono inclusi: `npm run build` produce direttamente la versione con il volto di Alter Ego. Non distribuire le build.
+Gli sprite sono inclusi: `npm run build` produce direttamente la versione con il volto di Alter Ego.
 
 La release si crea da GitHub: Actions → *Release* → *Run workflow* (branch `main`), oppure con un push sul branch `release`.
-La versione è quella di `src-tauri/tauri.conf.json`. Il workflow si rifiuta di pubblicare se la repo è pubblica.
+La versione è quella di `src-tauri/tauri.conf.json`.
 
 ## Limiti noti
 
@@ -467,8 +464,7 @@ La versione è quella di `src-tauri/tauri.conf.json`. Il workflow si rifiuta di 
 
 - **Codice**: licenza [MIT](LICENSE).
 - **Alter Ego, Chihiro Fujisaki e Danganronpa** sono © Spike Chunsoft. Questo è un progetto fan non ufficiale,
-  non affiliato né approvato da Spike Chunsoft. **Gli sprite originali sono inclusi solo per uso personale** (repo privata):
-  sono esclusi dalla licenza MIT e non vanno ridistribuiti.
+  non affiliato né approvato da Spike Chunsoft. Gli sprite del personaggio appartengono ai rispettivi proprietari e non rientrano nella licenza MIT.
 - **Kokoro-82M** e la libreria `kokoro` di hexgrad: Apache-2.0. Non sono inclusi nell'app: li scarica l'installazione di Kokoro.
 - **VB-CABLE** di VB-Audio Software: donationware, non incluso; si scarica dal sito ufficiale.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).

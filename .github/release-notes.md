@@ -1,7 +1,5 @@
 ## Alter Ego 1.2.0
 
-⚠ **Contains the original Alter Ego sprites (© Spike Chunsoft): personal use only, do not distribute.**
-
 ### 🇬🇧 English
 **New**
 - **English interface**: window, settings, music player, tray menu and messages. Automatic from the Windows language or chosen in Settings → General. Alter Ego's answers can follow the interface language (Personality → Answer language → Automatic, default for new installs).
@@ -32,8 +30,6 @@ Unsigned build: SmartScreen may ask for *More info → Run anyway*.
 ---
 
 ## Alter Ego 1.1.0
-
-⚠ **Contiene gli sprite originali di Alter Ego (© Spike Chunsoft): solo per uso personale, non distribuire.**
 
 ### Novità
 - **Musica (Music Search and Play)**: "metti *titolo*" → Alter Ego cerca su YouTube (yt-dlp, scaricato al primo uso insieme a Deno) e suona il brano in un **lettore in stile CRT**: spettro delle frequenze, titolo e artista, avanzamento con salto, casuale / indietro / play-pausa / avanti / ripeti, volume, **testo sincronizzato** (LRCLIB) e il **volto di Alter Ego che cambia a tempo di musica**. Coda dei brani, cache degli ultimi 30, volume che si abbassa mentre lei parla, musica anche in Mic-Link (facoltativo).

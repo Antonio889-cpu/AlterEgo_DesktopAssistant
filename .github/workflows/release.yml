@@ -17,11 +17,6 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - name: Blocca se la repo è pubblica
-        shell: pwsh
-        run: |
-          if ("${{ github.event.repository.private }}" -ne "true") { Write-Error "La repo è pubblica: niente release con gli sprite."; exit 1 }
-
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
