@@ -234,6 +234,8 @@ pub fn set_compact(app: &AppHandle, on: bool) {
             let _ = w2.set_min_size(Some(tauri::LogicalSize::new(MIN_WIDTH_LOGICAL, MIN_WIDTH_LOGICAL / RATIO)));
             // salva la posizione finale (la finestra può essere stata spostata da compatta)
             save_geometry(w2.app_handle(), true, w2.outer_position().ok(), w2.inner_size().ok(), w2.current_monitor().ok().flatten());
+            // tornata grande: il lettore e la Venue non devono coprirla
+            crate::music::avoid_main(w2.app_handle());
         });
     }
 }

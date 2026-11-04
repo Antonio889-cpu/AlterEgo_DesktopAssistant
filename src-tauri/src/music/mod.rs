@@ -5,6 +5,7 @@
 
 mod analyze;
 mod decode;
+pub mod library;
 mod lyrics;
 mod ytdlp;
 
@@ -21,8 +22,21 @@ use std::{
 use tauri::{AppHandle, Emitter, Manager};
 
 pub const PLAYER: &str = "player";
+pub const VENUE: &str = "venue";
+/// Dimensione di riferimento del lettore (px logici): il contenuto si scala con la finestra.
 const PLAYER_W: f64 = 600.0;
 const PLAYER_H: f64 = 248.0;
+pub const PLAYER_MIN_W: f64 = 420.0;
+pub const PLAYER_MAX_W: f64 = 1200.0;
+const VENUE_W: f64 = 860.0;
+const VENUE_H: f64 = 540.0;
+
+/// Guadagno reale dalla posizione del cursore (0–1): curva quadratica, massimo −5 dB.
+/// Così metà corsa è circa −17 dB (volume "normale") invece di quasi tutto il volume.
+pub fn gain(slider: f64) -> f32 {
+    let v = slider.clamp(0.0, 1.0);
+    (0.56 * v * v) as f32
+}
 
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct Track {
@@ -62,6 +76,8 @@ pub struct Music {
     data_dir: PathBuf,
     /// Un download alla volta.
     busy: tokio::sync::Mutex<()>,
+    /// Brani recenti e preferiti (Music Venue).
+    pub library: Mutex<library::Library>,
 }
 
 /// Stato inviato al lettore.
@@ -79,6 +95,9 @@ pub struct State {
     pub queue_len: usize,
     pub status: String,
     pub reactive_sprite: bool,
+    /// Il brano attuale è tra i preferiti.
+    pub favorite: bool,
+    pub venue_open: bool,
 }
 
 impl Music {
@@ -89,6 +108,7 @@ impl Music {
             gen: AtomicU64::new(0),
             data_dir: data_dir.to_path_buf(),
             busy: tokio::sync::Mutex::new(()),
+            library: Mutex::new(library::load(data_dir)),
         }
     }
 }
@@ -105,6 +125,7 @@ pub fn state(app: &AppHandle) -> State {
     let track = i.index.and_then(|x| i.queue.get(x)).cloned();
     let played = app.state::<AudioEngine>().music_played(false) as f64 / rate_for_position(app) as f64;
     let duration = track.as_ref().map(|t| t.duration).unwrap_or(0.0);
+    let favorite = track.as_ref().is_some_and(|t| m.library.lock().unwrap().is_favorite(&t.id));
     let mut position = if i.playing { i.base + played } else { i.base };
     if duration > 0.0 {
         position = position.min(duration);
@@ -122,6 +143,8 @@ pub fn state(app: &AppHandle) -> State {
         queue_len: i.queue.len(),
         status: i.status.clone(),
         reactive_sprite: cfg.reactive_sprite,
+        favorite,
+        venue_open: app.get_webview_window(VENUE).is_some(),
     }
 }
 
@@ -144,7 +167,11 @@ fn open_player(app: &AppHandle) {
         }
         return;
     }
-    let pos = app.state::<AppState>().cfg.lock().unwrap().music.player_pos;
+    let (pos, width) = {
+        let st = app.state::<AppState>();
+        let c = st.cfg.lock().unwrap();
+        (c.music.player_pos, c.music.player_width.clamp(PLAYER_MIN_W, PLAYER_MAX_W))
+    };
     let b = tauri::WebviewWindowBuilder::new(app, PLAYER, tauri::WebviewUrl::App("player.html".into()))
         .title("Alter Ego – Musica")
         .decorations(false)
@@ -155,20 +182,225 @@ fn open_player(app: &AppHandle) {
         .resizable(false)
         .focused(false)
         .visible(false)
-        .inner_size(PLAYER_W, PLAYER_H);
+        .inner_size(width, width * PLAYER_H / PLAYER_W);
     let Ok(w) = b.build() else { return };
-    // posizione salvata, altrimenti in alto a destra del monitor principale
-    let placed = pos.map(|(x, y)| w.set_position(tauri::PhysicalPosition::new(x, y)).is_ok()).unwrap_or(false);
-    if !placed {
-        if let Ok(Some(m)) = w.primary_monitor() {
-            let a = m.work_area();
-            // dimensione nota (outer_size prima di mostrare la finestra non è affidabile)
-            let size = (PLAYER_W * m.scale_factor()) as i32;
-            let margin = (24.0 * m.scale_factor()) as i32;
-            let _ = w.set_position(tauri::PhysicalPosition::new(a.position.x + a.size.width as i32 - size - margin, a.position.y + margin));
+    let scale = w.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
+    let size = ((width * scale) as i32, (width * PLAYER_H / PLAYER_W * scale) as i32);
+    // posizione salvata se non copre Alter Ego, altrimenti accanto alla finestra principale
+    let saved = pos.filter(|p| !overlaps_main(app, Rect { x: p.0, y: p.1, w: size.0, h: size.1 }));
+    match saved {
+        Some((x, y)) => {
+            let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
         }
+        None => place_clear(app, &w, size, &[]),
     }
     let _ = w.show();
+}
+
+// ---------- posizionamento: lettore e Venue non coprono la finestra principale ----------
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+impl Rect {
+    fn of(w: &tauri::WebviewWindow) -> Option<Rect> {
+        let p = w.outer_position().ok()?;
+        let s = w.outer_size().ok()?;
+        Some(Rect { x: p.x, y: p.y, w: s.width as i32, h: s.height as i32 })
+    }
+    fn overlaps(&self, o: &Rect) -> bool {
+        self.x < o.x + o.w && o.x < self.x + self.w && self.y < o.y + o.h && o.y < self.y + self.h
+    }
+    fn union(&self, o: &Rect) -> Rect {
+        let (x, y) = (self.x.min(o.x), self.y.min(o.y));
+        Rect { x, y, w: (self.x + self.w).max(o.x + o.w) - x, h: (self.y + self.h).max(o.y + o.h) - y }
+    }
+    fn inside(&self, a: &Rect) -> bool {
+        self.x >= a.x && self.y >= a.y && self.x + self.w <= a.x + a.w && self.y + self.h <= a.y + a.h
+    }
+}
+
+fn main_rect(app: &AppHandle) -> Option<Rect> {
+    let m = app.get_webview_window(crate::window::MAIN)?;
+    if !m.is_visible().unwrap_or(false) {
+        return None;
+    }
+    Rect::of(&m)
+}
+
+fn overlaps_main(app: &AppHandle, r: Rect) -> bool {
+    main_rect(app).is_some_and(|m| m.overlaps(&r))
+}
+
+/// Prima posizione libera attorno all'ostacolo (sopra, a sinistra, sotto, a destra) dentro l'area di lavoro.
+pub fn free_spot(obstacle: Rect, size: (i32, i32), area: Rect, gap: i32) -> Option<(i32, i32)> {
+    let (w, h) = size;
+    let cx = |x: i32| x.clamp(area.x, area.x + area.w - w);
+    let cy = |y: i32| y.clamp(area.y, area.y + area.h - h);
+    let cands = [
+        (cx(obstacle.x + obstacle.w - w), obstacle.y - gap - h),
+        (obstacle.x - gap - w, cy(obstacle.y + obstacle.h - h)),
+        (cx(obstacle.x + obstacle.w - w), obstacle.y + obstacle.h + gap),
+        (obstacle.x + obstacle.w + gap, cy(obstacle.y + obstacle.h - h)),
+    ];
+    cands.into_iter().find(|&(x, y)| {
+        let r = Rect { x, y, w, h };
+        r.inside(&area) && !r.overlaps(&obstacle)
+    })
+}
+
+/// Mette `win` (dimensione `size`, pixel fisici) accanto ad Alter Ego e agli altri `extra`.
+fn place_clear(app: &AppHandle, win: &tauri::WebviewWindow, size: (i32, i32), extra: &[Rect]) {
+    let mon = app
+        .get_webview_window(crate::window::MAIN)
+        .and_then(|m| m.current_monitor().ok().flatten())
+        .or_else(|| win.primary_monitor().ok().flatten());
+    let Some(mon) = mon else { return };
+    let a = mon.work_area();
+    let area = Rect { x: a.position.x, y: a.position.y, w: a.size.width as i32, h: a.size.height as i32 };
+    let gap = (12.0 * mon.scale_factor()) as i32;
+    let mut obstacle = main_rect(app);
+    for e in extra {
+        obstacle = Some(obstacle.map(|o| o.union(e)).unwrap_or(*e));
+    }
+    let spot = match obstacle {
+        Some(o) => free_spot(o, size, area, gap).or_else(|| main_rect(app).and_then(|m| free_spot(m, size, area, gap))),
+        None => None,
+    };
+    let (x, y) = spot.unwrap_or((area.x + area.w - size.0 - 2 * gap, area.y + 2 * gap));
+    let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+}
+
+/// Dopo un cambio di dimensione di Alter Ego (modalità compatta): sposta lettore e Venue se ora la coprono.
+pub fn avoid_main(app: &AppHandle) {
+    let Some(m) = main_rect(app) else { return };
+    let mut placed = Vec::new();
+    for label in [PLAYER, VENUE] {
+        let Some(w) = app.get_webview_window(label) else { continue };
+        let Some(r) = Rect::of(&w) else { continue };
+        if r.overlaps(&m) || placed.iter().any(|p: &Rect| p.overlaps(&r)) {
+            place_clear(app, &w, (r.w, r.h), &placed);
+        }
+        if let Some(r) = Rect::of(&w) {
+            placed.push(r);
+        }
+    }
+}
+
+/// Ridimensiona il lettore (larghezza in px logici, proporzioni fisse).
+pub fn resize_player(app: &AppHandle, width: f64) {
+    let width = width.clamp(PLAYER_MIN_W, PLAYER_MAX_W);
+    if let Some(w) = app.get_webview_window(PLAYER) {
+        let _ = w.set_size(tauri::LogicalSize::new(width, width * PLAYER_H / PLAYER_W));
+    }
+    app.state::<AppState>().cfg.lock().unwrap().music.player_width = width;
+    app.state::<AppState>().dirty.store(true, Ordering::Relaxed);
+}
+
+// ---------- Music Venue ----------
+
+pub fn open_venue(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window(VENUE) {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return;
+    }
+    let pos = app.state::<AppState>().cfg.lock().unwrap().music.venue_pos;
+    let b = tauri::WebviewWindowBuilder::new(app, VENUE, tauri::WebviewUrl::App("venue.html".into()))
+        .title("Music Venue")
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(true)
+        .min_inner_size(620.0, 400.0)
+        .visible(false)
+        .inner_size(VENUE_W, VENUE_H);
+    let Ok(w) = b.build() else { return };
+    let scale = w.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
+    let size = ((VENUE_W * scale) as i32, (VENUE_H * scale) as i32);
+    let player = app.get_webview_window(PLAYER).and_then(|p| Rect::of(&p));
+    let free = |r: Rect| !overlaps_main(app, r) && !player.is_some_and(|p| p.overlaps(&r));
+    match pos.filter(|p| free(Rect { x: p.0, y: p.1, w: size.0, h: size.1 })) {
+        Some((x, y)) => {
+            let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+        }
+        None => place_clear(app, &w, size, &player.into_iter().collect::<Vec<_>>()),
+    }
+    let _ = w.show();
+    let _ = w.set_focus();
+    emit_state(app);
+}
+
+/// Chiude la Venue con l'animazione glitch (la pagina chiama `venue_closed` alla fine).
+pub fn close_venue(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window(VENUE) {
+        let _ = app.emit_to(VENUE, "venue-tv", "off");
+        let w = w.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1200));
+            let _ = w.close();
+        });
+    }
+}
+
+pub fn record_venue_position(win: &tauri::Window) {
+    if let Ok(p) = win.outer_position() {
+        let app = win.app_handle();
+        app.state::<AppState>().cfg.lock().unwrap().music.venue_pos = Some((p.x, p.y));
+        app.state::<AppState>().dirty.store(true, Ordering::Relaxed);
+    }
+}
+
+fn entry_of(t: &Track) -> library::Entry {
+    library::Entry {
+        id: t.id.clone(),
+        title: t.title.clone(),
+        artist: t.artist.clone(),
+        duration: t.duration,
+        thumbnail: t.thumbnail.clone(),
+        url: t.url.clone(),
+        ..Default::default()
+    }
+}
+
+fn save_library(app: &AppHandle) {
+    let m = app.state::<Music>();
+    let lib = m.library.lock().unwrap().clone();
+    library::save(&m.data_dir, &lib);
+    let _ = app.emit("venue-library", lib);
+}
+
+/// Aggiunge/toglie il brano attuale dai preferiti. Restituisce il nuovo stato.
+pub fn favorite_current(app: &AppHandle, want: Option<bool>) -> Result<bool, String> {
+    let Some(t) = state(app).track else {
+        return Err(crate::i18n::tr("non sta suonando niente", "nothing is playing").into());
+    };
+    let m = app.state::<Music>();
+    let now = {
+        let mut lib = m.library.lock().unwrap();
+        let is = lib.is_favorite(&t.id);
+        if want.is_none_or(|w| w != is) { lib.toggle_favorite(entry_of(&t)) } else { is }
+    };
+    save_library(app);
+    emit_state(app);
+    Ok(now)
+}
+
+/// Mostra il lettore (se c'è musica).
+pub fn show_player(app: &AppHandle) {
+    open_player(app);
+}
+
+/// Ferma la musica e chiude il lettore.
+pub fn stop_music(app: &AppHandle) {
+    stop(app);
 }
 
 /// Chiude il lettore con l'animazione "TV" (la finestra la esegue e poi chiama `player_closed`).
@@ -213,6 +445,7 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
         let mut i = m.inner.lock().unwrap();
         let Some(t) = i.queue.get(index) else { return };
         let f = t.file.clone();
+        m.library.lock().unwrap().played(entry_of(t));
         i.index = Some(index);
         i.base = start;
         i.playing = true;
@@ -220,10 +453,11 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
         i.status.clear();
         f
     };
+    save_library(app);
     let engine = app.state::<AudioEngine>();
     engine.set_music_paused(false);
     let vol = app.state::<AppState>().cfg.lock().unwrap().music.volume;
-    engine.set_music_gain(vol as f32);
+    engine.set_music_gain(gain(vol));
     let (tx, rx) = mpsc::channel();
     *m.ctl.lock().unwrap() = Some(tx);
     open_player(app);
@@ -479,8 +713,12 @@ pub async fn control(app: &AppHandle, action: &str, value: Option<f64>) -> Resul
             stop(app);
             Ok(crate::i18n::tr("Musica fermata.", "Music stopped.").into())
         }
+        "favorite" | "unfavorite" => {
+            let on = favorite_current(app, Some(action == "favorite"))?;
+            Ok(if on { crate::i18n::tr("Aggiunto ai preferiti.", "Added to favorites.") } else { crate::i18n::tr("Tolto dai preferiti.", "Removed from favorites.") }.into())
+        }
         "volume" => {
-            let v = (value.unwrap_or(70.0) / 100.0).clamp(0.0, 1.0);
+            let v = (value.unwrap_or(60.0) / 100.0).clamp(0.0, 1.0);
             set_volume(app, v);
             Ok(crate::tr!("Volume musica al {}%.", "Music volume at {}%.", (v * 100.0).round()))
         }
@@ -508,7 +746,7 @@ fn previous(app: &AppHandle) {
 }
 
 fn set_volume(app: &AppHandle, v: f64) {
-    app.state::<AudioEngine>().set_music_gain(v as f32);
+    app.state::<AudioEngine>().set_music_gain(gain(v));
     update_config(app, |c| c.music.volume = v);
     emit_state(app);
 }
@@ -623,8 +861,11 @@ pub async fn music_play(app: AppHandle, query: String) -> Result<String, String>
 }
 
 #[tauri::command]
-pub fn music_settings(app: AppHandle, lyrics: bool, reactive_sprite: bool, compact: Option<bool>) {
+pub fn music_settings(app: AppHandle, lyrics: bool, reactive_sprite: bool, compact: Option<bool>, music_sprite: Option<bool>) {
     update_config(&app, |c| {
+        if let Some(v) = music_sprite {
+            c.music.music_sprite = v;
+        }
         c.music.lyrics = lyrics;
         c.music.reactive_sprite = reactive_sprite;
         if let Some(v) = compact {
@@ -635,4 +876,74 @@ pub fn music_settings(app: AppHandle, lyrics: bool, reactive_sprite: bool, compa
         crate::window::set_compact(&app, false);
     }
     emit_state(&app);
+}
+
+#[tauri::command]
+pub fn player_resize(app: AppHandle, width: f64) {
+    resize_player(&app, width);
+}
+
+#[tauri::command]
+pub fn venue_open(app: AppHandle) {
+    open_venue(&app);
+}
+
+#[tauri::command]
+pub fn venue_close(app: AppHandle) {
+    close_venue(&app);
+}
+
+#[tauri::command]
+pub fn venue_closed(app: AppHandle) {
+    if let Some(w) = app.get_webview_window(VENUE) {
+        let _ = w.close();
+    }
+    // lo stato (venue_open) si aggiorna dopo la chiusura vera
+    let app2 = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(150));
+        emit_state(&app2);
+    });
+}
+
+#[tauri::command]
+pub fn venue_library(app: AppHandle) -> library::Library {
+    app.state::<Music>().library.lock().unwrap().clone()
+}
+
+/// Preferito: `id` vuoto = brano attuale.
+#[tauri::command]
+pub fn venue_favorite(app: AppHandle, id: String) -> Result<bool, String> {
+    if id.is_empty() {
+        return favorite_current(&app, None);
+    }
+    let m = app.state::<Music>();
+    let now = {
+        let mut lib = m.library.lock().unwrap();
+        let e = lib.find(&id).cloned().ok_or("brano non trovato")?;
+        lib.toggle_favorite(e)
+    };
+    save_library(&app);
+    emit_state(&app);
+    Ok(now)
+}
+
+#[tauri::command]
+pub fn venue_remove(app: AppHandle, id: String) {
+    app.state::<Music>().library.lock().unwrap().remove_recent(&id);
+    save_library(&app);
+}
+
+/// Riascolta un brano della libreria (dal link YouTube) o cerca una frase.
+#[tauri::command]
+pub async fn venue_play(app: AppHandle, id: String, query: Option<String>, enqueue: Option<bool>) -> Result<String, String> {
+    let q = match query.filter(|q| !q.trim().is_empty()) {
+        Some(q) => q,
+        None => {
+            let lib = app.state::<Music>().library.lock().unwrap().clone();
+            let e = lib.find(&id).ok_or("brano non trovato")?;
+            e.url.clone().unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", e.id))
+        }
+    };
+    play(&app, &q, enqueue.unwrap_or(false)).await
 }

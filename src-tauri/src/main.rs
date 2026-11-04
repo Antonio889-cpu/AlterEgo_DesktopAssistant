@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod actions;
+mod appctl;
 mod assistant;
 mod audio;
 mod config;
@@ -15,6 +16,7 @@ mod providers;
 mod sprites;
 mod stt;
 mod tray;
+mod update;
 mod web;
 mod window;
 
@@ -460,6 +462,7 @@ fn main() {
                 window::record_geometry(win)
             }
             WindowEvent::Moved(_) if win.label() == music::PLAYER => music::record_player_position(win),
+            WindowEvent::Moved(_) if win.label() == music::VENUE => music::record_venue_position(win),
             // Alt+F4 nasconde invece di chiudere: si esce solo dalla tray.
             WindowEvent::CloseRequested { api, .. } if win.label() == window::MAIN => {
                 api.prevent_close();
@@ -504,6 +507,18 @@ fn main() {
             music::music_play,
             music::music_settings,
             music::player_closed,
+            music::player_resize,
+            music::venue_open,
+            music::venue_close,
+            music::venue_closed,
+            music::venue_library,
+            music::venue_favorite,
+            music::venue_remove,
+            music::venue_play,
+            update::update_check,
+            update::update_install,
+            update::open_link_cmd,
+            update::app_version,
             assistant::chat,
             assistant::set_persona_options,
             assistant::set_stt,

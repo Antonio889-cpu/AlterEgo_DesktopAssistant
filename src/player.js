@@ -78,14 +78,21 @@ function applyState(s) {
   $("b-repeat").classList.toggle("one", s.repeat === "one");
   $("b-repeat").title = t({ off: "Ripeti: no", all: "Ripeti: tutta la coda", one: "Ripeti: questo brano" }[s.repeat]);
   $("dur").textContent = fmt(s.duration);
-  if (document.activeElement !== $("volume")) setVolumeUi(s.volume);
+  if (document.activeElement !== $("volume") && !volTimer) setVolumeUi(s.volume);
+  $("b-fav").classList.toggle("on", !!s.favorite);
+  $("b-fav").title = t(s.favorite ? "Togli dai preferiti" : "Aggiungi ai preferiti");
+  $("b-venue").classList.toggle("on", !!s.venue_open);
+  $("b-venue").title = t(s.venue_open ? "Chiudi la Music Venue" : "Apri la Music Venue");
   if (!s.reactive_sprite) showSprite("idle");
   render();
 }
 
+// il cursore va da 0 a 100; il guadagno vero segue una curva nel backend (metà corsa ≈ volume normale)
 function setVolumeUi(v) {
-  $("volume").value = v;
-  $("volume").style.setProperty("--v", `${Math.round(v * 100)}%`);
+  const pct = Math.round(v * 100);
+  $("volume").value = pct;
+  $("vol-val").textContent = pct;
+  $("volume").style.setProperty("--v", `${pct}%`);
   $("vol-w1").style.opacity = v > 0.05 ? 1 : 0.2;
   $("vol-w2").style.opacity = v > 0.5 ? 1 : 0.2;
 }
@@ -130,13 +137,24 @@ $("b-prev").onclick = () => invoke("music_prev");
 $("b-shuffle").onclick = () => invoke("music_shuffle");
 $("b-repeat").onclick = () => invoke("music_repeat");
 $("close").onclick = () => invoke("music_stop");
-let volTimer = null;
-$("volume").oninput = (e) => {
-  const v = +e.target.value;
-  setVolumeUi(v);
-  clearTimeout(volTimer);
-  volTimer = setTimeout(() => invoke("music_volume", { volume: v }), 60);
+$("b-fav").onclick = async () => {
+  try {
+    const on = await invoke("venue_favorite", { id: "" });
+    $("b-fav").classList.toggle("on", on);
+    $("b-fav").classList.remove("pop"); void $("b-fav").offsetWidth; $("b-fav").classList.add("pop");
+  } catch {}
 };
+$("b-venue").onclick = () => invoke(st?.venue_open ? "venue_close" : "venue_open");
+let volTimer = null;
+function setVolume(pct) {
+  pct = Math.max(0, Math.min(100, Math.round(pct)));
+  setVolumeUi(pct / 100);
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => { volTimer = null; invoke("music_volume", { volume: pct / 100 }); }, 60);
+}
+$("volume").oninput = (e) => setVolume(+e.target.value);
+// rotella sul volume: 2 punti a scatto
+$("vol").addEventListener("wheel", (e) => { e.preventDefault(); setVolume(+$("volume").value + (e.deltaY < 0 ? 2 : -2)); }, { passive: false });
 
 // seek: clic o trascinamento sulla barra
 const bar = $("bar");
@@ -161,30 +179,60 @@ bar.addEventListener("pointerup", (e) => {
   invoke("music_seek", { secs: to });
 });
 
+// ---------- dimensione: il contenuto è disegnato a 600 px e si scala con la finestra ----------
+const BASE_W = 600;
+function fit() { document.body.style.zoom = String(window.innerWidth / BASE_W); }
+window.addEventListener("resize", fit);
+fit();
+let rs = null;
+let rsWidth = null;
+const grip = $("resize");
+grip.addEventListener("pointerdown", (e) => {
+  e.stopPropagation();
+  grip.setPointerCapture(e.pointerId);
+  rs = { x: e.screenX, w: window.innerWidth };
+});
+grip.addEventListener("pointermove", (e) => {
+  if (!rs) return;
+  const first = rsWidth === null;
+  rsWidth = rs.w + (e.screenX - rs.x);
+  if (first) requestAnimationFrame(() => { invoke("player_resize", { width: rsWidth }); rsWidth = null; });
+});
+grip.addEventListener("pointerup", () => { rs = null; });
+grip.addEventListener("pointercancel", () => { rs = null; });
+window.addEventListener("wheel", (e) => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  invoke("player_resize", { width: window.innerWidth * (e.deltaY < 0 ? 1.06 : 1 / 1.06) });
+}, { passive: false });
+
 // spostamento della finestra (fuori dai comandi)
 $("screen").addEventListener("mousedown", (e) => {
-  if (e.button !== 0 || e.target.closest("button, input, #bar")) return;
+  if (e.button !== 0 || e.target.closest("button, input, #bar, #resize")) return;
   win.startDragging();
 });
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 window.addEventListener("keydown", (e) => {
   if (e.key === " ") { e.preventDefault(); invoke("music_toggle"); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); setVolume(+$("volume").value + 2); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); setVolume(+$("volume").value - 2); }
   else if (e.key === "ArrowRight") invoke("music_seek", { secs: position() + 5 });
   else if (e.key === "ArrowLeft") invoke("music_seek", { secs: Math.max(0, position() - 5) });
 });
 
 // ---------- accensione / spegnimento "TV" ----------
 const panel = $("panel");
+// accensione e spegnimento con effetto glitch (glitch.css)
 function tvOn() {
-  panel.classList.remove("tv-off", "tv-off-anim");
+  panel.classList.remove("tv-off", "glitch-out");
   void panel.offsetWidth;
-  panel.classList.add("tv-on-anim");
-  setTimeout(() => panel.classList.remove("tv-on-anim"), 650);
+  panel.classList.add("glitch-in");
+  setTimeout(() => panel.classList.remove("glitch-in"), 800);
 }
 function tvOff() {
-  panel.classList.remove("tv-on-anim");
-  panel.classList.add("tv-off-anim");
-  setTimeout(() => { panel.classList.add("tv-off"); invoke("player_closed"); }, 440);
+  panel.classList.remove("glitch-in");
+  panel.classList.add("glitch-out");
+  setTimeout(() => { panel.classList.add("tv-off"); invoke("player_closed"); }, 600);
 }
 
 // ---------- eventi ----------

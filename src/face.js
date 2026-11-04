@@ -18,6 +18,7 @@ const Face = (() => {
   let talking = false;
   let talkTimer = null;
   let blinkTimer = null;
+  let music = false;
   const placeholder = document.createElement("div");
   placeholder.className = "face-placeholder";
   placeholder.innerHTML = "<span></span><small>Volto segnaposto · importa gli sprite da Impostazioni → Personalità</small>";
@@ -41,7 +42,20 @@ const Face = (() => {
   function set(state) {
     current = state;
     box.dataset.state = state;
-    show(mode === "placeholder" ? state : resolve(state));
+    // musica in corso e Alter Ego tranquilla: cuffie e leggero dondolio
+    const groove = music && state === "idle" && !talking && has("music");
+    box.classList.toggle("groove", groove);
+    document.body.classList.toggle("grooving", groove);
+    show(mode === "placeholder" ? state : groove ? "music" : resolve(state));
+  }
+
+  /** Musica in corso (decide app.js: solo quando Alter Ego non è occupata). */
+  function setMusic(on) {
+    if (music === on) return;
+    music = on;
+    // piccolo glitch nel cambio di sprite
+    box.classList.remove("swap-glitch"); void box.offsetWidth; box.classList.add("swap-glitch");
+    set(current);
   }
 
   function setTalking(on) {
@@ -92,6 +106,8 @@ const Face = (() => {
     try { user = await window.__TAURI__.core.invoke("load_user_sprites"); } catch {}
     if (user.idle) {
       mode = "user";
+      // gli sprite importati non hanno le cuffie: si usa quello incluso, se c'è
+      if (!user.music && (await canLoad(`assets/sprites/${bundledFiles.music}`))) user.music = `assets/sprites/${bundledFiles.music}`;
       build(user);
     } else if (await canLoad(`assets/sprites/${bundledFiles.idle}`)) {
       mode = "bundled";
@@ -110,5 +126,5 @@ const Face = (() => {
   window.__TAURI__.event.listen("sprites-changed", () => load());
   load();
 
-  return { set, get: () => current, setTalking, isTalking: () => talking, mode: () => mode, reload: load };
+  return { set, setMusic, get: () => current, setTalking, isTalking: () => talking, mode: () => mode, reload: load };
 })();

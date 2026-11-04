@@ -46,6 +46,17 @@
       <h3>Avvio</h3>
       <label class="inline"><input type="checkbox" id="autostart" /> Avvia Alter Ego all'accesso a Windows</label>
       <span id="autostart-result" class="result"></span>
+      <h3>Info e aggiornamenti</h3>
+      <p class="note">Versione installata: <b id="app-version">…</b></p>
+      <div class="actions">
+        <button id="link-site">🌐 Sito web</button>
+        <button id="link-github">GitHub</button>
+        <button id="update-check">Controlla aggiornamenti</button>
+        <button id="update-install" hidden>⬇ Aggiorna ora</button>
+      </div>
+      <div class="actions"><span id="update-result" class="result"></span></div>
+      <p class="note">L'aggiornamento scarica l'installer dell'ultima release da GitHub, ne controlla lo SHA-256, chiede conferma e chiude
+        Alter Ego. Impostazioni, chiavi e memoria restano. Puoi anche dirlo a lei: «controlla gli aggiornamenti».</p>
     </section>
 
     <section data-tab="ai">
@@ -75,6 +86,9 @@
       <label>Timida <input id="confidence" type="range" min="0" max="1" step="0.05" /> Sicura</label>
       <label>Formale <input id="warmth" type="range" min="0" max="1" step="0.05" /> Affettuosa</label>
       <label>Modalità imitazione <input id="imitate" maxlength="60" placeholder="vuoto = spenta (es. Mondo Owada)" /></label>
+      <div class="perm danger-zone"><label class="inline"><input type="checkbox" id="unfiltered" /> <b>Senza filtri</b>: fa quello che chiedi anche se non è d'accordo</label>
+        <p class="note">Niente rifiuti per gusto personale, niente prediche: al massimo un dubbio in mezza frase, poi esegue.
+          Le azioni sul PC passano <b>comunque</b> dai Permessi e dalle conferme, e restano le regole del provider AI che usi.</p></div>
       <p class="note">La scheda del personaggio è il file <code>persona\alter_ego.md</code> nella cartella dati: modificalo liberamente,
         vale dal messaggio successivo.</p>
       <button id="open-data">Apri cartella dati</button>
@@ -190,6 +204,10 @@
       <label class="inline"><input type="checkbox" id="music-lyrics" /> Testi sincronizzati (LRCLIB)</label>
       <label class="inline"><input type="checkbox" id="music-reactive" /> Il volto di Alter Ego nel lettore cambia a tempo di musica</label>
       <label class="inline"><input type="checkbox" id="music-compact" /> Durante la musica rimpicciolisci Alter Ego (torna grande quando parla o le scrivi)</label>
+      <label class="inline"><input type="checkbox" id="music-sprite" /> Durante la musica Alter Ego mette le cuffie (torna normale quando le parli)</label>
+      <p class="note">Il lettore si ridimensiona dall'angolo in basso a destra (o con Ctrl + rotella) e si apre accanto ad Alter Ego senza coprirla.
+        Volume: rotella del mouse o frecce ↑ ↓ sul lettore, a passi del 2%.</p>
+      <div class="actions"><button id="open-venue">♫ Apri la Music Venue</button></div>
       <div class="actions"><input id="music-query" placeholder="Prova: titolo e artista" /> <button id="music-go">Cerca e suona</button> <span id="music-result" class="result"></span></div>
     </section>
 
@@ -211,6 +229,12 @@
       <label>Volume voce di Alter Ego <input id="link-voice-vol" type="range" min="0" max="1.5" step="0.05" /></label>
       <label class="inline"><input type="checkbox" id="link-blips" /> Anche i blip del dialogo</label>
       <label class="inline"><input type="checkbox" id="link-music" /> Anche la musica del lettore</label>
+      <h3>Riduzione del rumore</h3>
+      <label class="inline"><input type="checkbox" id="ns-enabled" /> Riduci il rumore del microfono (ventole, tastiera, traffico…)</label>
+      <label>Intensità <input id="ns-strength" type="range" min="0" max="1" step="0.05" /> <output id="ns-strength-val"></output></label>
+      <label>Soglia voce <input id="ns-gate" type="range" min="0" max="0.9" step="0.05" /> <output id="ns-gate-val"></output></label>
+      <p class="note">Filtro RNNoise sul microfono di Mic-Link, in locale. <b>Intensità</b>: quanto rumore togliere.
+        <b>Soglia voce</b>: sotto questa probabilità di voce il microfono si abbassa (0 = mai). Se tagli l'inizio delle parole, abbassala.</p>
       <div class="actions"><span id="link-status" class="result"></span></div>
       <p class="note">Il microfono resta usabile anche dal push-to-talk. Se dopo l'installazione di VB-CABLE non senti più niente,
         Windows lo ha messo come uscita predefinita: rimetti i tuoi altoparlanti in Impostazioni → Sistema → Audio.</p>
@@ -267,6 +291,12 @@
           ogni ricerca o pagina costa circa $0,00075 e finisce nella scheda Costi. Il testo trovato è trattato come dato.</p></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="music" /> <b>Musica</b> (cerca su YouTube e suona)</label>
         <p class="note">Al primo uso scarica <b>yt-dlp</b> e <b>Deno</b> da GitHub in <code>%APPDATA%\AlterEgo\tools</code>. I brani restano in una cache (ultimi 30).</p></div>
+      <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="input" /> <b>Mouse e tastiera</b> ⚠ (muove il cursore, clicca, scrive, preme tasti)</label>
+        <p class="note">Va bene insieme a <b>Lettura schermo</b>, così vede dove cliccare. Ogni azione chiede conferma e poi rimette in primo piano la finestra di prima.
+          <b>Stop d'emergenza</b>: porta il mouse nell'angolo in alto a sinistra dello schermo.</p>
+        <label class="inline sub"><input type="checkbox" data-perm="input_autonomous" /> <b>In autonomia</b>: senza chiedere conferma per ogni azione</label></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="app_control" /> <b>Comandi dell'app</b> («apri music venue», «chiudi il lettore», «apri il sito»…)</label>
+        <p class="note">Riguardano solo Alter Ego (finestre, lettore, aspetto, link, aggiornamento), non il PC. Le frasi brevi più comuni funzionano anche senza modello AI.</p></div>
       <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="terminal" /> <b>Terminale</b> ⚠ (PowerShell e cmd, comandi scritti da Alter Ego)</label>
         <p class="note">Alter Ego può eseguire qualsiasi comando non interattivo (timeout 120 s) e leggerne l'output.</p>
         <label class="inline sub"><input type="checkbox" data-perm="terminal_autonomous" /> <b>In autonomia</b>: senza chiedere conferma</label>

@@ -50,13 +50,25 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     )?;
     let sound = radio(app, tr("Suoni dialogo", "Dialogue sounds"), "blip", &[("dr", tr("Blip stile Danganronpa", "Danganronpa-style blips")), ("soft", tr("Blip morbidi", "Soft blips")), ("off", tr("Muto", "Muted"))], &cfg.audio.blips)?;
     let voice = CheckMenuItem::with_id(app, "tts", tr("Voce (TTS)", "Voice (TTS)"), true, cfg.audio.tts != "off", None::<&str>)?;
+    let venue = MenuItem::with_id(app, "venue", "Music Venue", true, None::<&str>)?;
+    let links = Submenu::with_items(
+        app,
+        tr("Info e aggiornamenti", "About and updates"),
+        true,
+        &[
+            &MenuItem::with_id(app, "site", tr("Sito web", "Website"), true, None::<&str>)?,
+            &MenuItem::with_id(app, "github", "GitHub", true, None::<&str>)?,
+            &MenuItem::with_id(app, "update", tr("Aggiorna all'ultima versione…", "Update to the latest version…"), true, None::<&str>)?,
+            &MenuItem::with_id(app, "version", format!("{} {}", tr("Versione", "Version"), crate::update::VERSION), false, None::<&str>)?,
+        ],
+    )?;
     let reset = MenuItem::with_id(app, "reset", tr("Reimposta posizione", "Reset position"), true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", tr("Esci", "Quit"), true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[&show, &talk, &settings, &demo, &sep, &click, &opacity, &look, &sound, &voice, &reset, &sep2, &quit],
+        &[&show, &talk, &settings, &venue, &demo, &sep, &click, &opacity, &look, &sound, &voice, &reset, &links, &sep2, &quit],
     )?;
     *state.tray_click_item.lock().unwrap() = Some(click);
     Ok(menu)
@@ -91,6 +103,21 @@ fn on_menu(app: &AppHandle, id: &str) {
             c.audio.tts = if c.audio.tts == "off" { "windows".into() } else { "off".into() };
         }),
         "reset" => window::reset_geometry(app),
+        "venue" => crate::music::open_venue(app),
+        "site" => {
+            let _ = crate::update::open_link("site");
+        }
+        "github" => {
+            let _ = crate::update::open_link("github");
+        }
+        "update" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let r = crate::update::install(&app).await;
+                // Alter Ego lo dice nel box di dialogo
+                let _ = app.emit("app-say", match r { Ok(t) => format!("[happy]\n{t}"), Err(e) => format!("[worried]\n{e}") });
+            });
+        }
         "quit" => window::hide_main(app, true),
         _ => {
             let Some((prefix, value)) = id.split_once(':') else { return };

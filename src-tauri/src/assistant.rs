@@ -66,6 +66,16 @@ pub async fn chat(
             tool_calls: vec![],
         });
     }
+    // comandi dell'app (apri music venue, chiudi il lettore…): subito, senza modello
+    if cfg.permissions.app_control {
+        if let Some(r) = crate::appctl::quick(&app, &text).await {
+            let (emotion, reply) = match r {
+                Ok(t) => ("happy", t),
+                Err(e) => ("worried", e),
+            };
+            return Ok(providers::ChatResult { text: format!("[{emotion}]\n{reply}"), provider: "locale".into(), model: "app".into(), tool_calls: vec![] });
+        }
+    }
     let mem = conv.mem(cfg.memory_enabled);
 
     // contesto: ultimi N messaggi (finestra "a scatti", vedi prompt::window_start) + riassunto + fatti

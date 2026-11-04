@@ -1,7 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale)",
-  "windows": ["main", "settings", "player"],
-  "permissions": ["core:default", "core:window:allow-start-dragging"]
+  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale, Music Venue)",
+  "windows": [
+    "main",
+    "settings",
+    "player",
+    "venue"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging"
+  ]
 }

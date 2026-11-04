@@ -1,4 +1,5 @@
-//! Tasti simulati (SendInput): scorciatoie delle clip e tasti multimediali del volume.
+//! Tasti e mouse simulati (SendInput): scorciatoie delle clip, tasti multimediali del volume
+//! e il controllo di mouse e tastiera da parte di Alter Ego (permesso "Mouse e tastiera").
 
 /// Codici virtual-key di Windows per una combinazione tipo "Ctrl+Shift+S" o "F8".
 pub fn parse_combo(combo: &str) -> Result<Vec<u16>, String> {
@@ -86,6 +87,132 @@ mod imp {
         }
         Ok(())
     }
+}
+
+/// Controllo di mouse e tastiera (solo Windows).
+#[cfg(windows)]
+pub mod pointer {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
+    use windows_sys::Win32::UI::WindowsAndMessaging::*;
+
+    fn send(events: &[INPUT]) -> Result<(), String> {
+        let sent = unsafe { SendInput(events.len() as u32, events.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
+        if sent as usize == events.len() { Ok(()) } else { Err(crate::i18n::tr("Windows ha bloccato l'input simulato", "Windows blocked the simulated input").into()) }
+    }
+
+    fn mouse(flags: u32, data: i32) -> INPUT {
+        INPUT {
+            r#type: INPUT_MOUSE,
+            Anonymous: INPUT_0 { mi: MOUSEINPUT { dx: 0, dy: 0, mouseData: data as _, dwFlags: flags, time: 0, dwExtraInfo: 0 } },
+        }
+    }
+
+    fn unicode(unit: u16, up: bool) -> INPUT {
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT { wVk: 0, wScan: unit, dwFlags: KEYEVENTF_UNICODE | if up { KEYEVENTF_KEYUP } else { 0 }, time: 0, dwExtraInfo: 0 },
+            },
+        }
+    }
+
+    /// Dimensione dello schermo principale in pixel.
+    pub fn screen_size() -> (i32, i32) {
+        unsafe { (GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)) }
+    }
+
+    pub fn cursor() -> (i32, i32) {
+        let mut p = POINT { x: 0, y: 0 };
+        unsafe { GetCursorPos(&mut p) };
+        (p.x, p.y)
+    }
+
+    pub fn move_to(x: i32, y: i32) -> Result<(), String> {
+        if unsafe { SetCursorPos(x, y) } == 0 { Err("cursore non spostato".into()) } else { Ok(()) }
+    }
+
+    /// `button`: "left", "right", "middle".
+    pub fn click(button: &str, double: bool) -> Result<(), String> {
+        let (down, up) = match button {
+            "right" => (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
+            "middle" => (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+            _ => (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
+        };
+        for _ in 0..if double { 2 } else { 1 } {
+            send(&[mouse(down, 0)])?;
+            std::thread::sleep(std::time::Duration::from_millis(30));
+            send(&[mouse(up, 0)])?;
+            std::thread::sleep(std::time::Duration::from_millis(60));
+        }
+        Ok(())
+    }
+
+    /// Rotella: positivo = su, negativo = giù (in "scatti").
+    pub fn scroll(clicks: i32, horizontal: bool) -> Result<(), String> {
+        send(&[mouse(if horizontal { MOUSEEVENTF_HWHEEL } else { MOUSEEVENTF_WHEEL }, clicks * 120)])
+    }
+
+    /// Scrive un testo carattere per carattere (Unicode); "\n" = Invio.
+    pub fn type_text(text: &str) -> Result<(), String> {
+        for ch in text.chars() {
+            if ch == '\n' {
+                super::imp::press(&[0x0D])?;
+                continue;
+            }
+            if ch == '\r' {
+                continue;
+            }
+            let mut buf = [0u16; 2];
+            for unit in ch.encode_utf16(&mut buf).iter() {
+                send(&[unicode(*unit, false), unicode(*unit, true)])?;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(8));
+        }
+        Ok(())
+    }
+
+    /// Finestra in primo piano (per rimetterla dopo una conferma).
+    pub fn foreground() -> isize {
+        unsafe { GetForegroundWindow() as isize }
+    }
+
+    pub fn set_foreground(h: isize) {
+        if h != 0 {
+            unsafe { SetForegroundWindow(h as _) };
+        }
+    }
+
+    /// La finestra in primo piano è di Alter Ego.
+    pub fn foreground_is_ours() -> bool {
+        let mut pid = 0u32;
+        unsafe {
+            GetWindowThreadProcessId(GetForegroundWindow(), &mut pid);
+            pid == windows_sys::Win32::System::Threading::GetCurrentProcessId()
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub mod pointer {
+    const NO: &str = "mouse e tastiera simulati funzionano solo su Windows";
+    pub fn screen_size() -> (i32, i32) { (1920, 1080) }
+    pub fn cursor() -> (i32, i32) { (500, 500) }
+    pub fn move_to(_x: i32, _y: i32) -> Result<(), String> { Err(NO.into()) }
+    pub fn click(_b: &str, _d: bool) -> Result<(), String> { Err(NO.into()) }
+    pub fn scroll(_c: i32, _h: bool) -> Result<(), String> { Err(NO.into()) }
+    pub fn type_text(_t: &str) -> Result<(), String> { Err(NO.into()) }
+    pub fn foreground() -> isize { 0 }
+    pub fn set_foreground(_h: isize) {}
+    pub fn foreground_is_ours() -> bool { false }
+}
+
+/// Griglia delle coordinate usata dal modello: quella dello screenshot (ridotto a max 1280 px).
+/// Restituisce (larghezza, altezza, fattore griglia→schermo).
+pub fn grid() -> (i32, i32, f64) {
+    let (w, h) = pointer::screen_size();
+    let f = ((w as f64) / 1280.0).ceil().max(1.0);
+    ((w as f64 / f) as i32, (h as f64 / f) as i32, f)
 }
 
 #[cfg(not(windows))]

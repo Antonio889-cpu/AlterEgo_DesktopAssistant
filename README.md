@@ -60,7 +60,12 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 - **Choice of audio devices**: speakers/headphones for the voice, microphone for push-to-talk.
 - **Mic-Link**: a virtual microphone, **AlterEgo Link Audio**, with your voice + Alter Ego's, for Discord, OBS and games.
 - **Music**: "play *title*" → Alter Ego searches YouTube and plays it in a CRT-style player with a spectrum, synced lyrics
-  and her face changing to the beat. While music plays, Alter Ego's window shrinks and grows back when she talks or you write to her.
+  and her face changing to the beat. While music plays, Alter Ego's window shrinks and she puts on her headphones.
+- **Music Venue**: a small library with recently played tracks and favorites, search and replay.
+- **Talk to the app**: "open music venue", "close the audio player", "open the website", "check for updates"… everything about the app can be done by asking her.
+- **Mouse and keyboard**: if you allow it, Alter Ego moves the cursor, clicks, types and presses keys (with confirmation and an emergency stop).
+- **Noise suppression** for the Mic-Link microphone (RNNoise, adjustable).
+- **Updates**: website and GitHub links in the app and a button to update to the latest release.
 - **Web search** with DeepSeek's Search and Fetch APIs, when up-to-date information is needed.
 - **Costs panel**: every request with tokens, cache, duration and cost; daily/monthly totals and per-model summary, editable prices, CSV export.
 - **Terminal**: Alter Ego can run PowerShell or cmd commands, with confirmation or autonomously.
@@ -211,6 +216,9 @@ How it works: Alter Ego reads your microphone and writes the microphone mixed wi
 If you hear nothing after installing VB-CABLE, Windows made it the default output: switch back to your speakers
 in *Windows Settings → System → Sound* (Alter Ego's settings warn you about it).
 
+**Noise suppression**: *Mic-Link → Noise suppression* cleans your microphone (fans, keyboard, traffic) with RNNoise, locally.
+*Strength* sets how much noise is removed; *Voice threshold* lowers the microphone when nobody is talking (0 = never).
+
 ## Music
 
 Turn on **Music** in *Settings → Permissions*, then ask Alter Ego "play *A Cruel Angel's Thesis*" (by voice or text).
@@ -233,6 +241,12 @@ You can also say "add … to the queue", "pause", "next", "previous", "volume to
 - Drag it wherever you like; it remembers its position. Space = play/pause, arrows = ±5 seconds. ✕ stops the music.
 - Music plays on the same device as the voice and gets quieter by itself while Alter Ego talks. With Mic-Link you can also
   send it to the virtual microphone (*The player's music too*).
+- **Headphones**: while music plays and nobody is talking to her, Alter Ego wears headphones and sways to the music;
+  when you ask her something she goes back to her usual expressions. Can be turned off in *Voice & audio → Music*.
+- The player **resizes** from its bottom-right corner (or Ctrl + wheel) and opens **next to Alter Ego without covering her**.
+  Volume follows a curve (half way ≈ normal listening volume, maximum lower than before) and moves in 2% steps with the wheel or ↑ ↓.
+- **Music Venue** (button in the player, the tray menu, or "open music venue"): recent tracks and favorites with covers,
+  search in your library or on YouTube, play or queue with one click, heart to add to favorites. Saved in `music_library.json`.
 - Use YouTube in accordance with its terms of service: this is meant for personal listening.
 
 ## Web search
@@ -300,6 +314,8 @@ an action before you see it, so only turn it on with actions and folders you're 
 | **Terminal**: PowerShell or cmd commands written by Alter Ego (120 s timeout) | ⚠ always, or **autonomous**; destructive commands still ask |
 | Web search (DeepSeek Search/Fetch) | no |
 | Music (YouTube) | no |
+| **Mouse and keyboard**: move, click, scroll, type, press keys | ⚠ every action, or **autonomous**; mouse in the top-left corner = stop |
+| **App commands** ("open music venue", "close the player"…), only Alter Ego itself, **on by default** | no (updating always asks) |
 
 Every action, even a denied one, goes to **Settings → Log**. Technical details (in Italian) in [docs/PERMESSI.md](docs/PERMESSI.md).
 
@@ -309,6 +325,8 @@ Every action, even a denied one, goes to **Settings → Log**. Technical details
   Edit it as you like: it applies from the next message. Lines starting with `>` are notes and are not sent to the model.
 - **Personality**: shy ↔ confident and formal ↔ affectionate sliders, **imitation mode** (write who to imitate),
   answer language: automatic (same as the interface), Italian only, Italian + English, English only.
+- **Unfiltered** (off by default): she does what you ask even if she disagrees, without lectures. PC actions still go through
+  permissions and confirmations, and your AI provider's own rules still apply.
 - **Memory** (SQLite, only on your PC):
   - every message sends the latest messages, a summary and the facts she knows about you;
   - from time to time she summarizes old conversations and learns lasting facts about you;

@@ -152,8 +152,47 @@ pub fn tool_defs(p: &Permissions) -> Option<Value> {
         t.push(func(
             "music_control",
             "Controlla il lettore musicale.",
-            obj(json!({ "action": { "type": "string", "enum": ["pause", "resume", "next", "previous", "stop", "volume", "status"] },
+            obj(json!({ "action": { "type": "string", "enum": ["pause", "resume", "next", "previous", "stop", "volume", "status", "favorite", "unfavorite"] },
                         "value": { "type": "number", "description": "volume 0-100 (solo per volume)" } }), &["action"]),
+        ));
+    }
+    if p.input {
+        let (gw, gh, _) = input::grid();
+        let grid = format!("Coordinate x,y nella griglia {gw}x{gh} (la stessa dello screenshot; 0,0 = in alto a sinistra).");
+        let xy = json!({ "x": { "type": "integer" }, "y": { "type": "integer" } });
+        t.push(func("mouse_move", &format!("Sposta il cursore del mouse. {grid}"), obj(xy.clone(), &["x", "y"])));
+        t.push(func(
+            "mouse_click",
+            &format!("Clicca con il mouse (se dai x,y prima ci si sposta). {grid}"),
+            obj(json!({ "x": { "type": "integer" }, "y": { "type": "integer" },
+                        "button": { "type": "string", "enum": ["left", "right", "middle"] },
+                        "double": { "type": "boolean" } }), &[]),
+        ));
+        t.push(func(
+            "mouse_scroll",
+            "Gira la rotella del mouse dove si trova il cursore. Positivo = su/destra, negativo = giù/sinistra.",
+            obj(json!({ "clicks": { "type": "integer", "minimum": -30, "maximum": 30 }, "horizontal": { "type": "boolean" } }), &["clicks"]),
+        ));
+        t.push(func(
+            "type_text",
+            "Scrive un testo nella finestra in primo piano, come dalla tastiera (\\n = Invio). Prima clicca dove scrivere.",
+            obj(json!({ "text": { "type": "string" } }), &["text"]),
+        ));
+        t.push(func(
+            "press_keys",
+            "Preme un tasto o una combinazione (es. \"Ctrl+S\", \"Alt+Tab\", \"Enter\", \"Win+D\").",
+            obj(json!({ "keys": { "type": "string" } }), &["keys"]),
+        ));
+    }
+    if p.app_control {
+        t.push(func(
+            "app_control",
+            "Controlla l'app Alter Ego stessa (non il PC): finestre, lettore musicale, Music Venue, aspetto, link, aggiornamenti, impostazioni. \
+Usalo quando l'utente chiede qualcosa sull'app (es. \"apri music venue\", \"chiudi il lettore audio\", \"ingrandisci il lettore\", \"apri il sito\", \"aggiorna\").",
+            obj(json!({
+                "action": { "type": "string", "enum": crate::appctl::ACTIONS },
+                "value": { "type": "number", "description": "solo per opacity (20-100) e player_size (420-1200 px)" }
+            }), &["action"]),
         ));
     }
     if t.is_empty() { None } else { Some(Value::Array(t)) }
@@ -206,7 +245,7 @@ async fn ask_user(app: &AppHandle, id: u64, text: String, rx: oneshot::Receiver<
 }
 
 /// Conferma che vale anche con "Non chiedere conferma" (comandi distruttivi).
-async fn confirm_always(app: &AppHandle, text: String) -> bool {
+pub async fn confirm_always(app: &AppHandle, text: String) -> bool {
     let actions = app.state::<Actions>();
     let id = actions.next_id.fetch_add(1, Ordering::SeqCst);
     let (tx, rx) = oneshot::channel();
@@ -501,7 +540,8 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             if let Some(w) = &win {
                 let _ = w.show();
             }
-            (String::new(), shot.map(|b64| Outcome { text: "Screenshot fatto: è nel messaggio successivo.".into(), image: Some(b64) }))
+            let (gw, gh, _) = input::grid();
+            (String::new(), shot.map(|b64| Outcome { text: format!("Screenshot fatto ({gw}x{gh}): è nel messaggio successivo. Le coordinate degli strumenti mouse usano questa griglia."), image: Some(b64) }))
         }
         "set_volume" => {
             need!(p.volume);
@@ -605,8 +645,100 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             let value = a.get("value").and_then(Value::as_f64);
             (action.clone(), crate::music::control(app, &action, value).await.map(Outcome::text))
         }
+        "mouse_move" | "mouse_click" | "mouse_scroll" | "type_text" | "press_keys" => {
+            need!(p.input);
+            pointer_action(app, p, name, a).await
+        }
+        "app_control" => {
+            need!(p.app_control);
+            let action = arg(a, "action").to_string();
+            let value = a.get("value").and_then(Value::as_f64);
+            (action.clone(), crate::appctl::run(app, &action, value).await.map(Outcome::text))
+        }
         other => (String::new(), Err(format!("strumento sconosciuto: {other}"))),
     }
+}
+
+// ---------- mouse e tastiera ----------
+
+/// Mouse e tastiera: conferma (salvo "senza conferma"), angolo di emergenza, finestra giusta.
+async fn pointer_action(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String, Result<Outcome, String>) {
+    use input::pointer;
+    let (gw, gh, f) = input::grid();
+    let xy = || -> Option<(i32, i32)> {
+        let x = a.get("x").and_then(Value::as_i64)?;
+        let y = a.get("y").and_then(Value::as_i64)?;
+        Some(((x.clamp(0, gw as i64 - 1) as f64 * f) as i32, (y.clamp(0, gh as i64 - 1) as f64 * f) as i32))
+    };
+    // angolo di emergenza: cursore in alto a sinistra = fermati
+    let (cx, cy) = pointer::cursor();
+    if cx <= 2 && cy <= 2 {
+        return (String::new(), Err(crate::i18n::tr(
+            "FERMATO dall'utente (mouse nell'angolo in alto a sinistra): non usare più mouse e tastiera in questa risposta",
+            "STOPPED by the user (mouse in the top-left corner): do not use mouse and keyboard again in this answer",
+        ).into()));
+    }
+    let text = arg(a, "text").to_string();
+    let keys = arg(a, "keys").to_string();
+    let button = match arg(a, "button") { "right" => "right", "middle" => "middle", _ => "left" };
+    let double = a.get("double").and_then(Value::as_bool).unwrap_or(false);
+    let clicks = a.get("clicks").and_then(Value::as_i64).unwrap_or(-3).clamp(-30, 30) as i32;
+    let horizontal = a.get("horizontal").and_then(Value::as_bool).unwrap_or(false);
+    let at = |o: Option<(i32, i32)>| o.map(|_| format!(" ({}, {})", a["x"], a["y"])).unwrap_or_default();
+    let (detail, question) = match name {
+        "mouse_move" => (format!("move{}", at(xy())), crate::tr!("Spostare il mouse{}?", "Move the mouse{}?", at(xy()))),
+        "mouse_click" => (
+            format!("{button}{}{}", if double { " x2" } else { "" }, at(xy())),
+            crate::tr!("Cliccare ({button}{}){}?", "Click ({button}{}){}?", if double { ", doppio" } else { "" }, at(xy())),
+        ),
+        "mouse_scroll" => (format!("scroll {clicks}"), crate::tr!("Scorrere con la rotella ({clicks})?", "Scroll the wheel ({clicks})?")),
+        "type_text" => (short(&text, 80), crate::tr!("Scrivere questo testo?\n{}", "Type this text?\n{}", short(&text, 400))),
+        _ => (keys.clone(), crate::tr!("Premere {keys}?", "Press {keys}?")),
+    };
+    if name == "type_text" && text.is_empty() {
+        return (detail, Err("testo vuoto".into()));
+    }
+    // la conferma porta in primo piano Alter Ego: poi si rimette la finestra di prima
+    let fg = pointer::foreground();
+    if !p.input_autonomous {
+        if !confirm(app, crate::tr!("🖱 {question}\n(mouse nell'angolo in alto a sinistra = stop)", "🖱 {question}\n(mouse in the top-left corner = stop)")).await {
+            return (detail, Err("l'utente ha negato il permesso".into()));
+        }
+        pointer::set_foreground(fg);
+        tokio::time::sleep(Duration::from_millis(180)).await;
+    }
+    if matches!(name, "type_text" | "press_keys") && pointer::foreground_is_ours() && xy().is_none() {
+        return (detail, Err(crate::i18n::tr(
+            "in primo piano c'è la finestra di Alter Ego: prima clicca sulla finestra dove scrivere",
+            "Alter Ego's window is in the foreground: first click on the window to type into",
+        ).into()));
+    }
+    let r = tauri::async_runtime::spawn_blocking({
+        let (name, text, keys) = (name.to_string(), text.clone(), keys.clone());
+        let pos = xy();
+        move || -> Result<String, String> {
+            match name.as_str() {
+                "mouse_move" => {
+                    let (x, y) = pos.ok_or("servono x e y")?;
+                    pointer::move_to(x, y).map(|_| "Cursore spostato.".into())
+                }
+                "mouse_click" => {
+                    if let Some((x, y)) = pos {
+                        pointer::move_to(x, y)?;
+                        std::thread::sleep(Duration::from_millis(60));
+                    }
+                    pointer::click(button, double).map(|_| "Clic fatto.".into())
+                }
+                "mouse_scroll" => pointer::scroll(clicks, horizontal).map(|_| "Scorrimento fatto.".into()),
+                "type_text" => pointer::type_text(&text).map(|_| format!("Scritti {} caratteri.", text.chars().count())),
+                _ => input::send_combo(&keys).map(|_| format!("Premuto {keys}.")),
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())
+    .and_then(|r| r);
+    (detail, r.map(Outcome::text))
 }
 
 // ---------- promemoria ----------
@@ -639,7 +771,7 @@ mod tests {
 
     #[test]
     fn tools_only_when_enabled() {
-        let mut p = Permissions::default();
+        let mut p = Permissions { app_control: false, ..Default::default() };
         assert!(tool_defs(&p).is_none());
         p.files = true; // senza cartelle: niente strumenti file
         assert!(tool_defs(&p).is_none());

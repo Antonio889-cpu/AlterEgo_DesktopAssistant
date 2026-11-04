@@ -169,12 +169,14 @@ function fillPersona(cfg) {
   $("confidence").value = cfg.personality.confidence;
   $("warmth").value = cfg.personality.warmth;
   $("imitate").value = cfg.personality.imitate;
+  $("unfiltered").checked = !!cfg.personality.unfiltered;
   $("memory-enabled").checked = cfg.memory_enabled;
 }
 $("language").onchange = (e) => { persona.language = e.target.value; savePersona(); };
 $("confidence").oninput = (e) => { persona.personality.confidence = +e.target.value; savePersona(); };
 $("warmth").oninput = (e) => { persona.personality.warmth = +e.target.value; savePersona(); };
 $("imitate").oninput = (e) => { persona.personality.imitate = e.target.value; savePersona(); };
+$("unfiltered").onchange = (e) => { persona.personality.unfiltered = e.target.checked; savePersona(); };
 $("memory-enabled").onchange = (e) => { persona.memoryEnabled = e.target.checked; savePersona(); };
 $("open-data").onclick = () => invoke("open_data_dir").catch((e) => alert(e));
 
@@ -451,6 +453,10 @@ function fillAudio(cfg) {
   $("link-voice-vol").value = ml.voice_volume;
   $("link-blips").checked = ml.include_blips;
   $("link-music").checked = !!ml.include_music;
+  $("ns-enabled").checked = !!ml.noise_suppression;
+  $("ns-strength").value = ml.ns_strength ?? 0.9;
+  $("ns-gate").value = ml.ns_gate ?? 0.3;
+  nsLabels();
   fillVoices();
   ttsRows();
   refreshDevices().then(refreshAudioStatus);
@@ -498,14 +504,24 @@ $("link-mic-vol").oninput = (e) => { audio.mic_link.mic_volume = +e.target.value
 $("link-voice-vol").oninput = (e) => { audio.mic_link.voice_volume = +e.target.value; saveAudio(); };
 $("link-blips").onchange = (e) => { audio.mic_link.include_blips = e.target.checked; saveAudio(); };
 $("link-music").onchange = (e) => { audio.mic_link.include_music = e.target.checked; saveAudio(); };
+function nsLabels() {
+  $("ns-strength-val").textContent = Math.round($("ns-strength").value * 100) + "%";
+  $("ns-gate-val").textContent = +$("ns-gate").value === 0 ? t("spenta") : Math.round($("ns-gate").value * 100) + "%";
+}
+$("ns-enabled").onchange = (e) => { audio.mic_link.noise_suppression = e.target.checked; saveAudio(); };
+$("ns-strength").oninput = (e) => { audio.mic_link.ns_strength = +e.target.value; nsLabels(); saveAudio(); };
+$("ns-gate").oninput = (e) => { audio.mic_link.ns_gate = +e.target.value; nsLabels(); saveAudio(); };
 
 // ---------- musica ----------
 function fillMusic(cfg) {
   $("music-lyrics").checked = cfg.music.lyrics;
   $("music-reactive").checked = cfg.music.reactive_sprite;
   $("music-compact").checked = cfg.music.compact !== false;
+  $("music-sprite").checked = cfg.music.music_sprite !== false;
 }
-const saveMusic = () => invoke("music_settings", { lyrics: $("music-lyrics").checked, reactiveSprite: $("music-reactive").checked, compact: $("music-compact").checked });
+const saveMusic = () => invoke("music_settings", { lyrics: $("music-lyrics").checked, reactiveSprite: $("music-reactive").checked, compact: $("music-compact").checked, musicSprite: $("music-sprite").checked });
+$("music-sprite").onchange = saveMusic;
+$("open-venue").onclick = () => invoke("venue_open");
 $("music-lyrics").onchange = saveMusic;
 $("music-compact").onchange = saveMusic;
 $("music-reactive").onchange = saveMusic;
@@ -782,6 +798,24 @@ function fillPerms(cfg) {
   });
   document.querySelectorAll(".list[data-list]").forEach(renderList);
 }
+
+// ---------- info e aggiornamenti ----------
+invoke("app_version").then((v) => { $("app-version").textContent = v; }).catch(() => {});
+$("link-site").onclick = () => invoke("open_link_cmd", { which: "site" });
+$("link-github").onclick = () => invoke("open_link_cmd", { which: "github" });
+function updResult(text, bad = false) { $("update-result").textContent = text; $("update-result").className = bad ? "result bad" : "result"; }
+$("update-check").onclick = async () => {
+  updResult(t("Controllo…"));
+  try {
+    const i = await invoke("update_check");
+    $("update-install").hidden = !i.newer;
+    updResult(i.newer ? t("Disponibile la versione {v} (hai la {c}).", { v: i.latest, c: i.current }) : t("Sei all'ultima versione ({c}).", { c: i.current }));
+  } catch (e) { updResult(String(e), true); }
+};
+$("update-install").onclick = async () => {
+  try { updResult(await invoke("update_install")); } catch (e) { updResult(String(e), true); }
+};
+listen("update-status", (e) => { if (e.payload) updResult(e.payload); });
 
 // ---------- registro ----------
 async function refreshLog() {

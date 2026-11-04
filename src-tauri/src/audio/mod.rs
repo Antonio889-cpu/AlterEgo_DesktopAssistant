@@ -9,6 +9,7 @@
 //! cambiano i dispositivi. I callback leggono da code condivise (mono, f32, al rate del dispositivo).
 
 pub mod commands;
+pub mod denoise;
 pub mod kokoro;
 #[cfg(windows)]
 pub mod rename;
@@ -86,6 +87,8 @@ struct Shared {
     /// Microfono già ricampionato al rate del cavo.
     mic: Mutex<VecDeque<f32>>,
     gains: Mutex<LinkGains>,
+    /// Riduzione del rumore del microfono (letta dal vivo dal callback).
+    ns: Mutex<denoise::Params>,
     status: Mutex<Status>,
     music_paused: AtomicBool,
     /// Volume musica (f32 in bit).
@@ -155,6 +158,8 @@ impl AudioEngine {
         let ml = &a.mic_link;
         *self.shared.gains.lock().unwrap() =
             LinkGains { mic: ml.mic_volume as f32, voice: ml.voice_volume as f32, blips: ml.include_blips, music: ml.include_music };
+        *self.shared.ns.lock().unwrap() =
+            denoise::Params { enabled: ml.noise_suppression, strength: ml.ns_strength as f32, gate: ml.ns_gate as f32 };
         let setup = Setup {
             output: a.output_device.clone(),
             link: ml.enabled.then(|| (ml.mic_device.clone(), ml.cable_device.clone())),
@@ -541,6 +546,12 @@ fn open_mic(name: &str, link_rate: u32, sh: Arc<Shared>) -> Result<(String, cpal
     let channels = config.channels() as usize;
     let max = (link_rate as f32 * MIC_MAX_SECONDS) as usize;
     let mut rs = Resampler::new(rate, link_rate);
+    // con la riduzione del rumore: microfono → 48 kHz → RNNoise → rate del cavo
+    let mut rs48 = Resampler::new(rate, denoise::RATE);
+    let mut rs_out = Resampler::new(denoise::RATE, link_rate);
+    let mut den = denoise::Denoiser::default();
+    let mut buf48 = VecDeque::<f32>::new();
+    let mut clean = Vec::<f32>::new();
     let mut mono = Vec::<f32>::new();
     let mut on_data = move |frames: &mut dyn Iterator<Item = f32>| {
         mono.clear();
@@ -552,8 +563,17 @@ fn open_mic(name: &str, link_rate: u32, sh: Arc<Shared>) -> Result<(String, cpal
                 acc = 0.0;
             }
         }
+        let ns = *sh.ns.lock().unwrap();
         let mut q = sh.mic.lock().unwrap();
-        rs.push(&mono, &mut q);
+        if ns.enabled {
+            buf48.clear();
+            rs48.push(&mono, &mut buf48);
+            clean.clear();
+            den.process(buf48.make_contiguous(), ns, &mut clean);
+            rs_out.push(&clean, &mut q);
+        } else {
+            rs.push(&mono, &mut q);
+        }
         let len = q.len();
         if len > max {
             q.drain(..len - max);

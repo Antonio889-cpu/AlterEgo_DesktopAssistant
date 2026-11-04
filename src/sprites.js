@@ -11,6 +11,8 @@ window.SPRITES = {
     sad: "sad.png",
     surprised: "surprised.png",
     error: "error.png",
+    // con le cuffie: mentre suona la musica (finestra principale, quando Alter Ego non sta parlando)
+    music: "music.png",
   },
   alias: {
     listening: "idle",

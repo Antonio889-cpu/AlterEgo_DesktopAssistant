@@ -187,6 +187,39 @@ body.fx #screen::after {
 #face.talking .face-placeholder span { animation: talk-bob .26s steps(2) infinite; display: inline-block; }
 #face.talking img.on { animation: talk-bob .26s steps(2) infinite; }
 @keyframes talk-bob { 50% { transform: translateY(-0.6%); } }
+/* con le cuffie durante la musica: dondola a tempo e fa uscire qualche nota */
+#face.groove img.on { animation: groove 1.7s ease-in-out infinite; transform-origin: 50% 85%; }
+@keyframes groove {
+  0%, 100% { transform: rotate(-1.6deg) translateY(0); }
+  25% { transform: rotate(0deg) translateY(-1.2%); }
+  50% { transform: rotate(1.6deg) translateY(0); }
+  75% { transform: rotate(0deg) translateY(-1.2%); }
+}
+#face.swap-glitch { animation: face-glitch .32s steps(1) both; }
+@keyframes face-glitch {
+  0% { filter: drop-shadow(-.6vh 0 rgba(255, 40, 110, .8)) drop-shadow(.6vh 0 rgba(40, 240, 255, .8)); transform: translateX(-52%); clip-path: inset(0 0 55% 0); }
+  25% { transform: translateX(-48%) skewX(6deg); clip-path: inset(45% 0 0 0); }
+  50% { filter: brightness(1.8); transform: translateX(-51%); clip-path: inset(0); }
+  75% { filter: none; transform: translateX(-50%); }
+  100% { filter: none; transform: translateX(-50%); clip-path: none; }
+}
+#notes { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: hidden; display: none; }
+body.grooving #notes { display: block; }
+#notes span {
+  position: absolute; bottom: 30%; font-family: "DotGothic16", monospace; font-size: 7vh; color: #f2ff8a; opacity: 0;
+  text-shadow: 0 0 1vh rgba(230, 255, 120, .9); animation: note-up 3.6s ease-out infinite;
+}
+#notes span:nth-child(1) { left: 22%; animation-delay: 0s; }
+#notes span:nth-child(2) { left: 74%; animation-delay: 1.2s; font-size: 5.5vh; }
+#notes span:nth-child(3) { left: 30%; animation-delay: 2.4s; font-size: 5vh; }
+#notes span:nth-child(4) { left: 68%; animation-delay: 3s; }
+@keyframes note-up {
+  0% { opacity: 0; transform: translate(0, 0) rotate(-10deg); }
+  15% { opacity: .9; }
+  60% { opacity: .7; transform: translate(2vh, -22vh) rotate(8deg); }
+  100% { opacity: 0; transform: translate(-1vh, -40vh) rotate(-6deg); }
+}
+@media (prefers-reduced-motion: reduce) { #face.groove img.on, #notes span { animation: none; } }
 body[data-mode="sleep"] #face { opacity: .55; }
 body[data-mode="sleep"] #face img.on { animation: breathe 4s ease-in-out infinite; }
 @keyframes breathe { 50% { transform: translateY(0.8%); } }

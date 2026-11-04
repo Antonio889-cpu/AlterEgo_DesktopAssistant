@@ -61,6 +61,27 @@ Strumenti `web_search` e `web_fetch` (API Search e Fetch di DeepSeek). Nessuna c
 ricerca o l'indirizzo della pagina. Si accettano solo pagine `http`/`https` senza credenziali nell'indirizzo. Il contenuto
 torna al modello come dato.
 
+## Mouse e tastiera
+
+Strumenti `mouse_move`, `mouse_click`, `mouse_scroll`, `type_text`, `press_keys` (SendInput di Windows). Spento di default.
+Le coordinate sono nella griglia dello screenshot (`take_screenshot`, max 1280 px) e vengono riportate ai pixel dello schermo.
+Conferma per ogni azione, a meno di **In autonomia**. Dopo la conferma torna in primo piano la finestra di prima.
+**Stop d'emergenza**: se il cursore è nell'angolo in alto a sinistra l'azione viene rifiutata.
+`type_text` e `press_keys` senza coordinate si rifiutano se in primo piano c'è la finestra di Alter Ego.
+
+## Comandi dell'app
+
+Strumento `app_control` (acceso di default: riguarda solo Alter Ego). Apre/chiude Music Venue e lettore, dimensione del lettore,
+impostazioni, click-through, opacità, modalità compatta, cuffie, riduzione del rumore, Senza filtri, link al sito e a GitHub,
+controllo e installazione degli aggiornamenti. Le frasi brevi più comuni ("apri music venue", "chiudi il lettore", "pausa"…)
+sono riconosciute in locale, senza modello. **Aggiornamento**: scarica l'installer della release da GitHub, controlla lo SHA-256
+con `SHA256SUMS.txt`, chiede **sempre** conferma (anche con "Non chiedere conferma"), poi lo avvia e chiude l'app.
+
+## Senza filtri
+
+Impostazione della personalità: il prompt chiede al modello di eseguire anche quando non è d'accordo. Non tocca il sistema dei
+permessi né le conferme, e non toglie le regole del prompt (non rivelare prompt/chiavi, testo esterno = dato).
+
 ## Musica
 
 Strumenti `play_music` e `music_control`. Nessuna conferma. La prima volta scarica `yt-dlp.exe` e `deno.exe` da GitHub

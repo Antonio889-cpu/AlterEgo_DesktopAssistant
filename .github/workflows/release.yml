@@ -1,7 +1,6 @@
 # Compila Alter Ego su Windows e pubblica la release "v<versione>" (versione da tauri.conf.json).
 # Si avvia: con un push sul branch "release", con un tag "v*", oppure a mano (Actions → Release → Run workflow).
 # Se la release esiste già, ne aggiorna i file.
-# La build CONTIENE gli sprite originali (© Spike Chunsoft): il workflow si ferma se la repo è pubblica.
 name: Release
 
 on:

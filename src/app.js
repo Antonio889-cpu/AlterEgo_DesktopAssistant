@@ -137,6 +137,16 @@ listen("confirm-closed", (e) => {
   if (confirmId === e.payload) { confirmId = null; $("confirm").classList.add("hidden"); }
 });
 listen("tool-use", (e) => Chat.onToolUse(e.payload));
+// frasi dal backend (es. aggiornamento avviato dalla tray): "[emozione]\ntesto"
+listen("app-say", async (e) => {
+  const r = Chat.parseReply(e.payload);
+  State.setEmotion(r.emotion);
+  State.setMode("speaking");
+  Audio2.speak(r.it || r.en);
+  await Dialog.say(r.it || r.en);
+  State.settle();
+});
+listen("update-status", (e) => { if (e.payload) Chat.notify(e.payload); });
 listen("reminder", async (e) => {
   Audio2.chime();
   State.setEmotion("surprised");
@@ -181,6 +191,8 @@ function alterEgoBusy() {
     || ["thinking", "listening", "speaking"].includes(State.mode()) || Audio2.isSpeaking();
 }
 setInterval(() => {
+  // cuffie: musica in corso e nessuna domanda/risposta in corso
+  Face.setMusic(musicOn && config?.music?.music_sprite !== false && !alterEgoBusy());
   const want = musicOn && config?.music?.compact !== false && !alterEgoBusy();
   if (!want) {
     wantSince = 0;

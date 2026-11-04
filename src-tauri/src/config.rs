@@ -119,11 +119,13 @@ pub struct Personality {
     pub warmth: f64,
     /// Modalità imitazione: nome della persona da imitare (vuoto = spenta).
     pub imitate: String,
+    /// "Senza filtri": fa ciò che le chiedi anche se non è d'accordo (permessi e conferme restano).
+    pub unfiltered: bool,
 }
 
 impl Default for Personality {
     fn default() -> Self {
-        Self { confidence: 0.3, warmth: 0.7, imitate: String::new() }
+        Self { confidence: 0.3, warmth: 0.7, imitate: String::new(), unfiltered: false }
     }
 }
 
@@ -158,7 +160,7 @@ pub struct Named {
 }
 
 /// Permessi delle azioni sul PC: tutto spento di default (vedi docs/PERMESSI.md).
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct Permissions {
     pub open: bool,
@@ -182,6 +184,38 @@ pub struct Permissions {
     pub web: bool,
     /// Cerca musica su YouTube e la riproduce.
     pub music: bool,
+    /// Mouse e tastiera: Alter Ego muove il cursore, clicca, scrive e preme tasti.
+    pub input: bool,
+    /// Mouse e tastiera senza conferma per ogni azione.
+    pub input_autonomous: bool,
+    /// Comandi dell'app a voce/testo ("apri Music Venue", "chiudi il lettore"…). Riguardano solo
+    /// Alter Ego, non il PC: acceso di default.
+    pub app_control: bool,
+}
+
+impl Default for Permissions {
+    fn default() -> Self {
+        Self {
+            open: false,
+            open_allowlist: Vec::new(),
+            files: false,
+            folders: Vec::new(),
+            reminders: false,
+            clipboard: false,
+            screen: false,
+            volume: false,
+            shell: false,
+            commands: Vec::new(),
+            auto_approve: false,
+            terminal: false,
+            terminal_autonomous: false,
+            web: false,
+            music: false,
+            input: false,
+            input_autonomous: false,
+            app_control: true,
+        }
+    }
 }
 
 /// Prezzo di un modello o servizio, in dollari. `model` vuoto = tutti i modelli del provider;
@@ -223,6 +257,7 @@ pub fn default_prices() -> Vec<Price> {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
 pub struct MusicConfig {
+    /// Posizione del cursore del volume (0–1); il guadagno vero segue una curva (vedi music::gain).
     pub volume: f64,
     pub shuffle: bool,
     /// "off", "one" (ripete il brano), "all" (ripete la coda).
@@ -235,11 +270,28 @@ pub struct MusicConfig {
     pub player_pos: Option<(i32, i32)>,
     /// Durante la musica la finestra di Alter Ego si rimpicciolisce (torna grande quando parla o scrivi).
     pub compact: bool,
+    /// Larghezza del lettore in px logici (si ridimensiona mantenendo le proporzioni).
+    pub player_width: f64,
+    /// Posizione della Music Venue (pixel fisici).
+    pub venue_pos: Option<(i32, i32)>,
+    /// Sprite "con le cuffie" nella finestra principale mentre suona la musica.
+    pub music_sprite: bool,
 }
 
 impl Default for MusicConfig {
     fn default() -> Self {
-        Self { volume: 0.7, shuffle: false, repeat: "off".into(), lyrics: true, reactive_sprite: true, player_pos: None, compact: true }
+        Self {
+            volume: 0.6,
+            shuffle: false,
+            repeat: "off".into(),
+            lyrics: true,
+            reactive_sprite: true,
+            player_pos: None,
+            compact: true,
+            player_width: 600.0,
+            venue_pos: None,
+            music_sprite: true,
+        }
     }
 }
 
@@ -292,11 +344,28 @@ pub struct MicLink {
     pub include_blips: bool,
     /// Anche la musica del lettore finisce nel microfono virtuale.
     pub include_music: bool,
+    /// Riduzione del rumore del microfono (RNNoise), solo sul microfono di Mic-Link.
+    pub noise_suppression: bool,
+    /// Quanto rumore togliere: 0 = niente, 1 = tutto quello che il modello trova.
+    pub ns_strength: f64,
+    /// Soglia voce (0–1): sotto questa probabilità di voce il microfono si abbassa (gate).
+    pub ns_gate: f64,
 }
 
 impl Default for MicLink {
     fn default() -> Self {
-        Self { enabled: false, mic_device: String::new(), cable_device: String::new(), mic_volume: 1.0, voice_volume: 0.9, include_blips: false, include_music: false }
+        Self {
+            enabled: false,
+            mic_device: String::new(),
+            cable_device: String::new(),
+            mic_volume: 1.0,
+            voice_volume: 0.9,
+            include_blips: false,
+            include_music: false,
+            noise_suppression: false,
+            ns_strength: 0.9,
+            ns_gate: 0.3,
+        }
     }
 }
 
@@ -453,6 +522,8 @@ impl Config {
         let ml = &mut self.audio.mic_link;
         ml.mic_volume = ml.mic_volume.clamp(0.0, 2.0);
         ml.voice_volume = ml.voice_volume.clamp(0.0, 1.5);
+        ml.ns_strength = ml.ns_strength.clamp(0.0, 1.0);
+        ml.ns_gate = ml.ns_gate.clamp(0.0, 0.95);
         self.audio.blip_volume = self.audio.blip_volume.clamp(0.0, 1.0);
         self.audio.tts_volume = self.audio.tts_volume.clamp(0.0, 1.0);
         self.audio.tts_rate = self.audio.tts_rate.clamp(0.5, 2.0);
@@ -476,6 +547,7 @@ pub fn load(path: &Path) -> Config {
             cfg.ai.normalize();
             cfg.normalize_voice();
             cfg.auto_advance_secs = cfg.auto_advance_secs.clamp(0.5, 30.0);
+            cfg.music.player_width = cfg.music.player_width.clamp(crate::music::PLAYER_MIN_W, crate::music::PLAYER_MAX_W);
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {
                 cfg.background = "both".into();
             }

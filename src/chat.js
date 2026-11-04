@@ -141,7 +141,8 @@ const Chat = (() => {
       delete_file: "elimino il file", set_reminder: "imposto il promemoria", list_reminders: "controllo i promemoria",
       cancel_reminder: "annullo il promemoria", read_clipboard: "leggo gli appunti", write_clipboard: "copio negli appunti",
       take_screenshot: "guardo lo schermo", set_volume: "regolo il volume", set_brightness: "regolo la luminosità", run_command: "eseguo il comando",
-      run_shell: "uso il terminale", web_search: "cerco sul web", web_fetch: "leggo la pagina", play_music: "cerco la musica", music_control: "controllo la musica" };
+      run_shell: "uso il terminale", web_search: "cerco sul web", web_fetch: "leggo la pagina", play_music: "cerco la musica", music_control: "controllo la musica",
+      mouse_move: "muovo il mouse", mouse_click: "clicco", mouse_scroll: "scorro", type_text: "scrivo", press_keys: "premo i tasti", app_control: "sistemo l'app" };
     State.setMode("thinking");
     Dialog.pending("⚙ " + names.map((n) => t(labels[n] || n)).join(", "));
   }

@@ -1,5 +1,6 @@
 /* Lettore musicale: stessa estetica CRT della finestra principale (cornice chiara con glow,
-   schermo verde con scanline), impaginazione ispirata alla reference. Finestra fissa 600×248. */
+   schermo verde con scanline), impaginazione ispirata alla reference. Disegnato a 600×248:
+   la finestra si ridimensiona e il contenuto si scala (zoom impostato da player.js). */
 
 @font-face {
   font-family: "DotGothic16";
@@ -193,7 +194,7 @@ html, body {
   height: 52px;
   display: flex;
   align-items: center;
-  gap: 26px;
+  gap: 24px;
   z-index: 2;
 }
 button {
@@ -236,7 +237,8 @@ body.paused #i-pause { display: none; }
 #vol { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 #vol-icon { width: 24px; height: 24px; fill: none; stroke: var(--accent); stroke-width: 1.9; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--glow)); }
 #vol-icon .solid { fill: var(--accent); stroke: none; }
-#volume { -webkit-appearance: none; appearance: none; width: 118px; height: 14px; background: transparent; cursor: pointer; }
+#volume { -webkit-appearance: none; appearance: none; width: 112px; height: 14px; background: transparent; cursor: pointer; }
+#vol-val { width: 26px; font-size: 13px; color: var(--accent); text-align: right; opacity: .85; }
 #volume::-webkit-slider-runnable-track {
   height: 3px;
   border-radius: 2px;
@@ -285,9 +287,23 @@ body.paused #i-pause { display: none; }
 #lines .l2 { color: var(--text); opacity: .5; }
 #lyrics.none #cursor { opacity: .35; }
 
-/* ---------- chiudi ---------- */
+/* ---------- chiudi, preferito, Venue ---------- */
 #close { position: absolute; right: 9px; top: 9px; z-index: 5; }
 #close svg { width: 20px; height: 20px; stroke-width: 2.2; }
+#topbtns { position: absolute; right: 38px; top: 8px; z-index: 5; display: flex; gap: 10px; }
+#topbtns svg { width: 21px; height: 21px; }
+#b-fav.on svg { fill: var(--accent); }
+#b-fav.pop svg { animation: fav-pop .35s ease-out; }
+@keyframes fav-pop { 40% { transform: scale(1.35); } }
+#b-venue.on svg { fill: rgba(141, 255, 69, .35); }
+
+/* ---------- maniglia di ridimensionamento ---------- */
+#resize {
+  position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; z-index: 20; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 0 55%, var(--accent) 55% 62%, transparent 62% 72%, var(--accent) 72% 79%, transparent 79%);
+  opacity: .55;
+}
+#resize:hover { opacity: 1; }
 
 /* ---------- overlay CRT ---------- */
 #scanlines {

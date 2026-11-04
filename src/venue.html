@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Music Venue</title>
+  <link rel="stylesheet" href="venue.css" />
+  <link rel="stylesheet" href="glitch.css" />
+</head>
+<body class="fx">
+  <div id="panel" class="tv-off">
+    <div id="screen">
+      <!-- colonna sinistra: libreria -->
+      <section id="lib">
+        <header id="head">
+          <div class="icon"><svg viewBox="0 0 24 24"><path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2.5v12a3 3 0 1 1-2-2.83V7.1L9 8.8z" /></svg></div>
+          <div class="titles">
+            <h1 class="gl" data-text="Music Venue">Music Venue</h1>
+            <p>La tua colonna sonora</p>
+          </div>
+        </header>
+        <nav id="tabs">
+          <button data-tab="library" class="on"><svg viewBox="0 0 24 24"><path d="M9 18.5a3 3 0 1 1-2-2.83V5l12-2.5v12a3 3 0 1 1-2-2.83V7.1L9 8.8z" /></svg><span>Libreria</span></button>
+          <button data-tab="recent"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg><span>Recenti</span></button>
+          <button data-tab="favorites"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg><span>Preferiti</span></button>
+          <label id="search"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l5 5" /></svg><input id="q" placeholder="Cerca…" autocomplete="off" spellcheck="false" /></label>
+        </nav>
+        <div id="lists">
+          <div class="box" id="box-recent">
+            <div class="box-head"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg><span>Brani recenti</span><button class="more" data-go="recent">Mostra tutto ›</button></div>
+            <ul class="rows" id="rows-recent"></ul>
+          </div>
+          <div class="box" id="box-fav">
+            <div class="box-head"><svg viewBox="0 0 24 24" class="solid"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></svg><span>Preferiti</span><button class="more" data-go="favorites">Mostra tutto ›</button></div>
+            <ul class="rows" id="rows-fav"></ul>
+          </div>
+          <div class="box" id="box-search" hidden>
+            <div class="box-head"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" /><path d="M15 15l5 5" /></svg><span id="search-title">Risultati</span></div>
+            <ul class="rows" id="rows-search"></ul>
+            <div class="search-yt"><button id="yt-play">▶ Cerca su YouTube e suona</button> <button id="yt-queue">+ In coda</button></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- colonna destra: in riproduzione -->
+      <section id="now">
+        <div id="now-card">
+          <img id="now-face" src="assets/sprites/music.png" alt="" draggable="false" />
+          <div class="box-head"><svg viewBox="0 0 24 24" class="solid"><path d="M5 19V11h3v8zM10.5 19V5h3v14zM16 19v-6h3v6z" /></svg><span>In riproduzione</span></div>
+          <div id="now-body">
+            <div id="now-thumb"><img id="now-img" alt="" /><div class="ph">♪</div></div>
+            <div id="now-meta">
+              <div id="now-title">—</div>
+              <div id="now-artist"></div>
+              <button id="now-fav" title="Aggiungi ai preferiti"><svg viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z" /></svg></button>
+            </div>
+          </div>
+          <div id="now-progress"><div id="now-fill"></div></div>
+          <div id="now-times"><span id="now-pos">0:00</span><span id="now-dur">0:00</span></div>
+          <div id="now-controls">
+            <button id="n-prev" title="Precedente"><svg viewBox="0 0 24 24"><path class="solid" d="M18 5v14L8 12zM6 5h2.5v14H6z" /></svg></button>
+            <button id="n-play" class="big" title="Play / pausa"><svg viewBox="0 0 24 24"><path id="n-i-pause" class="solid" d="M8 6h3v12H8zM13 6h3v12h-3z" /><path id="n-i-play" class="solid" d="M8.5 5.5v13l10-6.5z" /></svg></button>
+            <button id="n-next" title="Successivo"><svg viewBox="0 0 24 24"><path class="solid" d="M6 5v14l10-7zM15.5 5H18v14h-2.5z" /></svg></button>
+          </div>
+          <div id="status"></div>
+        </div>
+        <p class="tip">Puoi anche dirlo ad Alter Ego: «apri music venue», «metti nei preferiti», «chiudi il lettore».</p>
+      </section>
+
+      <button id="close" title="Chiudi" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      <div id="grip" title="Ridimensiona"></div>
+      <div id="scanlines"></div>
+      <div id="vignette"></div>
+      <div class="glitch-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+  <script src="i18n.js"></script>
+  <script src="venue.js"></script>
+</body>
+</html>

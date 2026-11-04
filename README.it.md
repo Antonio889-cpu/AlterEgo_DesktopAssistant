@@ -60,7 +60,12 @@ Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in ingle
 - **Dispositivi audio a scelta**: altoparlanti/cuffie per la voce, microfono per il push-to-talk.
 - **Mic-Link**: microfono virtuale **AlterEgo Link Audio** con la tua voce + quella di Alter Ego, da usare in Discord, OBS, giochi.
 - **Musica**: "metti *titolo*" → Alter Ego cerca su YouTube e suona in un lettore in stile CRT con spettro, testo sincronizzato
-  e il suo volto che cambia a tempo di musica. Mentre suona, la finestra di Alter Ego si rimpicciolisce e torna grande quando parla o le scrivi.
+  e il suo volto che cambia a tempo di musica. Mentre suona, la finestra di Alter Ego si rimpicciolisce e lei mette le cuffie.
+- **Music Venue**: piccola libreria con i brani ascoltati di recente e i preferiti, ricerca e riascolto.
+- **Parla con l'app**: "apri music venue", "chiudi il lettore audio", "apri il sito", "controlla gli aggiornamenti"… tutto ciò che riguarda l'app si fa chiedendolo a lei.
+- **Mouse e tastiera**: se lo permetti, Alter Ego muove il cursore, clicca, scrive e preme tasti (con conferma e stop d'emergenza).
+- **Riduzione del rumore** del microfono di Mic-Link (RNNoise, regolabile).
+- **Aggiornamenti**: link al sito e a GitHub nell'app e un tasto per aggiornare all'ultima release.
 - **Ricerca web** con le API Search e Fetch di DeepSeek, quando serve un'informazione aggiornata.
 - **Pannello Costi**: ogni richiesta con token, cache, durata e costo, totali per giorno/mese e per modello, prezzi modificabili, esportazione CSV.
 - **Terminale**: Alter Ego può eseguire comandi PowerShell o cmd, con conferma o in autonomia.
@@ -212,6 +217,9 @@ Come funziona: Alter Ego legge il tuo microfono e scrive nel lato uscita del cav
 Se dopo l'installazione di VB-CABLE non senti più niente, Windows l'ha messo come uscita predefinita: rimetti i tuoi altoparlanti
 in *Impostazioni di Windows → Sistema → Audio* (le impostazioni di Alter Ego te lo segnalano).
 
+**Riduzione del rumore**: *Mic-Link → Riduzione del rumore* pulisce il microfono (ventole, tastiera, traffico) con RNNoise, in locale.
+*Intensità* regola quanto rumore togliere; *Soglia voce* abbassa il microfono quando nessuno parla (0 = mai).
+
 ## Musica
 
 Attiva **Musica** in *Impostazioni → Permessi*, poi chiedi ad Alter Ego "metti *A Cruel Angel's Thesis*" (a voce o per iscritto).
@@ -234,6 +242,12 @@ Puoi anche dire "metti in coda…", "pausa", "avanti", "indietro", "volume al 40
 - Si trascina dove vuoi e ricorda la posizione. Spazio = play/pausa, frecce = ±5 secondi. La ✕ ferma la musica.
 - La musica esce dallo stesso dispositivo della voce e si abbassa da sola mentre Alter Ego parla. Con Mic-Link puoi mandarla
   anche nel microfono virtuale (*Anche la musica del lettore*).
+- **Cuffie**: mentre suona la musica e nessuno le parla, Alter Ego mette le cuffie e dondola a tempo;
+  quando le chiedi qualcosa torna alle solite espressioni. Si disattiva in *Voce e audio → Musica*.
+- Il lettore si **ridimensiona** dall'angolo in basso a destra (o con Ctrl + rotella) e si apre **accanto ad Alter Ego senza coprirla**.
+  Il volume segue una curva (a metà ≈ volume d'ascolto normale, massimo più basso di prima) e si muove a passi del 2% con rotella o ↑ ↓.
+- **Music Venue** (tasto nel lettore, menu della tray, oppure "apri music venue"): brani recenti e preferiti con copertina,
+  ricerca nella libreria o su YouTube, suona o metti in coda con un clic, cuore per i preferiti. Salvata in `music_library.json`.
 - Usa YouTube nel rispetto dei suoi termini di servizio: è pensato per l'ascolto personale.
 
 ## Ricerca web
@@ -301,6 +315,8 @@ un'azione senza che tu la veda prima, quindi attivalo solo con azioni e cartelle
 | **Terminale**: comandi PowerShell o cmd scritti da Alter Ego (timeout 120 s) | ⚠ sempre, oppure **in autonomia**; i comandi distruttivi chiedono comunque |
 | Ricerca web (DeepSeek Search/Fetch) | no |
 | Musica (YouTube) | no |
+| **Mouse e tastiera**: sposta, clicca, scorre, scrive, preme tasti | ⚠ ogni azione, oppure **in autonomia**; mouse nell'angolo in alto a sinistra = stop |
+| **Comandi dell'app** ("apri music venue", "chiudi il lettore"…), solo Alter Ego stessa, **acceso di default** | no (l'aggiornamento chiede sempre) |
 
 Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli tecnici in [docs/PERMESSI.md](docs/PERMESSI.md).
 
@@ -310,6 +326,8 @@ Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli te
   Le righe che iniziano con `>` sono note e non vengono inviate al modello.
 - **Personalità**: cursori timida ↔ sicura e formale ↔ affettuosa, **modalità imitazione** (scrivi chi imitare),
   lingua delle risposte: solo italiano, italiano + inglese, solo inglese.
+- **Senza filtri** (spento di default): fa quello che chiedi anche se non è d'accordo, senza prediche. Le azioni sul PC passano
+  comunque da permessi e conferme, e restano le regole del provider AI che usi.
 - **Memoria** (SQLite, solo sul tuo PC):
   - a ogni messaggio partono gli ultimi messaggi, un riassunto e i fatti che sa su di te;
   - ogni tanto riassume le conversazioni vecchie e impara fatti duraturi su di te;
