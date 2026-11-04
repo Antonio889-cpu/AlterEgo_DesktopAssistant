@@ -12,7 +12,8 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 
 ## Trailer
 
-[![Watch the Alter Ego trailer](docs/video/poster_en.jpg)](docs/video/AlterEgo_Trailer_EN.mp4)
+[![Watch the Alter Ego trailer](docs/video/AlterEgo_Trailer_EN.mp4)]
+
 
 ▶ [Trailer (English)](docs/video/AlterEgo_Trailer_EN.mp4) · [Trailer (Italiano)](docs/video/AlterEgo_Trailer_IT.mp4)
 
