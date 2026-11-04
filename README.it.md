@@ -2,11 +2,19 @@
 
 🇬🇧 [English](README.md) · 🇮🇹 **Italiano**
 
+**🌐 Sito web: [alterego.attentoweb.it](https://alterego.attentoweb.it)** · **🎬 [Trailer](#trailer)**
+
 Assistente desktop per **Windows 10/11** ispirato ad *Alter Ego* di Danganronpa: una finestrella in stile laptop CRT,
 sempre in primo piano, con cui parli a voce o per iscritto. Risponde con il proprio carattere, ricorda chi sei,
 può fare clip dei tuoi giochi con una frase e, se glielo permetti, eseguire piccole azioni sul PC.
 
 Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in inglese.
+
+## Trailer
+
+[![Guarda il trailer di Alter Ego](docs/video/poster_it.jpg)](docs/video/AlterEgo_Trailer_IT.mp4)
+
+▶ [Trailer (Italiano)](docs/video/AlterEgo_Trailer_IT.mp4) · [Trailer (English)](docs/video/AlterEgo_Trailer_EN.mp4)
 
 ![Alter Ego sul desktop](docs/screenshots/main.png)
 
@@ -14,6 +22,7 @@ Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in ingle
 
 ## Indice
 
+- [Trailer](#trailer)
 - [Funzionalità](#funzionalità)
 - [Screenshot](#screenshot)
 - [Installazione](#installazione)
