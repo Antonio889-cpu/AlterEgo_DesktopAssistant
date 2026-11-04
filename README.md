@@ -12,10 +12,9 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 
 ## Trailer
 
-[![Watch the Alter Ego trailer](docs/video/AlterEgo_Trailer_EN.mp4)]
+<a href="https://alterego.attentoweb.it/trailer.html"><img src="docs/video/preview_en.gif" alt="Alter Ego trailer — click to watch it with sound" width="100%"></a>
 
-
-▶ [Trailer (English)](docs/video/AlterEgo_Trailer_EN.mp4) · [Trailer (Italiano)](docs/video/AlterEgo_Trailer_IT.mp4)
+**▶ [Watch the trailer with sound](https://alterego.attentoweb.it/trailer.html)** · [Italian version](https://alterego.attentoweb.it/trailer.html?lang=it) · [Full screen or in the site's frame](https://alterego.attentoweb.it/#trailer)
 
 ![Alter Ego on the desktop](docs/screenshots/en/main.png)
 
