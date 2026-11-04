@@ -240,42 +240,76 @@ fn open_player_in(app: &AppHandle, expanded: bool) {
     };
     let scale = w.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
     let size = ((lw * scale) as i32, (lh * scale) as i32);
-    // posizione salvata se non copre Alter Ego, altrimenti accanto alla finestra principale
-    let saved = pos.filter(|p| !overlaps_main(app, Rect { x: p.0, y: p.1, w: size.0, h: size.1 }));
-    match saved {
-        Some((x, y)) => {
-            let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
-        }
-        None => place_clear(app, &w, size, &[]),
-    }
+    // posizione salvata se è libera, altrimenti accanto ad Alter Ego senza coprire niente
+    place_clear(app, &w, size, pos);
     let _ = w.show();
     emit_state(app);
 }
 
-/// Cambia la dimensione della finestra del lettore per la modalità (la pagina poi cambia da sola).
-fn apply_mode(app: &AppHandle, expanded: bool) {
+/// Cambia la dimensione della finestra del lettore per la modalità (la pagina poi cambia da sola):
+/// si allarga o si stringe con un'animazione, tenendo fermo l'angolo che non fa coprire Alter Ego
+/// né la Venue separata.
+async fn apply_mode(app: &AppHandle, expanded: bool) {
     let Some(w) = app.get_webview_window(PLAYER) else { return };
     EXPANDED.store(expanded, Ordering::SeqCst);
     let (lw, lh) = mode_size(app, expanded);
     let scale = w.scale_factor().unwrap_or(1.0);
+    let size = ((lw * scale).round() as i32, (lh * scale).round() as i32);
+    if let Some(from) = Rect::of(&w) {
+        let to = mode_target(app, &w, from, size, expanded);
+        let _ = w.set_min_size(None::<tauri::LogicalSize<f64>>);
+        let _ = w.set_resizable(true);
+        animate_rect(&w, from, to).await;
+    }
     let _ = w.set_resizable(expanded);
     let _ = w.set_min_size(if expanded { Some(tauri::LogicalSize::new(620.0, 400.0)) } else { None });
-    let _ = w.set_size(tauri::LogicalSize::new(lw, lh));
-    let size = ((lw * scale) as i32, (lh * scale) as i32);
-    // resta dov'è se c'è posto, altrimenti accanto ad Alter Ego
-    let fits = w.outer_position().ok().zip(w.current_monitor().ok().flatten()).is_some_and(|(p, m)| {
-        let a = m.work_area();
-        let area = Rect { x: a.position.x, y: a.position.y, w: a.size.width as i32, h: a.size.height as i32 };
-        let r = Rect { x: p.x, y: p.y, w: size.0, h: size.1 };
-        r.inside(&area) && !overlaps_main(app, r)
-    });
-    if !fits {
-        place_clear(app, &w, size, &[]);
-    }
     if expanded {
         let _ = w.set_focus();
     }
     emit_state(app);
+}
+
+/// Rettangolo finale: uno dei quattro angoli della finestra resta fermo. Allargandosi si preferisce
+/// crescere lontano da Alter Ego, stringendosi restarle vicino; mai sopra di lei o sulla Venue separata.
+fn mode_target(app: &AppHandle, w: &tauri::WebviewWindow, cur: Rect, size: (i32, i32), expanded: bool) -> Rect {
+    let (sw, sh) = size;
+    let mut cands = vec![
+        Rect { x: cur.x, y: cur.y, w: sw, h: sh },
+        Rect { x: cur.x + cur.w - sw, y: cur.y, w: sw, h: sh },
+        Rect { x: cur.x, y: cur.y + cur.h - sh, w: sw, h: sh },
+        Rect { x: cur.x + cur.w - sw, y: cur.y + cur.h - sh, w: sw, h: sh },
+    ];
+    let obstacles = obstacles_for(app, PLAYER);
+    if let Some(m) = main_rect(app) {
+        let (mx, my) = (m.x + m.w / 2, m.y + m.h / 2);
+        let d = |r: &Rect| {
+            let (cx, cy) = ((r.x + r.w / 2 - mx) as i64, (r.y + r.h / 2 - my) as i64);
+            cx * cx + cy * cy
+        };
+        cands.sort_by_key(|r| if expanded { -d(r) } else { d(r) });
+    }
+    let area = work_area(app, w);
+    if let Some(r) = cands.into_iter().find(|r| area.is_none_or(|a| r.inside(&a)) && !obstacles.iter().any(|o| o.overlaps(r))) {
+        return r;
+    }
+    let gap = (12.0 * w.scale_factor().unwrap_or(1.0)) as i32;
+    match area.and_then(|a| find_spot(size, &obstacles, a, gap, None)) {
+        Some((x, y)) => Rect { x, y, w: sw, h: sh },
+        None => Rect { x: cur.x, y: cur.y, w: sw, h: sh },
+    }
+}
+
+/// Animazione di posizione e dimensione (~220 ms, ease-out).
+async fn animate_rect(w: &tauri::WebviewWindow, from: Rect, to: Rect) {
+    const STEPS: i32 = 11;
+    for i in 1..=STEPS {
+        let t = i as f64 / STEPS as f64;
+        let e = 1.0 - (1.0 - t).powi(3);
+        let lerp = |a: i32, b: i32| (a as f64 + (b - a) as f64 * e).round() as i32;
+        let _ = w.set_size(tauri::PhysicalSize::new(lerp(from.w, to.w).max(1) as u32, lerp(from.h, to.h).max(1) as u32));
+        let _ = w.set_position(tauri::PhysicalPosition::new(lerp(from.x, to.x), lerp(from.y, to.y)));
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
 }
 
 /// Chiede alla finestra del lettore di passare a Venue (true) o lettore (false), con l'animazione.
@@ -330,47 +364,75 @@ fn main_rect(app: &AppHandle) -> Option<Rect> {
     Rect::of(&m)
 }
 
-fn overlaps_main(app: &AppHandle, r: Rect) -> bool {
-    main_rect(app).is_some_and(|m| m.overlaps(&r))
-}
 
-/// Prima posizione libera attorno all'ostacolo (sopra, a sinistra, sotto, a destra) dentro l'area di lavoro.
-pub fn free_spot(obstacle: Rect, size: (i32, i32), area: Rect, gap: i32) -> Option<(i32, i32)> {
+/// Prima posizione libera (dentro l'area di lavoro, senza toccare nessun ostacolo): prima `prefer`,
+/// poi sopra / a sinistra / sotto / a destra di ogni ostacolo e del loro insieme, poi gli angoli dello schermo.
+pub fn find_spot(size: (i32, i32), obstacles: &[Rect], area: Rect, gap: i32, prefer: Option<(i32, i32)>) -> Option<(i32, i32)> {
     let (w, h) = size;
-    let cx = |x: i32| x.clamp(area.x, area.x + area.w - w);
-    let cy = |y: i32| y.clamp(area.y, area.y + area.h - h);
-    let cands = [
-        (cx(obstacle.x + obstacle.w - w), obstacle.y - gap - h),
-        (obstacle.x - gap - w, cy(obstacle.y + obstacle.h - h)),
-        (cx(obstacle.x + obstacle.w - w), obstacle.y + obstacle.h + gap),
-        (obstacle.x + obstacle.w + gap, cy(obstacle.y + obstacle.h - h)),
-    ];
+    let cx = |x: i32| x.clamp(area.x, (area.x + area.w - w).max(area.x));
+    let cy = |y: i32| y.clamp(area.y, (area.y + area.h - h).max(area.y));
+    let mut cands: Vec<(i32, i32)> = prefer.into_iter().collect();
+    let mut bases = obstacles.to_vec();
+    if obstacles.len() > 1 {
+        bases.push(obstacles[1..].iter().fold(obstacles[0], |u, o| u.union(o)));
+    }
+    for o in &bases {
+        cands.extend([
+            (cx(o.x + o.w - w), o.y - gap - h),
+            (o.x - gap - w, cy(o.y + o.h - h)),
+            (cx(o.x + o.w - w), o.y + o.h + gap),
+            (o.x + o.w + gap, cy(o.y + o.h - h)),
+            (cx(o.x), o.y - gap - h),
+            (o.x - gap - w, cy(o.y)),
+            (cx(o.x), o.y + o.h + gap),
+            (o.x + o.w + gap, cy(o.y)),
+        ]);
+    }
+    cands.extend([
+        (area.x + area.w - w - gap, area.y + gap),
+        (area.x + gap, area.y + gap),
+        (area.x + area.w - w - gap, area.y + area.h - h - gap),
+        (area.x + gap, area.y + area.h - h - gap),
+    ]);
     cands.into_iter().find(|&(x, y)| {
         let r = Rect { x, y, w, h };
-        r.inside(&area) && !r.overlaps(&obstacle)
+        r.inside(&area) && !obstacles.iter().any(|o| o.overlaps(&r))
     })
 }
 
-/// Mette `win` (dimensione `size`, pixel fisici) accanto ad Alter Ego e agli altri `extra`.
-fn place_clear(app: &AppHandle, win: &tauri::WebviewWindow, size: (i32, i32), extra: &[Rect]) {
+/// Area di lavoro del monitor di Alter Ego (o di quello della finestra).
+fn work_area(app: &AppHandle, win: &tauri::WebviewWindow) -> Option<Rect> {
     let mon = app
         .get_webview_window(crate::window::MAIN)
+        .filter(|m| m.is_visible().unwrap_or(false))
         .and_then(|m| m.current_monitor().ok().flatten())
-        .or_else(|| win.primary_monitor().ok().flatten());
-    let Some(mon) = mon else { return };
+        .or_else(|| win.current_monitor().ok().flatten())
+        .or_else(|| win.primary_monitor().ok().flatten())?;
     let a = mon.work_area();
-    let area = Rect { x: a.position.x, y: a.position.y, w: a.size.width as i32, h: a.size.height as i32 };
-    let gap = (12.0 * mon.scale_factor()) as i32;
-    let mut obstacle = main_rect(app);
-    for e in extra {
-        obstacle = Some(obstacle.map(|o| o.union(e)).unwrap_or(*e));
+    Some(Rect { x: a.position.x, y: a.position.y, w: a.size.width as i32, h: a.size.height as i32 })
+}
+
+/// Finestre da non coprire per la finestra `label`: Alter Ego e l'altra finestra musicale (se non sta chiudendosi).
+fn obstacles_for(app: &AppHandle, label: &str) -> Vec<Rect> {
+    let mut v: Vec<Rect> = main_rect(app).into_iter().collect();
+    let other = if label == PLAYER { VENUE } else { PLAYER };
+    let closing = if other == VENUE { VENUE_CLOSING.load(Ordering::SeqCst) } else { PLAYER_CLOSING.load(Ordering::SeqCst) };
+    if !closing {
+        if let Some(r) = app.get_webview_window(other).and_then(|w| Rect::of(&w)) {
+            v.push(r);
+        }
     }
-    let spot = match obstacle {
-        Some(o) => free_spot(o, size, area, gap).or_else(|| main_rect(app).and_then(|m| free_spot(m, size, area, gap))),
-        None => None,
-    };
-    let (x, y) = spot.unwrap_or((area.x + area.w - size.0 - 2 * gap, area.y + 2 * gap));
-    let _ = win.set_position(tauri::PhysicalPosition::new(x, y));
+    v
+}
+
+/// Mette `win` (dimensione `size`, pixel fisici) dove non copre Alter Ego né l'altra finestra musicale.
+/// `prefer`: posizione salvata, usata se è libera.
+fn place_clear(app: &AppHandle, win: &tauri::WebviewWindow, size: (i32, i32), prefer: Option<(i32, i32)>) {
+    let Some(area) = work_area(app, win) else { return };
+    let gap = (12.0 * win.scale_factor().unwrap_or(1.0)) as i32;
+    let obstacles = obstacles_for(app, win.label());
+    let spot = find_spot(size, &obstacles, area, gap, prefer).unwrap_or((area.x + area.w - size.0 - 2 * gap, area.y + 2 * gap));
+    let _ = win.set_position(tauri::PhysicalPosition::new(spot.0, spot.1));
 }
 
 /// Dopo un cambio di dimensione di Alter Ego (modalità compatta): sposta lettore e Venue se ora la coprono.
@@ -381,7 +443,7 @@ pub fn avoid_main(app: &AppHandle) {
         let Some(w) = app.get_webview_window(label) else { continue };
         let Some(r) = Rect::of(&w) else { continue };
         if r.overlaps(&m) || placed.iter().any(|p: &Rect| p.overlaps(&r)) {
-            place_clear(app, &w, (r.w, r.h), &placed);
+            place_clear(app, &w, (r.w, r.h), None);
         }
         if let Some(r) = Rect::of(&w) {
             placed.push(r);
@@ -434,14 +496,7 @@ fn open_venue_window(app: &AppHandle) {
     let Ok(w) = b.build() else { return };
     let scale = w.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
     let size = ((VENUE_W * scale) as i32, (VENUE_H * scale) as i32);
-    let player = app.get_webview_window(PLAYER).and_then(|p| Rect::of(&p));
-    let free = |r: Rect| !overlaps_main(app, r) && !player.is_some_and(|p| p.overlaps(&r));
-    match pos.filter(|p| free(Rect { x: p.0, y: p.1, w: size.0, h: size.1 })) {
-        Some((x, y)) => {
-            let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
-        }
-        None => place_clear(app, &w, size, &player.into_iter().collect::<Vec<_>>()),
-    }
+    place_clear(app, &w, size, pos);
     let _ = w.show();
     let _ = w.set_focus();
     emit_state(app);
@@ -949,6 +1004,26 @@ pub fn spawn_analyzer(app: AppHandle) {
         .expect("thread spettro");
 }
 
+#[cfg(test)]
+mod place_tests {
+    use super::*;
+
+    #[test]
+    fn spot_never_overlaps() {
+        let area = Rect { x: 0, y: 0, w: 1920, h: 1040 };
+        let main = Rect { x: 1300, y: 640, w: 600, h: 338 };
+        let player = Rect { x: 1300, y: 380, w: 600, h: 248 };
+        for size in [(600, 248), (860, 540), (1200, 496)] {
+            let (x, y) = find_spot(size, &[main, player], area, 12, None).expect("posto libero");
+            let r = Rect { x, y, w: size.0, h: size.1 };
+            assert!(r.inside(&area) && !r.overlaps(&main) && !r.overlaps(&player), "{size:?} → {r:?}");
+        }
+        // la posizione preferita si usa solo se è libera
+        assert_eq!(find_spot((600, 248), &[main], area, 12, Some((10, 10))), Some((10, 10)));
+        assert_ne!(find_spot((600, 248), &[main], area, 12, Some((1300, 640))), Some((1300, 640)));
+    }
+}
+
 // ---------- comandi del lettore ----------
 
 #[tauri::command]
@@ -1041,7 +1116,7 @@ pub async fn player_resize(app: AppHandle, width: f64) {
 /// Dalla pagina del lettore/Venue agganciata: ridimensiona per la nuova modalità (poi la pagina cambia).
 #[tauri::command]
 pub async fn player_expand(app: AppHandle, on: bool) {
-    apply_mode(&app, on);
+    apply_mode(&app, on).await;
 }
 
 #[tauri::command]
@@ -1054,18 +1129,23 @@ pub async fn venue_close(app: AppHandle) {
     close_venue(&app);
 }
 
-/// Separa la Venue in una finestra a parte (e lo ricorda).
+/// Separa la Venue in una finestra a parte (e lo ricorda). Prima il lettore torna piccolo,
+/// poi la Venue compare accanto senza coprirlo. Restituisce "player" (la pagina torna lettore)
+/// o "closed" (niente musica: il lettore si chiude).
 #[tauri::command]
-pub async fn venue_detach(app: AppHandle) {
+pub async fn venue_detach(app: AppHandle) -> &'static str {
     update_config(&app, |c| c.music.venue_docked = false);
-    open_venue_window(&app);
+    let mut r = "player";
     if is_expanded() {
         if state(&app).playing {
-            request_mode(&app, false);
+            apply_mode(&app, false).await;
         } else {
             close_player(&app);
+            r = "closed";
         }
     }
+    open_venue_window(&app);
+    r
 }
 
 /// Riaggancia la Venue al lettore (e lo ricorda).
@@ -1073,6 +1153,8 @@ pub async fn venue_detach(app: AppHandle) {
 pub async fn venue_dock(app: AppHandle) {
     update_config(&app, |c| c.music.venue_docked = true);
     close_venue_window(&app);
+    // la Venue separata si spegne, poi il lettore si allarga al suo posto
+    tokio::time::sleep(Duration::from_millis(450)).await;
     request_mode(&app, true);
 }
 

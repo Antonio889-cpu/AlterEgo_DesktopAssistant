@@ -185,7 +185,9 @@ bar.addEventListener("pointerup", (e) => {
 
 // ---------- dimensione: il contenuto è disegnato a 600 px e si scala con la finestra ----------
 const BASE_W = 600;
-function fit() { document.body.style.zoom = String(window.innerWidth / BASE_W); }
+// durante la trasformazione in Venue la finestra cambia forma: lo zoom resta fermo
+let morphing = false;
+function fit() { if (!morphing) document.body.style.zoom = String(window.innerWidth / BASE_W); }
 window.addEventListener("resize", fit);
 fit();
 let rs = null;
@@ -240,17 +242,19 @@ function tvOff() {
   panel.classList.add("glitch-out");
   offTimer = setTimeout(() => { panel.classList.add("tv-off"); invoke("player_closed"); }, 600);
 }
-// espansione nella Music Venue (stessa finestra): glitch → ridimensiona → cambia pagina
+// espansione nella Music Venue (stessa finestra): il contenuto si sfalda, la cornice si allunga
+// con la finestra (animata dal backend), poi la Venue si ricompone
 let switching = false;
 async function toMode(m) {
   if (m !== "venue" || switching) return;
   switching = true;
+  morphing = true;
+  document.body.style.zoom = "1";
   panel.classList.remove("glitch-in");
-  panel.classList.add("glitch-out");
-  await new Promise((r) => setTimeout(r, 380));
-  panel.classList.add("tv-off");
+  document.body.classList.add("morph");
+  await new Promise((r) => setTimeout(r, 300));
   try { await invoke("player_expand", { on: true }); } catch {}
-  location.replace("venue.html?docked=1");
+  location.replace("venue.html?docked=1&from=player");
 }
 
 // ---------- eventi ----------
@@ -272,5 +276,10 @@ listen("player-mode", (e) => toMode(e.payload));
   await loadSprites();
   drawBands([]);
   try { applyState(await invoke("music_state")); } catch {}
-  tvOn();
+  if (new URLSearchParams(location.search).get("from") === "venue") {
+    // arriva dalla Venue agganciata: niente accensione da TV, il contenuto si ricompone
+    panel.classList.remove("tv-off");
+    document.body.classList.add("morph-in");
+    setTimeout(() => document.body.classList.remove("morph-in"), 600);
+  } else tvOn();
 })();

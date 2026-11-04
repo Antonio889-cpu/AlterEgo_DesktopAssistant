@@ -1,3 +1,11 @@
+## Alter Ego 1.3.2
+
+- Headphones sprite: whole neck and collar visible.
+- Player ⇄ Music Venue: animated resize with a glitch transition; detach/dock animated too.
+- Player and Venue never cover Alter Ego or each other (new placement).
+
+`AlterEgo_1.3.2_setup.exe` installer · `AlterEgo_1.3.2_portable.zip` portable · `SHA256SUMS.txt`
+
 ## Alter Ego 1.3.1
 
 - Player expands into the Music Venue (same window) and back; ⧉ detaches it into its own window.

@@ -182,7 +182,7 @@ $("close").onclick = () => invoke("venue_close");
 $("b-detach").hidden = !DOCKED;
 $("b-dock").hidden = DOCKED;
 $("b-collapse").onclick = () => toMode("player");
-$("b-detach").onclick = () => invoke("venue_detach");
+$("b-detach").onclick = () => detach();
 $("b-dock").onclick = () => invoke("venue_dock");
 
 // spostamento e ridimensionamento (finestra senza bordi)
@@ -211,17 +211,28 @@ function tvOff() {
   panel.classList.add("glitch-out");
   offTimer = setTimeout(() => { panel.classList.add("tv-off"); invoke(DOCKED ? "player_closed" : "venue_closed"); }, 600);
 }
-// agganciata: torna lettore nella stessa finestra (glitch → ridimensiona → cambia pagina)
+// agganciata: torna lettore nella stessa finestra (il contenuto si sfalda, la cornice si stringe)
 let switching = false;
+async function morphOut() {
+  panel.classList.remove("glitch-in");
+  document.body.classList.add("morph");
+  await new Promise((r) => setTimeout(r, 300));
+}
 async function toMode(m) {
   if (m !== "player" || switching) return;
   switching = true;
-  panel.classList.remove("glitch-in");
-  panel.classList.add("glitch-out");
-  await new Promise((r) => setTimeout(r, 380));
-  panel.classList.add("tv-off");
+  await morphOut();
   try { await invoke("player_expand", { on: false }); } catch {}
-  location.replace("player.html");
+  location.replace("player.html?from=venue");
+}
+// separa: il lettore si stringe, poi la Venue compare accanto (finestra nuova, accensione glitch)
+async function detach() {
+  if (switching) return;
+  switching = true;
+  await morphOut();
+  let r = "player";
+  try { r = await invoke("venue_detach"); } catch {}
+  if (r === "player") location.replace("player.html?from=venue");
 }
 
 // ---------- eventi ----------
@@ -241,5 +252,9 @@ if (DOCKED) {
   try { lib = await invoke("venue_library"); } catch {}
   render();
   try { applyState(await invoke("music_state")); } catch {}
-  tvOn();
+  if (new URLSearchParams(location.search).get("from") === "player") {
+    panel.classList.remove("tv-off");
+    document.body.classList.add("morph-in");
+    setTimeout(() => document.body.classList.remove("morph-in"), 600);
+  } else tvOn();
 })();
