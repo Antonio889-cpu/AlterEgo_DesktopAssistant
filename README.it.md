@@ -248,6 +248,7 @@ Puoi anche dire "metti in coda…", "pausa", "avanti", "indietro", "volume al 40
   Il volume segue una curva (a metà ≈ volume d'ascolto normale, massimo più basso di prima) e si muove a passi del 2% con rotella o ↑ ↓.
 - **Music Venue** (tasto nel lettore, menu della tray, oppure "apri music venue"): brani recenti e preferiti con copertina,
   ricerca nella libreria o su YouTube, suona o metti in coda con un clic, cuore per i preferiti. Salvata in `music_library.json`.
+  Di default il lettore **si espande nella Venue** nella stessa finestra e torna lettore; il tasto ⧉ la separa in una finestra a parte (e la riaggancia).
 - Usa YouTube nel rispetto dei suoi termini di servizio: è pensato per l'ascolto personale.
 
 ## Ricerca web

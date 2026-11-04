@@ -201,7 +201,7 @@ fn set_ai_config(app: AppHandle, mut ai: config::AiConfig) {
 }
 
 #[tauri::command]
-fn open_settings(app: AppHandle) -> Result<(), String> {
+async fn open_settings(app: AppHandle) -> Result<(), String> {
     window::open_settings(&app).map_err(|e| e.to_string())
 }
 
@@ -463,6 +463,9 @@ fn main() {
             }
             WindowEvent::Moved(_) if win.label() == music::PLAYER => music::record_player_position(win),
             WindowEvent::Moved(_) if win.label() == music::VENUE => music::record_venue_position(win),
+            WindowEvent::Destroyed if win.label() == music::PLAYER || win.label() == music::VENUE => {
+                music::window_destroyed(win.app_handle(), win.label())
+            }
             // Alt+F4 nasconde invece di chiudere: si esce solo dalla tray.
             WindowEvent::CloseRequested { api, .. } if win.label() == window::MAIN => {
                 api.prevent_close();
@@ -509,6 +512,9 @@ fn main() {
             music::player_closed,
             music::player_resize,
             music::venue_open,
+            music::player_expand,
+            music::venue_detach,
+            music::venue_dock,
             music::venue_close,
             music::venue_closed,
             music::venue_library,

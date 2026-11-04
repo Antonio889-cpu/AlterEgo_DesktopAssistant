@@ -8,6 +8,8 @@ let lib = { recent: [], favorites: [] };
 let st = null;
 let stAt = 0;
 let tab = "library";
+// agganciata: questa pagina è dentro la finestra del lettore (venue.html?docked=1)
+const DOCKED = new URLSearchParams(location.search).get("docked") === "1";
 
 const fmt = (s) => { s = Math.max(0, Math.floor(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const favIds = () => new Set(lib.favorites.map((f) => f.id));
@@ -137,6 +139,7 @@ function applyState(s) {
   $("now-dur").textContent = fmt(s.duration);
   document.body.classList.toggle("paused", !s.playing || s.paused);
   if (s.status) $("status").textContent = s.status;
+  $("b-collapse").hidden = !DOCKED || !s.playing;
   markCurrent();
 }
 function position() {
@@ -176,6 +179,11 @@ $("now-fav").onclick = async () => {
   $("now-fav").classList.remove("pop"); void $("now-fav").offsetWidth; $("now-fav").classList.add("pop");
 };
 $("close").onclick = () => invoke("venue_close");
+$("b-detach").hidden = !DOCKED;
+$("b-dock").hidden = DOCKED;
+$("b-collapse").onclick = () => toMode("player");
+$("b-detach").onclick = () => invoke("venue_detach");
+$("b-dock").onclick = () => invoke("venue_dock");
 
 // spostamento e ridimensionamento (finestra senza bordi)
 $("screen").addEventListener("mousedown", (e) => {
@@ -190,7 +198,9 @@ window.addEventListener("keydown", (e) => {
 
 // ---------- apertura / chiusura glitch ----------
 const panel = $("panel");
+let offTimer = null;
 function tvOn() {
+  clearTimeout(offTimer); // una riapertura annulla la chiusura in corso
   panel.classList.remove("tv-off", "glitch-out");
   void panel.offsetWidth;
   panel.classList.add("glitch-in");
@@ -199,14 +209,31 @@ function tvOn() {
 function tvOff() {
   panel.classList.remove("glitch-in");
   panel.classList.add("glitch-out");
-  setTimeout(() => { panel.classList.add("tv-off"); invoke("venue_closed"); }, 600);
+  offTimer = setTimeout(() => { panel.classList.add("tv-off"); invoke(DOCKED ? "player_closed" : "venue_closed"); }, 600);
+}
+// agganciata: torna lettore nella stessa finestra (glitch → ridimensiona → cambia pagina)
+let switching = false;
+async function toMode(m) {
+  if (m !== "player" || switching) return;
+  switching = true;
+  panel.classList.remove("glitch-in");
+  panel.classList.add("glitch-out");
+  await new Promise((r) => setTimeout(r, 380));
+  panel.classList.add("tv-off");
+  try { await invoke("player_expand", { on: false }); } catch {}
+  location.replace("player.html");
 }
 
 // ---------- eventi ----------
 listen("music-state", (e) => applyState(e.payload));
 listen("venue-library", (e) => { lib = e.payload; render(); });
 // NB: listen() riceve anche gli eventi di altre finestre: la Venue ha il suo nome
-listen("venue-tv", (e) => (e.payload === "off" ? tvOff() : tvOn()));
+if (DOCKED) {
+  listen("player-tv", (e) => (e.payload === "off" ? tvOff() : tvOn()));
+  listen("player-mode", (e) => toMode(e.payload));
+} else {
+  listen("venue-tv", (e) => (e.payload === "off" ? tvOff() : tvOn()));
+}
 
 (async () => {
   try { I18N.setLang(I18N.resolve((await invoke("get_config")).ui_language)); } catch {}

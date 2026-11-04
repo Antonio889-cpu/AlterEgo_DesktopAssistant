@@ -247,6 +247,7 @@ You can also say "add … to the queue", "pause", "next", "previous", "volume to
   Volume follows a curve (half way ≈ normal listening volume, maximum lower than before) and moves in 2% steps with the wheel or ↑ ↓.
 - **Music Venue** (button in the player, the tray menu, or "open music venue"): recent tracks and favorites with covers,
   search in your library or on YouTube, play or queue with one click, heart to add to favorites. Saved in `music_library.json`.
+  By default the player **expands into the Venue** in the same window and shrinks back; the ⧉ button detaches it into its own window (and docks it again).
 - Use YouTube in accordance with its terms of service: this is meant for personal listening.
 
 ## Web search

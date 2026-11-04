@@ -66,7 +66,12 @@
         <p class="tip">Puoi anche dirlo ad Alter Ego: «apri music venue», «metti nei preferiti», «chiudi il lettore».</p>
       </section>
 
-      <button id="close" title="Chiudi" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      <div id="winbtns">
+        <button id="b-collapse" title="Riduci a lettore" aria-label="Riduci a lettore" hidden><svg viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M10 14l-6 6M14 10l6-6" /></svg></button>
+        <button id="b-detach" title="Separa in una finestra a parte" aria-label="Separa" hidden><svg viewBox="0 0 24 24"><rect x="3.5" y="8.5" width="11" height="11" rx="1.5" /><path d="M9.5 4.5h10v10M14 10l6-6" /></svg></button>
+        <button id="b-dock" title="Aggancia al lettore" aria-label="Aggancia al lettore" hidden><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="1.5" /><path d="M3.5 14.5h17M12 7v5M9.5 9.5L12 12l2.5-2.5" /></svg></button>
+        <button id="close" title="Chiudi" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      </div>
       <div id="grip" title="Ridimensiona"></div>
       <div id="scanlines"></div>
       <div id="vignette"></div>

@@ -276,6 +276,8 @@ pub struct MusicConfig {
     pub venue_pos: Option<(i32, i32)>,
     /// Sprite "con le cuffie" nella finestra principale mentre suona la musica.
     pub music_sprite: bool,
+    /// La Music Venue si apre dentro il lettore (true) o in una finestra separata.
+    pub venue_docked: bool,
 }
 
 impl Default for MusicConfig {
@@ -291,6 +293,7 @@ impl Default for MusicConfig {
             player_width: 600.0,
             venue_pos: None,
             music_sprite: true,
+            venue_docked: true,
         }
     }
 }

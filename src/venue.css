@@ -155,8 +155,10 @@ body.paused #n-i-pause { display: none; }
 .tip { margin: 0; font-size: 12.5px; color: var(--dim); line-height: 1.35; }
 
 /* ---------- chiudi, maniglia ---------- */
-#close { position: absolute; right: 30px; top: 12px; z-index: 5; }
-#close svg { width: 22px; height: 22px; stroke-width: 2.2; filter: drop-shadow(0 0 3px var(--glow)); }
+#winbtns { position: absolute; right: 30px; top: 12px; z-index: 5; display: flex; gap: 14px; align-items: center; }
+#winbtns button svg { width: 22px; height: 22px; stroke-width: 2.1; filter: drop-shadow(0 0 3px var(--glow)); }
+#winbtns button[hidden] { display: none; }
+#close svg { stroke-width: 2.4; }
 #grip { position: absolute; right: 2px; bottom: 2px; width: 18px; height: 18px; z-index: 20; cursor: nwse-resize; opacity: .55;
   background: linear-gradient(135deg, transparent 0 55%, var(--accent) 55% 62%, transparent 62% 72%, var(--accent) 72% 79%, transparent 79%); }
 #grip:hover { opacity: 1; }

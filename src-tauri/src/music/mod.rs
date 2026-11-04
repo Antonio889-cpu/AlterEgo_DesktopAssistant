@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::{
     path::PathBuf,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Mutex,
     },
     time::{Duration, Instant},
@@ -98,6 +98,10 @@ pub struct State {
     /// Il brano attuale è tra i preferiti.
     pub favorite: bool,
     pub venue_open: bool,
+    /// La finestra del lettore mostra la Venue.
+    pub expanded: bool,
+    /// La Venue si apre dentro il lettore (altrimenti in una finestra a parte).
+    pub venue_docked: bool,
 }
 
 impl Music {
@@ -144,7 +148,9 @@ pub fn state(app: &AppHandle) -> State {
         status: i.status.clone(),
         reactive_sprite: cfg.reactive_sprite,
         favorite,
-        venue_open: app.get_webview_window(VENUE).is_some(),
+        venue_open: is_expanded() || app.get_webview_window(VENUE).is_some(),
+        expanded: is_expanded(),
+        venue_docked: cfg.venue_docked,
     }
 }
 
@@ -160,32 +166,80 @@ fn set_status(app: &AppHandle, s: &str) {
 
 // ---------- finestra del lettore ----------
 
+// Il lettore può "espandersi" nella Music Venue (stessa finestra, pagina venue.html?docked=1)
+// e tornare lettore; dalla Venue agganciata un tasto la separa in una finestra a parte.
+/// La finestra del lettore mostra la Music Venue.
+static EXPANDED: AtomicBool = AtomicBool::new(false);
+/// Chiusura animata in corso (lettore / Venue separata): una riapertura la annulla.
+static PLAYER_CLOSING: AtomicBool = AtomicBool::new(false);
+static PLAYER_CLOSE_GEN: AtomicU64 = AtomicU64::new(0);
+static VENUE_CLOSING: AtomicBool = AtomicBool::new(false);
+static VENUE_CLOSE_GEN: AtomicU64 = AtomicU64::new(0);
+
+pub fn is_expanded() -> bool {
+    EXPANDED.load(Ordering::SeqCst)
+}
+
+fn player_width(app: &AppHandle) -> f64 {
+    app.state::<AppState>().cfg.lock().unwrap().music.player_width.clamp(PLAYER_MIN_W, PLAYER_MAX_W)
+}
+
+fn venue_docked(app: &AppHandle) -> bool {
+    app.state::<AppState>().cfg.lock().unwrap().music.venue_docked
+}
+
+/// Dimensione logica della finestra del lettore nella modalità data.
+fn mode_size(app: &AppHandle, expanded: bool) -> (f64, f64) {
+    if expanded {
+        (VENUE_W, VENUE_H)
+    } else {
+        let w = player_width(app);
+        (w, w * PLAYER_H / PLAYER_W)
+    }
+}
+
 fn open_player(app: &AppHandle) {
+    open_player_in(app, false);
+}
+
+/// Mostra il lettore; se non esiste lo crea (come lettore o già espanso nella Venue).
+fn open_player_in(app: &AppHandle, expanded: bool) {
     if let Some(w) = app.get_webview_window(PLAYER) {
+        // stava chiudendosi: si annulla e si riaccende
+        if PLAYER_CLOSING.swap(false, Ordering::SeqCst) {
+            let _ = app.emit_to(PLAYER, "player-tv", "on");
+        }
         if !w.is_visible().unwrap_or(true) {
             let _ = w.show();
         }
         return;
     }
-    let (pos, width) = {
+    EXPANDED.store(expanded, Ordering::SeqCst);
+    let pos = {
         let st = app.state::<AppState>();
         let c = st.cfg.lock().unwrap();
-        (c.music.player_pos, c.music.player_width.clamp(PLAYER_MIN_W, PLAYER_MAX_W))
+        if expanded { c.music.venue_pos } else { c.music.player_pos }
     };
-    let b = tauri::WebviewWindowBuilder::new(app, PLAYER, tauri::WebviewUrl::App("player.html".into()))
+    let (lw, lh) = mode_size(app, expanded);
+    let url = if expanded { "venue.html?docked=1" } else { "player.html" };
+    let b = tauri::WebviewWindowBuilder::new(app, PLAYER, tauri::WebviewUrl::App(url.into()))
         .title("Alter Ego – Musica")
         .decorations(false)
         .transparent(true)
         .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .resizable(false)
-        .focused(false)
+        .resizable(expanded)
+        .focused(expanded)
         .visible(false)
-        .inner_size(width, width * PLAYER_H / PLAYER_W);
-    let Ok(w) = b.build() else { return };
+        .inner_size(lw, lh);
+    let b = if expanded { b.min_inner_size(620.0, 400.0) } else { b };
+    let Ok(w) = b.build() else {
+        EXPANDED.store(false, Ordering::SeqCst);
+        return;
+    };
     let scale = w.primary_monitor().ok().flatten().map(|m| m.scale_factor()).unwrap_or(1.0);
-    let size = ((width * scale) as i32, (width * PLAYER_H / PLAYER_W * scale) as i32);
+    let size = ((lw * scale) as i32, (lh * scale) as i32);
     // posizione salvata se non copre Alter Ego, altrimenti accanto alla finestra principale
     let saved = pos.filter(|p| !overlaps_main(app, Rect { x: p.0, y: p.1, w: size.0, h: size.1 }));
     match saved {
@@ -195,6 +249,49 @@ fn open_player(app: &AppHandle) {
         None => place_clear(app, &w, size, &[]),
     }
     let _ = w.show();
+    emit_state(app);
+}
+
+/// Cambia la dimensione della finestra del lettore per la modalità (la pagina poi cambia da sola).
+fn apply_mode(app: &AppHandle, expanded: bool) {
+    let Some(w) = app.get_webview_window(PLAYER) else { return };
+    EXPANDED.store(expanded, Ordering::SeqCst);
+    let (lw, lh) = mode_size(app, expanded);
+    let scale = w.scale_factor().unwrap_or(1.0);
+    let _ = w.set_resizable(expanded);
+    let _ = w.set_min_size(if expanded { Some(tauri::LogicalSize::new(620.0, 400.0)) } else { None });
+    let _ = w.set_size(tauri::LogicalSize::new(lw, lh));
+    let size = ((lw * scale) as i32, (lh * scale) as i32);
+    // resta dov'è se c'è posto, altrimenti accanto ad Alter Ego
+    let fits = w.outer_position().ok().zip(w.current_monitor().ok().flatten()).is_some_and(|(p, m)| {
+        let a = m.work_area();
+        let area = Rect { x: a.position.x, y: a.position.y, w: a.size.width as i32, h: a.size.height as i32 };
+        let r = Rect { x: p.x, y: p.y, w: size.0, h: size.1 };
+        r.inside(&area) && !overlaps_main(app, r)
+    });
+    if !fits {
+        place_clear(app, &w, size, &[]);
+    }
+    if expanded {
+        let _ = w.set_focus();
+    }
+    emit_state(app);
+}
+
+/// Chiede alla finestra del lettore di passare a Venue (true) o lettore (false), con l'animazione.
+fn request_mode(app: &AppHandle, expanded: bool) {
+    if app.get_webview_window(PLAYER).is_some() {
+        open_player_in(app, expanded); // annulla un'eventuale chiusura in corso
+        if is_expanded() != expanded {
+            let _ = app.emit_to(PLAYER, "player-mode", if expanded { "venue" } else { "player" });
+        } else if expanded {
+            if let Some(w) = app.get_webview_window(PLAYER) {
+                let _ = w.set_focus();
+            }
+        }
+    } else if expanded {
+        open_player_in(app, true);
+    }
 }
 
 // ---------- posizionamento: lettore e Venue non coprono la finestra principale ----------
@@ -295,7 +392,7 @@ pub fn avoid_main(app: &AppHandle) {
 /// Ridimensiona il lettore (larghezza in px logici, proporzioni fisse).
 pub fn resize_player(app: &AppHandle, width: f64) {
     let width = width.clamp(PLAYER_MIN_W, PLAYER_MAX_W);
-    if let Some(w) = app.get_webview_window(PLAYER) {
+    if let Some(w) = app.get_webview_window(PLAYER).filter(|_| !is_expanded()) {
         let _ = w.set_size(tauri::LogicalSize::new(width, width * PLAYER_H / PLAYER_W));
     }
     app.state::<AppState>().cfg.lock().unwrap().music.player_width = width;
@@ -304,8 +401,20 @@ pub fn resize_player(app: &AppHandle, width: f64) {
 
 // ---------- Music Venue ----------
 
+/// Apre la Music Venue: dentro il lettore (agganciata, predefinito) o in una finestra a parte.
 pub fn open_venue(app: &AppHandle) {
+    if venue_docked(app) {
+        request_mode(app, true);
+    } else {
+        open_venue_window(app);
+    }
+}
+
+fn open_venue_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(VENUE) {
+        if VENUE_CLOSING.swap(false, Ordering::SeqCst) {
+            let _ = app.emit_to(VENUE, "venue-tv", "on");
+        }
         let _ = w.show();
         let _ = w.set_focus();
         return;
@@ -338,16 +447,43 @@ pub fn open_venue(app: &AppHandle) {
     emit_state(app);
 }
 
-/// Chiude la Venue con l'animazione glitch (la pagina chiama `venue_closed` alla fine).
+/// Chiude la Venue (separata con l'animazione glitch; agganciata: torna lettore o si chiude).
 pub fn close_venue(app: &AppHandle) {
+    close_venue_window(app);
+    if is_expanded() {
+        if state(app).playing {
+            request_mode(app, false);
+        } else {
+            close_player(app);
+        }
+    }
+}
+
+fn close_venue_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(VENUE) {
+        VENUE_CLOSING.store(true, Ordering::SeqCst);
+        let gen = VENUE_CLOSE_GEN.fetch_add(1, Ordering::SeqCst) + 1;
         let _ = app.emit_to(VENUE, "venue-tv", "off");
-        let w = w.clone();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(1200));
-            let _ = w.close();
+            // la pagina non ha risposto e nessuno l'ha riaperta nel frattempo
+            if VENUE_CLOSING.load(Ordering::SeqCst) && VENUE_CLOSE_GEN.load(Ordering::SeqCst) == gen {
+                VENUE_CLOSING.store(false, Ordering::SeqCst);
+                let _ = w.close();
+            }
         });
     }
+}
+
+/// Una finestra del lettore o della Venue è stata distrutta.
+pub fn window_destroyed(app: &AppHandle, label: &str) {
+    if label == PLAYER {
+        EXPANDED.store(false, Ordering::SeqCst);
+        PLAYER_CLOSING.store(false, Ordering::SeqCst);
+    } else if label == VENUE {
+        VENUE_CLOSING.store(false, Ordering::SeqCst);
+    }
+    emit_state(app);
 }
 
 pub fn record_venue_position(win: &tauri::Window) {
@@ -398,36 +534,50 @@ pub fn show_player(app: &AppHandle) {
     open_player(app);
 }
 
-/// Ferma la musica e chiude il lettore.
+/// Ferma la musica e chiude il lettore (anche se mostra la Venue agganciata).
 pub fn stop_music(app: &AppHandle) {
     stop(app);
+    if is_expanded() {
+        close_player(app);
+    }
 }
 
-/// Chiude il lettore con l'animazione "TV" (la finestra la esegue e poi chiama `player_closed`).
+/// Chiude il lettore con l'animazione glitch (la finestra la esegue e poi chiama `player_closed`).
 fn close_player(app: &AppHandle) {
     if let Some(w) = app.get_webview_window(PLAYER) {
+        PLAYER_CLOSING.store(true, Ordering::SeqCst);
+        let gen = PLAYER_CLOSE_GEN.fetch_add(1, Ordering::SeqCst) + 1;
         // nome proprio del lettore: "tv" è della finestra principale
         let _ = app.emit_to(PLAYER, "player-tv", "off");
-        let w = w.clone();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(1200));
-            let _ = w.close(); // se la pagina non ha risposto
+            if PLAYER_CLOSING.load(Ordering::SeqCst) && PLAYER_CLOSE_GEN.load(Ordering::SeqCst) == gen {
+                PLAYER_CLOSING.store(false, Ordering::SeqCst);
+                let _ = w.close(); // se la pagina non ha risposto
+            }
         });
     }
 }
 
+/// Fine dell'animazione di chiusura del lettore (solo se nel frattempo non è stato riaperto).
 #[tauri::command]
-pub fn player_closed(app: AppHandle) {
-    if let Some(w) = app.get_webview_window(PLAYER) {
-        let _ = w.close();
+pub async fn player_closed(app: AppHandle) {
+    if PLAYER_CLOSING.swap(false, Ordering::SeqCst) {
+        if let Some(w) = app.get_webview_window(PLAYER) {
+            let _ = w.close();
+        }
     }
 }
 
-/// La finestra del lettore è stata spostata: ricorda dove.
+/// La finestra del lettore è stata spostata: ricorda dove (come lettore o come Venue).
 pub fn record_player_position(win: &tauri::Window) {
     if let Ok(p) = win.outer_position() {
         let app = win.app_handle();
-        app.state::<AppState>().cfg.lock().unwrap().music.player_pos = Some((p.x, p.y));
+        {
+            let st = app.state::<AppState>();
+            let mut c = st.cfg.lock().unwrap();
+            if is_expanded() { c.music.venue_pos = Some((p.x, p.y)) } else { c.music.player_pos = Some((p.x, p.y)) }
+        }
         app.state::<AppState>().dirty.store(true, Ordering::Relaxed);
     }
 }
@@ -539,7 +689,10 @@ fn stop(app: &AppHandle) {
     }
     app.state::<AudioEngine>().music_clear();
     emit_state(app);
-    close_player(app);
+    // la Venue agganciata resta aperta anche senza musica
+    if !is_expanded() {
+        close_player(app);
+    }
 }
 
 /// Cerca, scarica e suona (o accoda). Restituisce un messaggio per il modello.
@@ -576,7 +729,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
         Ok(r) => r,
         Err(e) => {
             set_status(app, &crate::tr!("Non trovato: {e}", "Not found: {e}"));
-            if !m.inner.lock().unwrap().playing {
+            if !m.inner.lock().unwrap().playing && !is_expanded() {
                 close_player(app);
             }
             return Err(e);
@@ -804,17 +957,17 @@ pub fn music_state(app: AppHandle) -> State {
 }
 
 #[tauri::command]
-pub fn music_toggle(app: AppHandle) {
+pub async fn music_toggle(app: AppHandle) {
     toggle_pause(&app);
 }
 
 #[tauri::command]
-pub fn music_next(app: AppHandle) {
+pub async fn music_next(app: AppHandle) {
     advance(&app, false);
 }
 
 #[tauri::command]
-pub fn music_prev(app: AppHandle) {
+pub async fn music_prev(app: AppHandle) {
     previous(&app);
 }
 
@@ -850,7 +1003,7 @@ pub fn music_repeat(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn music_stop(app: AppHandle) {
+pub async fn music_stop(app: AppHandle) {
     stop(&app);
 }
 
@@ -878,32 +1031,59 @@ pub fn music_settings(app: AppHandle, lyrics: bool, reactive_sprite: bool, compa
     emit_state(&app);
 }
 
+// NB: su Windows creare o chiudere finestre da un comando sincrono blocca l'app: questi sono async.
+
 #[tauri::command]
-pub fn player_resize(app: AppHandle, width: f64) {
+pub async fn player_resize(app: AppHandle, width: f64) {
     resize_player(&app, width);
 }
 
+/// Dalla pagina del lettore/Venue agganciata: ridimensiona per la nuova modalità (poi la pagina cambia).
 #[tauri::command]
-pub fn venue_open(app: AppHandle) {
+pub async fn player_expand(app: AppHandle, on: bool) {
+    apply_mode(&app, on);
+}
+
+#[tauri::command]
+pub async fn venue_open(app: AppHandle) {
     open_venue(&app);
 }
 
 #[tauri::command]
-pub fn venue_close(app: AppHandle) {
+pub async fn venue_close(app: AppHandle) {
     close_venue(&app);
 }
 
+/// Separa la Venue in una finestra a parte (e lo ricorda).
 #[tauri::command]
-pub fn venue_closed(app: AppHandle) {
-    if let Some(w) = app.get_webview_window(VENUE) {
-        let _ = w.close();
+pub async fn venue_detach(app: AppHandle) {
+    update_config(&app, |c| c.music.venue_docked = false);
+    open_venue_window(&app);
+    if is_expanded() {
+        if state(&app).playing {
+            request_mode(&app, false);
+        } else {
+            close_player(&app);
+        }
     }
-    // lo stato (venue_open) si aggiorna dopo la chiusura vera
-    let app2 = app.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(150));
-        emit_state(&app2);
-    });
+}
+
+/// Riaggancia la Venue al lettore (e lo ricorda).
+#[tauri::command]
+pub async fn venue_dock(app: AppHandle) {
+    update_config(&app, |c| c.music.venue_docked = true);
+    close_venue_window(&app);
+    request_mode(&app, true);
+}
+
+/// Fine dell'animazione di chiusura della Venue separata.
+#[tauri::command]
+pub async fn venue_closed(app: AppHandle) {
+    if VENUE_CLOSING.swap(false, Ordering::SeqCst) {
+        if let Some(w) = app.get_webview_window(VENUE) {
+            let _ = w.close();
+        }
+    }
 }
 
 #[tauri::command]

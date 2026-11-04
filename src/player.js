@@ -144,7 +144,11 @@ $("b-fav").onclick = async () => {
     $("b-fav").classList.remove("pop"); void $("b-fav").offsetWidth; $("b-fav").classList.add("pop");
   } catch {}
 };
-$("b-venue").onclick = () => invoke(st?.venue_open ? "venue_close" : "venue_open");
+// Venue: di default si espande nella stessa finestra; se è stata separata apre/chiude l'altra finestra
+$("b-venue").onclick = () => {
+  if (!st || st.venue_docked) toMode("venue");
+  else invoke(st.venue_open ? "venue_close" : "venue_open");
+};
 let volTimer = null;
 function setVolume(pct) {
   pct = Math.max(0, Math.min(100, Math.round(pct)));
@@ -223,7 +227,9 @@ window.addEventListener("keydown", (e) => {
 // ---------- accensione / spegnimento "TV" ----------
 const panel = $("panel");
 // accensione e spegnimento con effetto glitch (glitch.css)
+let offTimer = null;
 function tvOn() {
+  clearTimeout(offTimer); // riaperto mentre si chiudeva
   panel.classList.remove("tv-off", "glitch-out");
   void panel.offsetWidth;
   panel.classList.add("glitch-in");
@@ -232,7 +238,19 @@ function tvOn() {
 function tvOff() {
   panel.classList.remove("glitch-in");
   panel.classList.add("glitch-out");
-  setTimeout(() => { panel.classList.add("tv-off"); invoke("player_closed"); }, 600);
+  offTimer = setTimeout(() => { panel.classList.add("tv-off"); invoke("player_closed"); }, 600);
+}
+// espansione nella Music Venue (stessa finestra): glitch → ridimensiona → cambia pagina
+let switching = false;
+async function toMode(m) {
+  if (m !== "venue" || switching) return;
+  switching = true;
+  panel.classList.remove("glitch-in");
+  panel.classList.add("glitch-out");
+  await new Promise((r) => setTimeout(r, 380));
+  panel.classList.add("tv-off");
+  try { await invoke("player_expand", { on: true }); } catch {}
+  location.replace("venue.html?docked=1");
 }
 
 // ---------- eventi ----------
@@ -246,6 +264,7 @@ listen("music-spectrum", (e) => {
 });
 // NB: listen() riceve anche gli eventi mandati ad altre finestre: il lettore ha i suoi nomi
 listen("player-tv", (e) => (e.payload === "off" ? tvOff() : tvOn()));
+listen("player-mode", (e) => toMode(e.payload));
 
 (async () => {
   try { I18N.setLang(I18N.resolve((await invoke("get_config")).ui_language)); } catch {}

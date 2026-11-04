@@ -39,6 +39,9 @@ const I18N = (() => {
     "leggo la pagina": "reading the page", "cerco la musica": "looking for the music", "controllo la musica": "controlling the music",
 
     // ---------- 1.3: Music Venue, aggiornamenti, mouse e tastiera ----------
+    "Riduci a lettore": "Shrink to player",
+    "Separa in una finestra a parte": "Detach into its own window",
+    "Aggancia al lettore": "Dock to the player",
     "Apri la Music Venue": "Open the Music Venue",
     "Chiudi la Music Venue": "Close the Music Venue",
     "Aggiungi ai preferiti": "Add to favorites",
