@@ -1,7 +1,7 @@
 {
   "name": "alter-ego",
   "private": true,
-  "version": "1.3.2",
+  "version": "1.3.3",
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",

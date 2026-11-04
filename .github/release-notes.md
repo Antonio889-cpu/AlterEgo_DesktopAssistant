@@ -1,3 +1,9 @@
+## Alter Ego 1.3.3
+
+- Headphones sprite much bigger in the main window (still whole, neck included).
+
+`AlterEgo_1.3.3_setup.exe` installer · `AlterEgo_1.3.3_portable.zip` portable · `SHA256SUMS.txt`
+
 ## Alter Ego 1.3.2
 
 - Headphones sprite: whole neck and collar visible.

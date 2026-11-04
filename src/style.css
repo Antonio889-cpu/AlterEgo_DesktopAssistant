@@ -188,6 +188,14 @@ body.fx #screen::after {
 #face.talking img.on { animation: talk-bob .26s steps(2) infinite; }
 @keyframes talk-bob { 50% { transform: translateY(-0.6%); } }
 /* con le cuffie durante la musica: dondola a tempo e fa uscire qualche nota */
+/* lo sprite con le cuffie è più alto (orecchie, cuffie, collo): riquadro più grande, sfuma solo l'ultimo bordo */
+#face { transition: top .35s ease, height .35s ease; }
+#face.groove {
+  top: 2%;
+  height: 92%;
+  -webkit-mask-image: linear-gradient(to bottom, #000 93%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 93%, transparent 100%);
+}
 #face.groove img.on { animation: groove 1.7s ease-in-out infinite; transform-origin: 50% 85%; }
 @keyframes groove {
   0%, 100% { transform: rotate(-1.6deg) translateY(0); }
