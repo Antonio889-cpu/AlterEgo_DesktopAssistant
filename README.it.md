@@ -87,9 +87,22 @@ Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in ingle
 | ![Richiesta di permesso](docs/screenshots/confirm.png) | ![Input di testo](docs/screenshots/input.png) |
 | Conferma prima di un'azione sul PC | Scrivere ad Alter Ego (`Ctrl+Alt+T`) |
 
-**Lettore musicale**
+**Lettore musicale e Music Venue**
 
-![Lettore musicale: spettro, titolo, comandi, testo sincronizzato e volto di Alter Ego](docs/screenshots/player.png)
+| | |
+|---|---|
+| ![Alter Ego con le cuffie mentre suona la musica](docs/screenshots/main-music.png) | ![Lettore musicale: spettro, titolo, comandi, preferito, tasto Venue, testo sincronizzato](docs/screenshots/player.png) |
+| Mentre suona la musica mette le cuffie (sprite di [Ayari](https://www.instagram.com/xxayariii/)) | Lettore: preferito ♥, tasto Music Venue, angolo per ridimensionare |
+| ![Music Venue: brani recenti, preferiti e in riproduzione](docs/screenshots/venue.png) | ![Music Venue: ricerca nella libreria o su YouTube](docs/screenshots/venue-search.png) |
+| Music Venue: recenti, preferiti, in riproduzione | Ricerca nella libreria o su YouTube |
+
+![Il lettore si espande nella Music Venue nella stessa finestra, con una transizione glitch](docs/screenshots/venue-morph.png)
+
+*Il lettore si espande nella Music Venue (e torna lettore) nella stessa finestra.*
+
+![Alter Ego, il lettore e la Music Venue separata affiancati, senza sovrapporsi](docs/screenshots/desktop-layout.png)
+
+*Separata (⧉): le finestre si aprono affiancate e non coprono mai Alter Ego né si sovrappongono.*
 
 **Spegnimento e accensione "vecchia TV"**
 
@@ -496,6 +509,8 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - **Kokoro-82M** e la libreria `kokoro` di hexgrad: Apache-2.0. Non sono inclusi nell'app: li scarica l'installazione di Kokoro.
 - **VB-CABLE** di VB-Audio Software: donationware, non incluso; si scarica dal sito ufficiale.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+- Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),
+  adattato per l'app (sfondo rimosso, tinta verde CRT). Grazie, Ayari! 💚
 - Logo, sfondo a circuiti, icona e suoni sono stati creati per questo progetto.
 - Costruito con [Tauri](https://tauri.app), [rusqlite](https://github.com/rusqlite/rusqlite), [cpal](https://github.com/RustAudio/cpal),
   [reqwest](https://github.com/seanmonstar/reqwest), [keyring](https://github.com/hwchen/keyring-rs) e altre librerie open source (vedi `src-tauri/Cargo.toml`).

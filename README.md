@@ -87,9 +87,22 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 | ![Permission request](docs/screenshots/en/confirm.png) | ![Text input](docs/screenshots/en/input.png) |
 | Confirmation before a PC action | Writing to Alter Ego (`Ctrl+Alt+T`) |
 
-**Music player**
+**Music player and Music Venue**
 
-![Music player: spectrum, title, controls, synced lyrics and Alter Ego's face](docs/screenshots/en/player.png)
+| | |
+|---|---|
+| ![Alter Ego with headphones while music plays](docs/screenshots/en/main-music.png) | ![Music player: spectrum, title, controls, favorite, Venue button, synced lyrics](docs/screenshots/en/player.png) |
+| While music plays she wears headphones (sprite by [Ayari](https://www.instagram.com/xxayariii/)) | Player: favorite ♥, Music Venue button, resizable corner |
+| ![Music Venue: recent tracks, favorites and now playing](docs/screenshots/en/venue.png) | ![Music Venue: search in the library or on YouTube](docs/screenshots/en/venue-search.png) |
+| Music Venue: recent tracks, favorites, now playing | Search in the library or on YouTube |
+
+![The player expands into the Music Venue in the same window, with a glitch transition](docs/screenshots/en/venue-morph.png)
+
+*The player expands into the Music Venue (and back) in the same window.*
+
+![Alter Ego, the player and the detached Music Venue side by side, without overlapping](docs/screenshots/en/desktop-layout.png)
+
+*Detached (⧉): the windows open side by side and never cover Alter Ego or each other.*
 
 **"Old TV" power off and on**
 
@@ -496,6 +509,8 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **Kokoro-82M** and hexgrad's `kokoro` library: Apache-2.0. Not bundled with the app: the Kokoro installation downloads them.
 - **VB-CABLE** by VB-Audio Software: donationware, not bundled; download it from the official website.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+- **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),
+  adapted for the app (background removed, green CRT tint). Thank you, Ayari! 💚
 - Logo, circuit background, icon and sounds were created for this project.
 - Built with [Tauri](https://tauri.app), [rusqlite](https://github.com/rusqlite/rusqlite), [cpal](https://github.com/RustAudio/cpal),
   [reqwest](https://github.com/seanmonstar/reqwest), [keyring](https://github.com/hwchen/keyring-rs), [symphonia](https://github.com/pdeljanov/Symphonia),
