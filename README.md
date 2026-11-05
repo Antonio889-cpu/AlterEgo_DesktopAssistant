@@ -33,6 +33,7 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 - [Mic-Link](#mic-link)
 - [Music](#music)
 - [Web search](#web-search)
+- [Token saving](#token-saving)
 - [Costs](#costs)
 - [Voice clips](#voice-clips)
 - [PC actions and permissions](#pc-actions-and-permissions)
@@ -66,7 +67,9 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 - **Mouse and keyboard**: if you allow it, Alter Ego moves the cursor, clicks, types and presses keys (with confirmation and an emergency stop).
 - **Noise suppression** for the Mic-Link microphone (RNNoise, adjustable).
 - **Updates**: website and GitHub links in the app and a button to update to the latest release.
-- **Web search** with DeepSeek's Search and Fetch APIs, when up-to-date information is needed.
+- **Web search** with your choice of engine: DeepSeek, Google (via Gemini), Tavily, Brave or DuckDuckGo (free), with fallback.
+- **Spotify** (Premium): "play *title*" can play on your Spotify instead of YouTube.
+- **Token saving**: thinking off, tools only when needed, local router (keywords or Rizzo Flow), cheap model for simple questions.
 - **Costs panel**: every request with tokens, cache, duration and cost; daily/monthly totals and per-model summary, editable prices, CSV export.
 - **Terminal**: Alter Ego can run PowerShell or cmd commands, with confirmation or autonomously.
 - **Voice clips**: "Alter Ego clip that" → saves the clip with AMD Adrenalin, NVIDIA App or Medal, **without going through the AI**.
@@ -193,8 +196,8 @@ that start exactly like a previous request. That's why:
 
 ## Voice
 
-- **Speech recognition (push-to-talk)**: Groq Whisper (`whisper-large-v3-turbo`) or a local OpenAI-compatible Whisper server
-  (e.g. faster-whisper-server/speaches, whisper.cpp server). *Test microphone* records 4 seconds and shows what it understood.
+- **Speech recognition (push-to-talk)**: Groq Whisper (`whisper-large-v3-turbo`), **Google Gemini** (Gemini key) or a local OpenAI-compatible
+  Whisper server (e.g. faster-whisper-server/speaches, whisper.cpp server), with a **fallback** service (e.g. Groq ⇄ Gemini) if the first one fails. *Test microphone* records 4 seconds and shows what it understood.
 - **Alter Ego's voice (TTS)**, in *Settings → Voice & audio*:
   - **Kokoro-82M (local)**: an 82M-parameter model ([Hugging Face](https://huggingface.co/hexgrad/Kokoro-82M),
     [library](https://github.com/hexgrad/kokoro), Apache-2.0) with English voices (*Heart*, *Bella*, *Emma*…) and the Italian
@@ -261,19 +264,47 @@ You can also say "add … to the queue", "pause", "next", "previous", "volume to
 - **Music Venue** (button in the player, the tray menu, or "open music venue"): recent tracks and favorites with covers,
   search in your library or on YouTube, play or queue with one click, heart to add to favorites. Saved in `music_library.json`.
   By default the player **expands into the Venue** in the same window and shrinks back; the ⧉ button detaches it into its own window (and docks it again).
+- Titles and artists shown are the **YouTube video title and channel**, as on YouTube (the cleaned-up title is only used to find the lyrics).
+- **Spotify (Premium)**: in *Voice & audio → Music → Spotify* paste the Client ID of a free app created on
+  [developer.spotify.com](https://developer.spotify.com/dashboard) (Redirect URI `http://127.0.0.1:8898/callback`), press **Connect account**
+  and tick **Use Spotify**: "play…", pause, next and volume then control your Spotify (PC app, phone or web player). Login uses PKCE
+  (no secret), the token stays in the Credential Manager, tracks also go to the Music Venue's recent list.
 - Use YouTube in accordance with its terms of service: this is meant for personal listening.
 
 ## Web search
 
-Turn on **Web search** in *Settings → Permissions*. When you ask about something recent or that she doesn't know, Alter Ego uses the tools:
+Turn on **Web search** in *Settings → Permissions* and pick the search engine:
 
-- `web_search`: DeepSeek's **Search** API (`POST https://api.deepseek.com/v1/tools/search`, up to 10 results with title, link and snippet);
-- `web_fetch`: the **Fetch** API (`POST https://api.deepseek.com/v1/tools/fetch`), which returns a page as Markdown.
+| Engine | Key | Notes |
+|---|---|---|
+| DeepSeek Search | DeepSeek (same as chat) | ~$0.75 per 1000 searches |
+| Google via Gemini | Gemini (same as chat) | "Grounding with Google Search": an answer already summarized, with sources |
+| Tavily | Tavily | 1000 free searches a month |
+| Brave Search | Brave | |
+| DuckDuckGo | none | free (HTML page) |
 
-They use the **DeepSeek keys** (with the same rotation as chat) and work with whichever AI service is active for the chat.
-They cost about **$0.75 per 1000** successful calls; every call shows up in the Costs tab. Found text is passed to the model
-as data, not as instructions. Endpoints and format are the ones DeepSeek published in October 2026: if they change,
-the error message will say so.
+With **fallback** on, if the engine fails the other available ones are tried (DuckDuckGo last).
+Pages are read by DeepSeek Fetch or **directly from the PC** (free): *Reading pages → Automatic / From the PC / DeepSeek Fetch*.
+Tavily and Brave keys go to the Windows Credential Manager. Found text is passed to the model as data, not as instructions;
+every search shows up in the Costs tab.
+
+## Token saving
+
+*Settings → AI & keys* has a **Token saving** section (the length and quality of the answers don't change):
+
+- **Thinking**: the reasoning of "thinking" models (`<think>…</think>`) is never shown; set it to **Off** to save the reasoning tokens
+  (Gemini 2.5 Flash, Qwen3, gpt-oss, DeepSeek, OpenRouter and Ollama get the right parameter; if a model refuses it, it's retried without).
+- **Tools only when needed**: tool definitions (1–3 thousand tokens per message) are sent only when the question asks for an action.
+  If the model realizes it needed one it answers `[[TOOLS]]` and the question is repeated right away with the tools.
+- **Local router**: decides "is an action needed?" and "is this a simple question?" without spending tokens — keywords (free)
+  or [**Rizzo Flow**](https://github.com/Rizzo-AI-Academy/rizzo-flow) by Rizzo AI Academy, a local model that answers typed questions
+  in ~50 ms with zero generated tokens (`uv run rizzo serve`, default `http://127.0.0.1:8017`).
+- **Cheap model for simple questions**: greetings and short questions go to a provider/model of your choice (model routing).
+- **Compact tool descriptions**, **shorter old answers in the history** (deterministic, so the provider cache keeps working),
+  **only the most relevant facts**, **smaller screenshots** and **shorter web pages**.
+- **Maximum saving** turns on everything at once; **Defaults** goes back.
+
+Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini): the fixed part comes first, history moves in steps.
 
 ## Costs
 

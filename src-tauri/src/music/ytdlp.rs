@@ -187,6 +187,22 @@ pub fn prune(cache: &Path, keep: usize) {
 }
 
 /// Titolo e artista leggibili da metadati YouTube spesso disordinati.
+/// Titolo e autore da mostrare: quelli di YouTube così come sono (titolo del video, nome del canale).
+/// I metadati "musicali" di YouTube (`track`/`artist`) a volte sono di un altro brano: non si usano qui.
+pub fn display_meta(info: &Info) -> (String, String) {
+    let title = info.title.split_whitespace().collect::<Vec<_>>().join(" ");
+    let channel = info
+        .channel
+        .clone()
+        .or_else(|| info.uploader.clone())
+        .unwrap_or_default()
+        .trim_end_matches(" - Topic")
+        .trim()
+        .to_string();
+    (title, channel)
+}
+
+/// Titolo e artista "puliti", solo per cercare il testo della canzone.
 pub fn clean_meta(info: &Info) -> (String, String) {
     let strip = |s: &str| -> String {
         let mut t = s.to_string();

@@ -1,6 +1,6 @@
 [package]
 name = "alter-ego"
-version = "1.3.3"
+version = "1.4.0"
 description = "Alter Ego – assistente desktop personale"
 edition = "2021"
 
@@ -15,7 +15,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 futures-util = "0.3"
-tokio = { version = "1", features = ["time", "sync", "process", "io-util"] }
+tokio = { version = "1", features = ["time", "sync", "process", "io-util", "net"] }
 keyring = { version = "3", features = ["windows-native", "linux-native"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 cpal = "0.15"
@@ -32,6 +32,8 @@ rustfft = "6"
 nnnoiseless = { version = "0.5", default-features = false }
 # controllo dello SHA-256 degli aggiornamenti
 sha2 = "0.10"
+# verificatore PKCE casuale (collegamento a Spotify)
+getrandom = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

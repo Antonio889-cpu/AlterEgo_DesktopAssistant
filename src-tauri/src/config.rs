@@ -65,6 +65,8 @@ pub struct AiConfig {
     pub temperature: f64,
     /// Messaggi recenti inviati come contesto.
     pub max_history: usize,
+    /// Ragionamento dei modelli "thinking": "hide" (si usa ma non si vede) o "off" (spento, meno token).
+    pub thinking: String,
 }
 
 impl Default for AiConfig {
@@ -83,6 +85,7 @@ impl Default for AiConfig {
             ]),
             temperature: 0.7,
             max_history: 12,
+            thinking: "hide".into(),
         }
     }
 }
@@ -107,6 +110,9 @@ impl AiConfig {
         }
         self.temperature = self.temperature.clamp(0.0, 2.0);
         self.max_history = self.max_history.clamp(2, 50);
+        if !["hide", "off"].contains(&self.thinking.as_str()) {
+            self.thinking = "hide".into();
+        }
     }
 }
 
@@ -138,6 +144,10 @@ pub struct SttConfig {
     /// Server Whisper locale compatibile OpenAI (solo provider "local").
     pub base_url: String,
     pub language: String,
+    /// Se il primo fallisce: "none", "groq", "gemini" o "local".
+    pub fallback: String,
+    /// Modello Gemini per la trascrizione (chiavi Gemini).
+    pub gemini_model: String,
 }
 
 impl Default for SttConfig {
@@ -147,6 +157,8 @@ impl Default for SttConfig {
             model: "whisper-large-v3-turbo".into(),
             base_url: "http://localhost:8000/v1".into(),
             language: "it".into(),
+            fallback: "gemini".into(),
+            gemini_model: "gemini-2.5-flash".into(),
         }
     }
 }
@@ -426,6 +438,93 @@ impl Default for AudioConfig {
     }
 }
 
+/// Risparmio di token sulle API (stessa qualità di risposta; vedi README → Risparmio token).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct SavingConfig {
+    /// Manda le definizioni degli strumenti solo quando la domanda sembra chiederne uno
+    /// (risparmia ~1–3 mila token a messaggio di chiacchiera).
+    pub tools_on_demand: bool,
+    /// Descrizioni degli strumenti accorciate (solo la prima frase).
+    pub compact_tools: bool,
+    /// Accorcia le risposte vecchie di Alter Ego nella cronologia (le ultime restano intere).
+    pub trim_history: bool,
+    /// Fatti sull'utente inviati: solo i più pertinenti alla domanda (0 = tutti).
+    pub facts_limit: usize,
+    /// Larghezza massima degli screenshot mandati al modello (meno pixel = meno token).
+    pub screenshot_width: u32,
+    /// Caratteri massimi di una pagina web letta.
+    pub page_chars: usize,
+    /// Router locale: "off", "rizzo" (Rizzo Flow) o "heuristic" (parole chiave, gratis).
+    pub router: String,
+    pub router_url: String,
+    /// Modello economico per le domande semplici (provider e modello; vuoto = spento).
+    pub economy_provider: String,
+    pub economy_model: String,
+}
+
+impl Default for SavingConfig {
+    fn default() -> Self {
+        Self {
+            tools_on_demand: false,
+            compact_tools: false,
+            trim_history: true,
+            facts_limit: 0,
+            screenshot_width: 1280,
+            page_chars: 8000,
+            router: "heuristic".into(),
+            router_url: "http://127.0.0.1:8017".into(),
+            economy_provider: String::new(),
+            economy_model: String::new(),
+        }
+    }
+}
+
+impl SavingConfig {
+    pub fn normalize(&mut self) {
+        self.screenshot_width = self.screenshot_width.clamp(512, 1920);
+        self.page_chars = self.page_chars.clamp(1000, 30000);
+        self.facts_limit = self.facts_limit.min(100);
+        if !["off", "rizzo", "heuristic"].contains(&self.router.as_str()) {
+            self.router = "heuristic".into();
+        }
+    }
+}
+
+/// Spotify Web API (serve Spotify Premium per controllare la riproduzione).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default)]
+pub struct SpotifyConfig {
+    /// "Metti …" suona su Spotify invece che su YouTube.
+    pub enabled: bool,
+    /// Client ID dell'app creata su developer.spotify.com (non è un segreto: si usa PKCE).
+    pub client_id: String,
+    /// Account collegato (il refresh token sta nel Credential Manager).
+    pub connected: bool,
+    /// Nome dell'account collegato.
+    pub account: String,
+}
+
+/// Ricerca web: provider, fallback e lettura delle pagine.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct WebConfig {
+    /// "deepseek", "gemini" (Google Search), "tavily", "brave", "duckduckgo".
+    pub provider: String,
+    /// Se il provider fallisce prova gli altri disponibili (DuckDuckGo per ultimo, gratis).
+    pub fallback: bool,
+    /// Lettura delle pagine: "auto", "deepseek" o "local" (gratis, direttamente dal PC).
+    pub fetch: String,
+    /// Modello Gemini per la ricerca con Google.
+    pub gemini_model: String,
+}
+
+impl Default for WebConfig {
+    fn default() -> Self {
+        Self { provider: "deepseek".into(), fallback: true, fetch: "auto".into(), gemini_model: "gemini-2.5-flash".into() }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct Config {
@@ -466,6 +565,11 @@ pub struct Config {
     pub audio: AudioConfig,
     pub prices: Vec<Price>,
     pub music: MusicConfig,
+    pub web: WebConfig,
+    /// Risparmio di token (vedi providers::saving).
+    pub saving: SavingConfig,
+    /// Spotify (utenti Premium): controllo della riproduzione via Web API.
+    pub spotify: SpotifyConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -496,6 +600,9 @@ impl Default for Config {
             permissions: Permissions::default(),
             prices: default_prices(),
             music: MusicConfig::default(),
+            web: WebConfig::default(),
+            saving: SavingConfig::default(),
+            spotify: SpotifyConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
             last_monitor: None,
@@ -512,9 +619,19 @@ impl Config {
         self.personality.confidence = self.personality.confidence.clamp(0.0, 1.0);
         self.personality.warmth = self.personality.warmth.clamp(0.0, 1.0);
         self.personality.imitate = self.personality.imitate.trim().chars().take(60).collect();
-        if !["groq", "local", "off"].contains(&self.stt.provider.as_str()) {
+        if !["groq", "gemini", "local", "off"].contains(&self.stt.provider.as_str()) {
             self.stt.provider = "groq".into();
         }
+        if !["none", "groq", "gemini", "local"].contains(&self.stt.fallback.as_str()) || self.stt.fallback == self.stt.provider {
+            self.stt.fallback = "none".into();
+        }
+        if !["deepseek", "gemini", "tavily", "brave", "duckduckgo"].contains(&self.web.provider.as_str()) {
+            self.web.provider = "deepseek".into();
+        }
+        if !["auto", "deepseek", "local"].contains(&self.web.fetch.as_str()) {
+            self.web.fetch = "auto".into();
+        }
+        self.saving.normalize();
         if !["dr", "soft", "off"].contains(&self.audio.blips.as_str()) {
             self.audio.blips = "dr".into();
         }

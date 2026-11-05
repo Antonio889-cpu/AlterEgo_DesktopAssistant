@@ -568,6 +568,12 @@ fn save_library(app: &AppHandle) {
     let _ = app.emit("venue-library", lib);
 }
 
+/// Brano suonato fuori dal lettore (Spotify): va nei recenti della Venue.
+pub fn record_external(app: &AppHandle, e: library::Entry) {
+    app.state::<Music>().library.lock().unwrap().played(e);
+    save_library(app);
+}
+
 /// Aggiunge/toglie il brano attuale dai preferiti. Restituisce il nuovo stato.
 pub fn favorite_current(app: &AppHandle, want: Option<bool>) -> Result<bool, String> {
     let Some(t) = state(app).track else {
@@ -790,7 +796,9 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
             return Err(e);
         }
     };
-    let (title, artist) = ytdlp::clean_meta(&info);
+    // nel lettore e nella Venue: titolo e canale di YouTube; per i testi: titolo e artista ripuliti
+    let (title, artist) = ytdlp::display_meta(&info);
+    let (lyr_title, lyr_artist) = ytdlp::clean_meta(&info);
     let duration = info.duration.filter(|d| *d > 0.0).or_else(|| decode::duration(&file)).unwrap_or(0.0);
     let track = Track {
         id: info.id.clone(),
@@ -829,7 +837,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
         let id = info.id.clone();
         let raw = info.title.clone();
         let url = info.webpage_url.clone().unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", info.id));
-        let (title, artist) = (title.clone(), artist.clone());
+        let (title, artist) = (lyr_title.clone(), lyr_artist.clone());
         tauri::async_runtime::spawn(async move {
             let http = app.state::<AppState>().ai.http.clone();
             let mut found = lyrics::find(&http, &title, &raw, &artist, duration, None).await;
@@ -1200,12 +1208,22 @@ pub fn venue_remove(app: AppHandle, id: String) {
 #[tauri::command]
 pub async fn venue_play(app: AppHandle, id: String, query: Option<String>, enqueue: Option<bool>) -> Result<String, String> {
     let q = match query.filter(|q| !q.trim().is_empty()) {
-        Some(q) => q,
+        Some(q) => {
+            // ricerca dalla Venue: su Spotify se è la fonte scelta
+            if crate::spotify::active(&app) {
+                return crate::spotify::play(&app, &q, enqueue.unwrap_or(false)).await;
+            }
+            q
+        }
         None => {
             let lib = app.state::<Music>().library.lock().unwrap().clone();
             let e = lib.find(&id).ok_or("brano non trovato")?;
             e.url.clone().unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", e.id))
         }
     };
+    // brano della libreria preso da Spotify
+    if q.starts_with("spotify:") {
+        return crate::spotify::play(&app, &q, enqueue.unwrap_or(false)).await;
+    }
     play(&app, &q, enqueue.unwrap_or(false)).await
 }

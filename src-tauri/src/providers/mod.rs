@@ -10,6 +10,7 @@
 
 mod openai_compat;
 pub mod prompt;
+pub mod textcalls;
 
 use crate::{config::AiConfig, keys};
 use serde::{Deserialize, Serialize};
@@ -117,6 +118,8 @@ pub struct Target {
     pub key: Option<String>,
     pub model: String,
     pub temperature: f64,
+    /// Chiede al modello di non "pensare" (parametri diversi per provider).
+    pub thinking_off: bool,
 }
 
 /// Classifica una risposta HTTP non riuscita (stesse regole della chat).
@@ -167,6 +170,8 @@ pub struct Ai {
     pub cost_log: Mutex<Option<std::path::PathBuf>>,
     /// Provider che hanno rifiutato `stream_options`: non lo si manda più.
     pub no_usage: Mutex<std::collections::HashSet<String>>,
+    /// "provider/modello" che rifiutano i parametri per spegnere il ragionamento.
+    pub no_think_params: Mutex<std::collections::HashSet<String>>,
 }
 
 /// Contatori dei token (dai campi `usage` delle risposte).
@@ -205,6 +210,7 @@ impl Ai {
             kind,
             cost_log: Mutex::new(None),
             no_usage: Mutex::new(Default::default()),
+            no_think_params: Mutex::new(Default::default()),
         }
     }
 
@@ -335,7 +341,7 @@ pub async fn chat(
         let mut last_msg = String::new();
 
         for (k_pos, (k_index, key)) in key_list.into_iter().enumerate() {
-            let mut target = Target { id: id.clone(), base: base.clone(), key, model: model.clone(), temperature: cfg.temperature };
+            let mut target = Target { id: id.clone(), base: base.clone(), key, model: model.clone(), temperature: cfg.temperature, thinking_off: cfg.thinking == "off" };
             if target.model.is_empty() {
                 // Ollama senza modello scelto: usa il primo installato.
                 match openai_compat::list_models(ai.client_for(&target.base), &target).await {
@@ -362,8 +368,18 @@ pub async fn chat(
                 let _ = events.send(StreamEvent::Start { provider: id.clone(), model: target.model.clone() });
                 match openai_compat::stream_chat(ai, gen, &target, &system, &messages, use_tools.as_ref(), &events).await {
                     Ok(reply) => {
+                        // via il "pensiero" e le chiamate a strumenti scritte come testo
+                        let allowed = use_tools.as_ref().map(textcalls::tool_names).unwrap_or_default();
+                        let (text, text_calls) = textcalls::extract(&textcalls::strip_thinking(&reply.text), &allowed);
+                        let tool_calls = if reply.tool_calls.is_empty() { text_calls } else { reply.tool_calls };
+                        if text.trim().is_empty() && tool_calls.is_empty() && attempt < 2 {
+                            // solo ragionamento o una chiamata non valida: riprova
+                            attempt += 1;
+                            let _ = events.send(StreamEvent::Reset);
+                            continue;
+                        }
                         ai.mark_good(&id, k_index);
-                        return Ok(ChatResult { text: reply.text, provider: id, model: target.model, tool_calls: reply.tool_calls });
+                        return Ok(ChatResult { text, provider: id, model: target.model, tool_calls });
                     }
                     Err(e) => {
                         let _ = events.send(StreamEvent::Reset);
@@ -400,7 +416,7 @@ pub async fn list_models(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<Vec<String
     let base = base_url(cfg, id)?;
     let mut last = String::from("nessuna chiave");
     for (_, key) in keys_for(ai, cfg, id)? {
-        let t = Target { id: id.into(), base: base.clone(), key, model: String::new(), temperature: 0.0 };
+        let t = Target { id: id.into(), base: base.clone(), key, model: String::new(), temperature: 0.0, thinking_off: false };
         match openai_compat::list_models(ai.client_for(&t.base), &t).await {
             Ok(v) => return Ok(v),
             Err(e) => last = keys::redact(&e.message, t.key.as_deref()),

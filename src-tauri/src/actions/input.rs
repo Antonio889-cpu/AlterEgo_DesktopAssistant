@@ -207,11 +207,22 @@ pub mod pointer {
     pub fn foreground_is_ours() -> bool { false }
 }
 
-/// Griglia delle coordinate usata dal modello: quella dello screenshot (ridotto a max 1280 px).
+/// Larghezza massima degli screenshot (Impostazioni → Risparmio token).
+static SHOT_W: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1280);
+
+pub fn set_shot_width(w: u32) {
+    SHOT_W.store(w.clamp(512, 1920), std::sync::atomic::Ordering::Relaxed);
+}
+
+pub fn shot_width() -> u32 {
+    SHOT_W.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Griglia delle coordinate usata dal modello: quella dello screenshot (ridotto a `shot_width`).
 /// Restituisce (larghezza, altezza, fattore griglia→schermo).
 pub fn grid() -> (i32, i32, f64) {
     let (w, h) = pointer::screen_size();
-    let f = ((w as f64) / 1280.0).ceil().max(1.0);
+    let f = ((w as f64) / shot_width() as f64).ceil().max(1.0);
     ((w as f64 / f) as i32, (h as f64 / f) as i32, f)
 }
 

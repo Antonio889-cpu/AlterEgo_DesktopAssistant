@@ -239,9 +239,17 @@ function fillStt(cfg) {
   $("stt-model").value = sttCfg.model;
   $("stt-url").value = sttCfg.base_url;
   $("stt-language").value = sttCfg.language;
-  $("stt-url-row").style.display = sttCfg.provider === "local" ? "" : "none";
+  $("stt-fallback").value = sttCfg.fallback || "none";
+  $("stt-gemini-model").value = sttCfg.gemini_model || "";
+  sttRows();
 }
-$("stt-provider").onchange = (e) => { sttCfg.provider = e.target.value; $("stt-url-row").style.display = sttCfg.provider === "local" ? "" : "none"; saveStt(); };
+function sttRows() {
+  $("stt-url-row").style.display = sttCfg.provider === "local" || sttCfg.fallback === "local" ? "" : "none";
+  $("stt-gemini-row").style.display = sttCfg.provider === "gemini" || sttCfg.fallback === "gemini" ? "" : "none";
+}
+$("stt-provider").onchange = (e) => { sttCfg.provider = e.target.value; if (sttCfg.fallback === sttCfg.provider) { sttCfg.fallback = "none"; $("stt-fallback").value = "none"; } sttRows(); saveStt(); };
+$("stt-fallback").onchange = (e) => { sttCfg.fallback = e.target.value; sttRows(); saveStt(); };
+$("stt-gemini-model").oninput = (e) => { sttCfg.gemini_model = e.target.value.trim(); saveStt(); };
 $("stt-model").oninput = (e) => { sttCfg.model = e.target.value.trim(); saveStt(); };
 $("stt-url").oninput = (e) => { sttCfg.base_url = e.target.value.trim(); saveStt(); };
 $("stt-language").oninput = (e) => { sttCfg.language = e.target.value.trim(); saveStt(); };
@@ -799,6 +807,121 @@ function fillPerms(cfg) {
   document.querySelectorAll(".list[data-list]").forEach(renderList);
 }
 
+// ---------- ragionamento e risparmio token ----------
+$("thinking").onchange = (e) => { ai.thinking = e.target.value; saveAi(); };
+let saving = null;
+let savingTimer = null;
+function saveSaving() { clearTimeout(savingTimer); savingTimer = setTimeout(() => invoke("set_saving", { saving }), 250); }
+const SAVING_DEFAULT = { tools_on_demand: false, compact_tools: false, trim_history: true, facts_limit: 0, screenshot_width: 1280, page_chars: 8000 };
+const SAVING_MAX = { tools_on_demand: true, compact_tools: true, trim_history: true, facts_limit: 10, screenshot_width: 1024, page_chars: 5000 };
+function fillSaving(cfg) {
+  saving = structuredClone(cfg.saving);
+  const eco = $("sv-eco-provider");
+  if (eco.options.length <= 1) {
+    for (const [id, label] of [["gemini", "Google Gemini"], ["openrouter", "OpenRouter"], ["groq", "Groq"], ["deepseek", "DeepSeek"], ["ollama", "Ollama (locale)"]]) {
+      eco.append(Object.assign(document.createElement("option"), { value: id, textContent: label }));
+    }
+  }
+  $("sv-tools").checked = saving.tools_on_demand;
+  $("sv-compact").checked = saving.compact_tools;
+  $("sv-trim").checked = saving.trim_history;
+  $("sv-facts").value = String(saving.facts_limit);
+  $("sv-shot").value = String(saving.screenshot_width);
+  $("sv-page").value = String(saving.page_chars);
+  $("sv-router").value = saving.router;
+  $("sv-rizzo-url").value = saving.router_url;
+  $("sv-eco-provider").value = saving.economy_provider;
+  $("sv-eco-model").value = saving.economy_model;
+  $("sv-rizzo-row").style.display = $("sv-rizzo-note").style.display = saving.router === "rizzo" ? "" : "none";
+}
+$("sv-tools").onchange = (e) => { saving.tools_on_demand = e.target.checked; saveSaving(); };
+$("sv-compact").onchange = (e) => { saving.compact_tools = e.target.checked; saveSaving(); };
+$("sv-trim").onchange = (e) => { saving.trim_history = e.target.checked; saveSaving(); };
+$("sv-facts").onchange = (e) => { saving.facts_limit = +e.target.value; saveSaving(); };
+$("sv-shot").onchange = (e) => { saving.screenshot_width = +e.target.value; saveSaving(); };
+$("sv-page").onchange = (e) => { saving.page_chars = +e.target.value; saveSaving(); };
+$("sv-router").onchange = (e) => { saving.router = e.target.value; $("sv-rizzo-row").style.display = $("sv-rizzo-note").style.display = saving.router === "rizzo" ? "" : "none"; saveSaving(); };
+$("sv-rizzo-url").oninput = (e) => { saving.router_url = e.target.value.trim(); saveSaving(); };
+$("sv-eco-provider").onchange = (e) => { saving.economy_provider = e.target.value; saveSaving(); };
+$("sv-eco-model").oninput = (e) => { saving.economy_model = e.target.value.trim(); saveSaving(); };
+$("sv-rizzo-link").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "rizzo" }); };
+$("sv-rizzo-test").onclick = async (e) => {
+  e.preventDefault();
+  const r = $("sv-rizzo-result");
+  r.className = "result"; r.textContent = t("Controllo…");
+  try { r.textContent = await invoke("rizzo_test", { url: saving.router_url }); r.className = "result ok"; }
+  catch { r.textContent = t("Non raggiungibile: avvialo con «uv run rizzo serve»"); r.className = "result bad"; }
+};
+function applySavingPreset(p, thinking) {
+  Object.assign(saving, p);
+  ai.thinking = thinking; $("thinking").value = thinking; saveAi();
+  fillSaving({ saving }); saveSaving();
+}
+$("saving-max").onclick = () => applySavingPreset(SAVING_MAX, "off");
+$("saving-default").onclick = () => applySavingPreset(SAVING_DEFAULT, "hide");
+
+// ---------- ricerca web ----------
+let web = null;
+let webTimer = null;
+function saveWeb() { clearTimeout(webTimer); webTimer = setTimeout(() => invoke("set_web_config", { web }), 250); }
+async function webKeyStatus() {
+  let k = {};
+  try { k = (await invoke("web_keys")) || {}; } catch {}
+  for (const p of ["tavily", "brave"]) { const el = $(`web-${p}-st`); el.textContent = k[p] ? t("chiave salvata ✓") : ""; el.className = "result ok"; }
+}
+function webRows() {
+  $("web-gemini-row").style.display = web.provider === "gemini" ? "" : "none";
+  $("web-tavily-row").style.display = web.provider === "tavily" ? "" : "none";
+  $("web-brave-row").style.display = web.provider === "brave" ? "" : "none";
+}
+function fillWeb(cfg) {
+  web = structuredClone(cfg.web);
+  $("web-provider").value = web.provider;
+  $("web-fallback").checked = web.fallback;
+  $("web-fetch").value = web.fetch;
+  $("web-gemini-model").value = web.gemini_model;
+  webRows();
+  webKeyStatus();
+}
+$("web-provider").onchange = (e) => { web.provider = e.target.value; webRows(); saveWeb(); };
+$("web-fallback").onchange = (e) => { web.fallback = e.target.checked; saveWeb(); };
+$("web-fetch").onchange = (e) => { web.fetch = e.target.value; saveWeb(); };
+$("web-gemini-model").oninput = (e) => { web.gemini_model = e.target.value.trim(); saveWeb(); };
+for (const p of ["tavily", "brave"]) {
+  $(`web-${p}-save`).onclick = async (e) => {
+    e.preventDefault();
+    try { await invoke("set_web_key", { provider: p, key: $(`web-${p}-key`).value }); $(`web-${p}-key`).value = ""; webKeyStatus(); }
+    catch (err) { const el = $(`web-${p}-st`); el.textContent = String(err); el.className = "result bad"; }
+  };
+}
+
+// ---------- Spotify ----------
+async function spotifyStatus() {
+  const el = $("sp-status");
+  try {
+    const s = await invoke("spotify_status");
+    el.textContent = s.connected ? t("Collegato: {name}", { name: s.account }) : t("Non collegato");
+    el.className = s.connected ? "result ok" : "result";
+    $("sp-redirect").textContent = s.redirect;
+  } catch (e) { el.textContent = String(e); el.className = "result bad"; }
+}
+function fillSpotify(cfg) {
+  $("sp-client").value = cfg.spotify.client_id || "";
+  $("sp-enabled").checked = !!cfg.spotify.enabled;
+  spotifyStatus();
+}
+$("sp-dev").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "spotify_dev" }); };
+$("sp-connect").onclick = async (e) => {
+  const el = $("sp-status");
+  e.target.disabled = true;
+  el.className = "result"; el.textContent = t("Si apre il browser: accedi a Spotify e consenti l'accesso…");
+  try { const name = await invoke("spotify_connect", { clientId: $("sp-client").value }); el.textContent = t("Collegato: {name}", { name }); el.className = "result ok"; }
+  catch (err) { el.textContent = String(err); el.className = "result bad"; }
+  e.target.disabled = false;
+};
+$("sp-disconnect").onclick = async () => { await invoke("spotify_disconnect"); spotifyStatus(); };
+$("sp-enabled").onchange = (e) => invoke("spotify_settings", { enabled: e.target.checked });
+
 // ---------- info e aggiornamenti ----------
 invoke("app_version").then((v) => { $("app-version").textContent = v; }).catch(() => {});
 $("link-site").onclick = () => invoke("open_link_cmd", { which: "site" });
@@ -858,6 +981,10 @@ $("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle
   $("temperature").value = ai.temperature;
   $("temperature-val").textContent = ai.temperature.toFixed(2);
   $("max-history").value = ai.max_history;
+  $("thinking").value = ai.thinking || "hide";
+  fillSaving(cfg);
+  fillWeb(cfg);
+  fillSpotify(cfg);
   await reloadInfos();
   // aggiornamenti da altre parti dell'app (non sovrascrive ciò che si sta scrivendo)
   listen("config", (e) => {

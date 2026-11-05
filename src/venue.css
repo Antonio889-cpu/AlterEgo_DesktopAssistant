@@ -56,7 +56,7 @@ button { font: inherit; color: var(--accent); background: none; border: 0; paddi
 button:hover { filter: brightness(1.3) drop-shadow(0 0 4px var(--glow)); }
 
 /* ---------- testata ---------- */
-#lib { display: flex; flex-direction: column; min-height: 0; gap: 10px; }
+#lib { display: flex; flex-direction: column; min-height: 0; min-width: 0; gap: 10px; }
 #head { display: flex; align-items: center; gap: 14px; cursor: grab; }
 #head .icon { width: 54px; height: 54px; flex: none; border: 2px solid var(--accent); border-radius: 8px; display: grid; place-items: center; color: var(--accent); box-shadow: 0 0 6px var(--glow), inset 0 0 6px rgba(141, 255, 69, .4); }
 #head .icon svg { width: 30px; height: 30px; fill: currentColor; stroke: none; filter: drop-shadow(0 0 4px var(--glow)); }
@@ -71,11 +71,14 @@ body.fx .gl::after { color: #4ff4ff; animation: gl-b 6s steps(1) infinite; }
 @keyframes gl-b { 0%, 92%, 100% { opacity: 0; transform: none; } 93% { opacity: .8; transform: translate(3px, -1px); clip-path: inset(45% 0 0 0); } 96% { opacity: .8; transform: translate(-2px, 1px); clip-path: inset(0 0 60% 0); } }
 
 /* ---------- schede ---------- */
-#tabs { display: flex; align-items: stretch; gap: 4px; border-bottom: 1.5px solid var(--line); }
-#tabs button { display: flex; align-items: center; gap: 7px; padding: 8px 10px 9px; font-size: 16px; color: var(--text); opacity: .8; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+/* le schede restano dentro la colonna: si stringono e, se serve, mostrano solo l'icona */
+#tabs { display: flex; align-items: stretch; gap: 2px; border-bottom: 1.5px solid var(--line); min-width: 0; overflow: hidden; }
+#tabs button { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 8px 9px 9px; font-size: 16px; color: var(--text); opacity: .8; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+#tabs button span { overflow: hidden; text-overflow: ellipsis; }
+#tabs button svg { flex: none; }
 #tabs button svg { width: 19px; height: 19px; }
 #tabs button.on { color: #e9ffcc; opacity: 1; border-color: var(--accent); background: linear-gradient(to top, rgba(141, 255, 69, .14), transparent); text-shadow: 0 0 6px var(--glow); }
-#search { flex: 1; display: flex; align-items: center; gap: 6px; padding: 0 8px; min-width: 110px; color: var(--accent); }
+#search { flex: 1 1 70px; display: flex; align-items: center; gap: 6px; padding: 0 6px; min-width: 70px; color: var(--accent); overflow: hidden; }
 #search svg { width: 19px; height: 19px; flex: none; }
 #search input { flex: 1; min-width: 0; background: transparent; border: 0; border-bottom: 1px dashed transparent; color: #e9ffcc; font: 16px "DotGothic16", monospace; outline: none; padding: 4px 0; }
 #search input::placeholder { color: var(--text); opacity: .75; }
@@ -170,6 +173,13 @@ body.paused #n-i-pause { display: none; }
 body.fx #screen::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: rgba(160, 255, 120, .035); animation: flicker 3.5s steps(1) infinite; z-index: 12; }
 @keyframes flicker { 0%, 100% { opacity: 1; } 47% { opacity: .4; } 48% { opacity: 1; } 83% { opacity: .7; } }
 
+@media (max-width: 900px) {
+  #tabs button { font-size: 14px; padding: 8px 7px 9px; gap: 5px; }
+}
+/* stretta: solo icone per le schede non attive, così la ricerca ha posto */
+@media (max-width: 800px) {
+  #tabs button:not(.on) span { display: none; }
+}
 @media (max-width: 700px) {
   #screen { grid-template-columns: 1fr; }
   #now { display: none; }

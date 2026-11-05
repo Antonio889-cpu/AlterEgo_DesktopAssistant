@@ -1,3 +1,15 @@
+## Alter Ego 1.4.0
+
+- Fix: tool calls written as text (DeepSeek "DSML" etc.) are executed, not shown; `<think>` hidden.
+- Thinking: hide or turn off.
+- Token saving: tools only when needed, local router (keywords or Rizzo Flow), cheap model, compact history.
+- Web search: DeepSeek, Google (Gemini), Tavily, Brave or DuckDuckGo, with fallback; free local page reader.
+- Speech recognition: Google Gemini, and fallback Groq ⇄ Gemini.
+- Spotify (Premium) for "play…".
+- Music: YouTube titles as they are; player and Venue layout fixes.
+
+`AlterEgo_1.4.0_setup.exe` installer · `AlterEgo_1.4.0_portable.zip` portable · `SHA256SUMS.txt`
+
 ## Alter Ego 1.3.3
 
 - Headphones sprite much bigger in the main window (still whole, neck included).

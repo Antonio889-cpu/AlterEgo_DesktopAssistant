@@ -164,11 +164,14 @@ pub fn quick_match(text: &str) -> Option<&'static str> {
 pub async fn quick(app: &AppHandle, text: &str) -> Option<Result<String, String>> {
     let action = quick_match(text)?;
     if let Some(m) = action.strip_prefix("music:") {
-        // senza musica in corso la frase può voler dire altro: decide il modello
-        if !music::state(app).playing {
-            return None;
+        if music::state(app).playing {
+            return Some(music::control(app, m, None).await);
         }
-        return Some(music::control(app, m, None).await);
+        if crate::spotify::active(app) {
+            return Some(crate::spotify::control(app, m, None).await);
+        }
+        // senza musica in corso la frase può voler dire altro: decide il modello
+        return None;
     }
     Some(run(app, action, None).await)
 }

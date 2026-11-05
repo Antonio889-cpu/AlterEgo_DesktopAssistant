@@ -36,6 +36,10 @@ ol { list-style: none; padding: 0; margin: 0; }
 .badge.missing { color: var(--warn); border-color: var(--warn); }
 .provider:first-child .up, .provider:last-child .down { visibility: hidden; }
 .inline { gap: 6px; }
+/* le etichette lunghe con casella vanno a capo come testo, con la casella sulla prima riga */
+label.inline { display: block; line-height: 1.45; }
+label.inline > input[type=checkbox] { vertical-align: -2px; margin: 0 6px 0 0; }
+.note.sub { margin-left: 26px; }
 .result { color: var(--muted); }
 .result.ok { color: var(--accent); }
 .result.bad { color: var(--bad); }

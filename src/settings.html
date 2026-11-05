@@ -68,8 +68,42 @@
         <label>Temperatura <input id="temperature" type="range" min="0" max="1.5" step="0.05" /> <output id="temperature-val"></output></label>
         <label>Messaggi di contesto <input id="max-history" type="number" min="2" max="50" /></label>
       </div>
+      <label>Ragionamento dei modelli "thinking"
+        <select id="thinking">
+          <option value="hide">Nascosto (il modello ragiona, tu vedi solo la risposta)</option>
+          <option value="off">Spento (risposte più rapide, meno token)</option>
+        </select>
+      </label>
+      <p class="note">I tag <code>&lt;think&gt;</code> e le chiamate a strumenti scritte come testo (es. DeepSeek «DSML») non compaiono più nel dialogo:
+        le chiamate valide vengono eseguite normalmente (passando dai Permessi).</p>
       <ol id="providers"></ol>
       <p class="note" id="ai-usage"></p>
+      <h3>Risparmio token</h3>
+      <p class="note">Tecniche per spendere meno sulle API senza peggiorare le risposte. La lunghezza delle risposte non viene limitata.</p>
+      <div class="actions"><button id="saving-max">Massimo risparmio</button> <button id="saving-default">Predefinite</button></div>
+      <label class="inline"><input type="checkbox" id="sv-tools" /> <b>Strumenti solo quando servono</b>: le definizioni (1–3 mila token) partono solo se la domanda chiede un'azione</label>
+      <p class="note sub">Se il modello si accorge che gli serviva uno strumento lo dice e la domanda si ripete subito con gli strumenti: nessuna azione persa.</p>
+      <label class="inline"><input type="checkbox" id="sv-compact" /> Descrizioni degli strumenti compatte</label>
+      <label class="inline"><input type="checkbox" id="sv-trim" /> Accorcia le risposte vecchie nella cronologia (le ultime restano intere; la cache del provider continua a funzionare)</label>
+      <label>Fatti su di te inviati <select id="sv-facts"><option value="0">Tutti</option><option value="20">I 20 più pertinenti</option><option value="10">I 10 più pertinenti</option><option value="5">I 5 più pertinenti</option></select></label>
+      <label>Screenshot al modello <select id="sv-shot"><option value="1280">1280 px (dettagliati)</option><option value="1024">1024 px</option><option value="768">768 px (meno token)</option></select></label>
+      <label>Pagine web lette <select id="sv-page"><option value="8000">8000 caratteri</option><option value="5000">5000 caratteri</option><option value="3000">3000 caratteri (meno token)</option></select></label>
+      <label>Router locale
+        <select id="sv-router">
+          <option value="heuristic">Parole chiave (gratis, istantaneo)</option>
+          <option value="rizzo">Rizzo Flow (modello locale, più preciso)</option>
+          <option value="off">Spento</option>
+        </select>
+      </label>
+      <label id="sv-rizzo-row">URL di Rizzo Flow <input id="sv-rizzo-url" placeholder="http://127.0.0.1:8017" /> <button id="sv-rizzo-test">Prova</button> <span id="sv-rizzo-result" class="result"></span></label>
+      <p class="note sub" id="sv-rizzo-note"><a href="#" id="sv-rizzo-link">Rizzo Flow</a> (Rizzo AI Academy, Apache-2.0) è un modello locale che dà risposte tipizzate senza generare token (~50 ms):
+        Alter Ego gli chiede «serve un'azione?» e «è una domanda semplice?». Installazione: <code>git clone https://github.com/Rizzo-AI-Academy/rizzo-flow</code>,
+        poi nella cartella <code>uv sync --locked</code>, <code>uv run rizzo download</code>, <code>uv run rizzo serve</code>. Se non risponde si usano le parole chiave.</p>
+      <label>Modello economico per le domande semplici
+        <select id="sv-eco-provider"><option value="">Spento</option></select>
+        <input id="sv-eco-model" placeholder="es. gemini-2.5-flash-lite" />
+      </label>
+      <p class="note sub">Saluti e domande brevi (secondo il router) vanno a questo modello; tutto il resto al provider principale.</p>
       <p class="note privacy"><b>Cosa esce dal PC:</b> solo il prompt di sistema e gli ultimi messaggi della conversazione,
         inviati al provider che risponde. Con Ollama tutto resta sul tuo computer.</p>
     </section>
@@ -138,10 +172,20 @@
       <label>Servizio
         <select id="stt-provider">
           <option value="groq">Groq Whisper (usa la chiave Groq)</option>
+          <option value="gemini">Google Gemini (usa la chiave Gemini)</option>
           <option value="local">Server Whisper locale (compatibile OpenAI)</option>
           <option value="off">Disattivato</option>
         </select>
       </label>
+      <label>Se non funziona usa
+        <select id="stt-fallback">
+          <option value="none">Nessuno</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="groq">Groq Whisper</option>
+          <option value="local">Server Whisper locale</option>
+        </select>
+      </label>
+      <label id="stt-gemini-row">Modello Gemini <input id="stt-gemini-model" placeholder="gemini-2.5-flash" /></label>
       <label>Modello <input id="stt-model" placeholder="whisper-large-v3-turbo" /></label>
       <label id="stt-url-row">URL server locale <input id="stt-url" placeholder="http://localhost:8000/v1" /></label>
       <label>Lingua <input id="stt-language" maxlength="5" placeholder="it" style="max-width:80px;min-width:0" /></label>
@@ -209,6 +253,14 @@
         Volume: rotella del mouse o frecce ↑ ↓ sul lettore, a passi del 2%.</p>
       <div class="actions"><button id="open-venue">♫ Apri la Music Venue</button></div>
       <div class="actions"><input id="music-query" placeholder="Prova: titolo e artista" /> <button id="music-go">Cerca e suona</button> <span id="music-result" class="result"></span></div>
+      <h3>Spotify (Premium)</h3>
+      <p class="note">Con Spotify Premium, «metti <i>titolo</i>» può suonare sul tuo Spotify (app del PC, telefono o web) invece che su YouTube.
+        Una volta sola: crea un'app gratuita su <a href="#" id="sp-dev">developer.spotify.com</a> → Dashboard → Create app,
+        come <b>Redirect URI</b> metti <code id="sp-redirect">http://127.0.0.1:8898/callback</code>, spunta <i>Web API</i>, salva e copia il <b>Client ID</b> qui.</p>
+      <label>Client ID <input id="sp-client" autocomplete="off" spellcheck="false" placeholder="es. 3f2a…" /></label>
+      <div class="actions"><button id="sp-connect">Collega account</button> <button id="sp-disconnect">Scollega</button> <span id="sp-status" class="result"></span></div>
+      <label class="inline"><input type="checkbox" id="sp-enabled" /> Usa Spotify per «metti…», pausa, avanti e volume</label>
+      <p class="note sub">I brani suonati su Spotify finiscono anche nei recenti della Music Venue. Il token resta nel Credential Manager di Windows.</p>
     </section>
 
     <section data-tab="voice">
@@ -286,9 +338,28 @@
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="volume" /> <b>Volume e luminosità</b></label></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="shell" /> <b>Comandi</b> ⚠ (solo quelli in lista, mai testo libero)</label>
         <div class="list" data-list="commands" data-cols="Nome|Comando"></div></div>
-      <div class="perm"><label class="inline"><input type="checkbox" data-perm="web" /> <b>Ricerca web</b> (API Search e Fetch di DeepSeek)</label>
-        <p class="note">Alter Ego cerca sul web e legge le pagine quando serve. Usa la chiave DeepSeek (scheda AI e chiavi):
-          ogni ricerca o pagina costa circa $0,00075 e finisce nella scheda Costi. Il testo trovato è trattato come dato.</p></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="web" /> <b>Ricerca web</b></label>
+        <p class="note">Alter Ego cerca sul web e legge le pagine quando serve. Il testo trovato è trattato come dato; le ricerche finiscono nella scheda Costi.</p>
+        <label class="sub">Motore di ricerca
+          <select id="web-provider">
+            <option value="deepseek">DeepSeek Search (chiave DeepSeek, ~$0,00075 a ricerca)</option>
+            <option value="gemini">Google tramite Gemini (chiave Gemini, risposta già riassunta)</option>
+            <option value="tavily">Tavily (chiave Tavily, 1000 ricerche gratis al mese)</option>
+            <option value="brave">Brave Search (chiave Brave)</option>
+            <option value="duckduckgo">DuckDuckGo (gratis, senza chiave)</option>
+          </select>
+        </label>
+        <label class="inline sub"><input type="checkbox" id="web-fallback" /> Se non risponde prova gli altri disponibili (DuckDuckGo per ultimo)</label>
+        <label class="sub">Lettura delle pagine
+          <select id="web-fetch">
+            <option value="auto">Automatica</option>
+            <option value="local">Dal PC (gratis)</option>
+            <option value="deepseek">DeepSeek Fetch (a pagamento, legge meglio i siti difficili)</option>
+          </select>
+        </label>
+        <label class="sub" id="web-gemini-row">Modello Gemini per la ricerca <input id="web-gemini-model" placeholder="gemini-2.5-flash" /></label>
+        <label class="sub" id="web-tavily-row">Chiave Tavily <input type="password" id="web-tavily-key" autocomplete="off" placeholder="tvly-…" /> <button id="web-tavily-save">Salva</button> <span id="web-tavily-st" class="result"></span></label>
+        <label class="sub" id="web-brave-row">Chiave Brave <input type="password" id="web-brave-key" autocomplete="off" /> <button id="web-brave-save">Salva</button> <span id="web-brave-st" class="result"></span></label></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="music" /> <b>Musica</b> (cerca su YouTube e suona)</label>
         <p class="note">Al primo uso scarica <b>yt-dlp</b> e <b>Deno</b> da GitHub in <code>%APPDATA%\AlterEgo\tools</code>. I brani restano in una cache (ultimi 30).</p></div>
       <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="input" /> <b>Mouse e tastiera</b> ⚠ (muove il cursore, clicca, scrive, preme tasti)</label>

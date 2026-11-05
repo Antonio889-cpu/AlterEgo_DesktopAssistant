@@ -33,6 +33,7 @@ Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in ingle
 - [Mic-Link](#mic-link)
 - [Musica](#musica)
 - [Ricerca web](#ricerca-web)
+- [Risparmio token](#risparmio-token)
 - [Costi](#costi)
 - [Clip vocali](#clip-vocali)
 - [Azioni sul PC e permessi](#azioni-sul-pc-e-permessi)
@@ -66,7 +67,9 @@ Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in ingle
 - **Mouse e tastiera**: se lo permetti, Alter Ego muove il cursore, clicca, scrive e preme tasti (con conferma e stop d'emergenza).
 - **Riduzione del rumore** del microfono di Mic-Link (RNNoise, regolabile).
 - **Aggiornamenti**: link al sito e a GitHub nell'app e un tasto per aggiornare all'ultima release.
-- **Ricerca web** con le API Search e Fetch di DeepSeek, quando serve un'informazione aggiornata.
+- **Ricerca web** con il motore che preferisci: DeepSeek, Google (tramite Gemini), Tavily, Brave o DuckDuckGo (gratis), con fallback.
+- **Spotify** (Premium): "metti *titolo*" può suonare sul tuo Spotify invece che su YouTube.
+- **Risparmio token**: ragionamento spento, strumenti solo quando servono, router locale (parole chiave o Rizzo Flow), modello economico per le domande semplici.
 - **Pannello Costi**: ogni richiesta con token, cache, durata e costo, totali per giorno/mese e per modello, prezzi modificabili, esportazione CSV.
 - **Terminale**: Alter Ego può eseguire comandi PowerShell o cmd, con conferma o in autonomia.
 - **Clip vocali**: "Alter Ego clippa" → salva la clip con AMD Adrenalin, NVIDIA App o Medal, **senza passare dall'AI**.
@@ -194,8 +197,8 @@ che iniziano esattamente come una richiesta precedente. Per questo:
 
 ## Voce
 
-- **Riconoscimento (push-to-talk)**: Groq Whisper (`whisper-large-v3-turbo`) oppure un server Whisper locale compatibile OpenAI
-  (es. faster-whisper-server/speaches, whisper.cpp server). *Prova microfono* registra 4 secondi e mostra cosa ha capito.
+- **Riconoscimento (push-to-talk)**: Groq Whisper (`whisper-large-v3-turbo`), **Google Gemini** (chiave Gemini) oppure un server Whisper locale
+  compatibile OpenAI (es. faster-whisper-server/speaches, whisper.cpp server), con un servizio **di riserva** (es. Groq ⇄ Gemini) se il primo non funziona. *Prova microfono* registra 4 secondi e mostra cosa ha capito.
 - **Voce di Alter Ego (TTS)**, in *Impostazioni → Voce e audio*:
   - **Kokoro-82M (locale)**: modello da 82M parametri ([Hugging Face](https://huggingface.co/hexgrad/Kokoro-82M),
     [libreria](https://github.com/hexgrad/kokoro), Apache-2.0), voci italiane *Sara* (`if_sara`) e *Nicola* (`im_nicola`) più
@@ -262,19 +265,47 @@ Puoi anche dire "metti in coda…", "pausa", "avanti", "indietro", "volume al 40
 - **Music Venue** (tasto nel lettore, menu della tray, oppure "apri music venue"): brani recenti e preferiti con copertina,
   ricerca nella libreria o su YouTube, suona o metti in coda con un clic, cuore per i preferiti. Salvata in `music_library.json`.
   Di default il lettore **si espande nella Venue** nella stessa finestra e torna lettore; il tasto ⧉ la separa in una finestra a parte (e la riaggancia).
+- Titolo e artista mostrati sono **il titolo del video e il canale di YouTube**, così come sono (il titolo ripulito serve solo a trovare il testo).
+- **Spotify (Premium)**: in *Voce e audio → Musica → Spotify* incolla il Client ID di un'app gratuita creata su
+  [developer.spotify.com](https://developer.spotify.com/dashboard) (Redirect URI `http://127.0.0.1:8898/callback`), premi **Collega account**
+  e spunta **Usa Spotify**: «metti…», pausa, avanti e volume comandano il tuo Spotify (app del PC, telefono o web player). L'accesso usa PKCE
+  (nessun segreto), il token resta nel Credential Manager, i brani finiscono anche nei recenti della Music Venue.
 - Usa YouTube nel rispetto dei suoi termini di servizio: è pensato per l'ascolto personale.
 
 ## Ricerca web
 
-Attiva **Ricerca web** in *Impostazioni → Permessi*. Quando gli chiedi qualcosa di recente o che non sa, Alter Ego usa gli strumenti:
+Attiva **Ricerca web** in *Impostazioni → Permessi* e scegli il motore:
 
-- `web_search`: l'API **Search** di DeepSeek (`POST https://api.deepseek.com/v1/tools/search`, fino a 10 risultati con titolo, link ed estratto);
-- `web_fetch`: l'API **Fetch** (`POST https://api.deepseek.com/v1/tools/fetch`), che restituisce una pagina in Markdown.
+| Motore | Chiave | Note |
+|---|---|---|
+| DeepSeek Search | DeepSeek (la stessa della chat) | ~$0,75 ogni 1000 ricerche |
+| Google tramite Gemini | Gemini (la stessa della chat) | "Grounding with Google Search": risposta già riassunta, con le fonti |
+| Tavily | Tavily | 1000 ricerche gratis al mese |
+| Brave Search | Brave | |
+| DuckDuckGo | nessuna | gratis (pagina HTML) |
 
-Usano le **chiavi DeepSeek** (con la stessa rotazione della chat) e funzionano con qualsiasi servizio AI attivo per la chat.
-Costano circa **$0,75 ogni 1000 chiamate** riuscite; ogni chiamata finisce nella scheda Costi. Il testo trovato viene passato al modello
-come dato, non come istruzioni. Endpoint e formato sono quelli pubblicati da DeepSeek a ottobre 2026: se cambiano,
-il messaggio d'errore lo dice.
+Con il **fallback** attivo, se il motore non risponde si provano gli altri disponibili (DuckDuckGo per ultimo).
+Le pagine si leggono con DeepSeek Fetch oppure **direttamente dal PC** (gratis): *Lettura delle pagine → Automatica / Dal PC / DeepSeek Fetch*.
+Le chiavi di Tavily e Brave vanno nel Credential Manager di Windows. Il testo trovato arriva al modello come dato, non come istruzioni;
+ogni ricerca finisce nella scheda Costi.
+
+## Risparmio token
+
+In *Impostazioni → AI e chiavi* c'è la sezione **Risparmio token** (lunghezza e qualità delle risposte non cambiano):
+
+- **Ragionamento**: il "pensiero" dei modelli thinking (`<think>…</think>`) non si vede mai; mettilo su **Spento** per non pagare i token
+  del ragionamento (Gemini 2.5 Flash, Qwen3, gpt-oss, DeepSeek, OpenRouter e Ollama ricevono il parametro giusto; se un modello lo rifiuta si riprova senza).
+- **Strumenti solo quando servono**: le definizioni degli strumenti (1–3 mila token a messaggio) partono solo se la domanda chiede un'azione.
+  Se il modello si accorge che gliene serviva uno risponde `[[TOOLS]]` e la domanda si ripete subito con gli strumenti.
+- **Router locale**: decide «serve un'azione?» e «è una domanda semplice?» senza spendere token — parole chiave (gratis)
+  oppure [**Rizzo Flow**](https://github.com/Rizzo-AI-Academy/rizzo-flow) di Rizzo AI Academy, un modello locale che risponde a domande tipizzate
+  in ~50 ms senza generare token (`uv run rizzo serve`, predefinito `http://127.0.0.1:8017`).
+- **Modello economico per le domande semplici**: saluti e domande brevi vanno a un provider/modello a tua scelta (model routing).
+- **Descrizioni degli strumenti compatte**, **risposte vecchie accorciate nella cronologia** (in modo deterministico: la cache del provider continua
+  a funzionare), **solo i fatti più pertinenti**, **screenshot più piccoli** e **pagine web più corte**.
+- **Massimo risparmio** accende tutto insieme; **Predefinite** torna indietro.
+
+I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSeek, Gemini): prima la parte fissa, la cronologia si sposta a scatti.
 
 ## Costi
 

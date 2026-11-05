@@ -87,7 +87,7 @@ pub fn encode_png(w: u32, h: u32, rgba: &[u8]) -> Result<Vec<u8>, String> {
 pub fn screenshot_base64() -> Result<String, String> {
     use base64::Engine;
     let (w, h, rgba) = capture_rgba()?;
-    let (w, h, rgba) = downscale(w, h, &rgba, 1280);
+    let (w, h, rgba) = downscale(w, h, &rgba, super::input::shot_width());
     Ok(base64::engine::general_purpose::STANDARD.encode(encode_png(w, h, &rgba)?))
 }
 

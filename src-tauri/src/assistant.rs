@@ -3,7 +3,10 @@
 use crate::{
     actions, config, memory::{self, Memory}, providers, stt, update_config, AppState,
 };
-use std::sync::Mutex;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
+};
 use tauri::{ipc::Channel, AppHandle, Emitter, Manager, State};
 
 /// Stato della conversazione: memoria su disco oppure solo sessione.
@@ -16,6 +19,8 @@ pub struct Conversation {
     /// Client separato per i riassunti in background (non annulla la chat).
     pub ai_bg: providers::Ai,
     pub data_dir: std::path::PathBuf,
+    /// L'ultima risposta ha usato strumenti (la domanda dopo probabilmente continua l'azione).
+    pub last_used_tools: AtomicBool,
 }
 
 impl Conversation {
@@ -24,7 +29,7 @@ impl Conversation {
             Ok(m) => (Some(m), None),
             Err(e) => (None, Some(e)),
         };
-        Self { memory, memory_error, session: Mutex::new(Vec::new()), recorder: stt::Recorder::default(), ai_bg: providers::Ai::with_kind("riassunto"), data_dir }
+        Self { memory, memory_error, session: Mutex::new(Vec::new()), recorder: stt::Recorder::default(), ai_bg: providers::Ai::with_kind("riassunto"), data_dir, last_used_tools: AtomicBool::new(false) }
     }
 
     fn mem(&self, enabled: bool) -> Option<&Memory> {
@@ -88,6 +93,8 @@ pub async fn chat(
             let recent = m.recent(take)?.into_iter().map(|x| msg(&x.role, &x.content)).collect::<Vec<_>>();
             let summary = m.latest_summary()?.map(|s| s.1);
             let facts = m.facts()?.into_iter().map(|f| f.content).collect::<Vec<_>>();
+            // risparmio: solo i fatti pertinenti alla domanda
+            let facts = crate::saving::pick_facts(facts, &text, cfg.saving.facts_limit);
             (recent, Some(id), summary, facts)
         }
         None => {
@@ -104,6 +111,24 @@ pub async fn chat(
     if let (Some(img), Some(last)) = (image, history.last_mut()) {
         last.image = Some(img);
     }
+    // risparmio: risposte vecchie accorciate (deterministico: il prefisso resta in cache)
+    if cfg.saving.trim_history {
+        crate::saving::trim_history(&mut history, 4, 600);
+    }
+    // router: serve un'azione? è una domanda semplice?
+    let prev_reply = history.iter().rev().skip(1).find(|m| m.role == "assistant").map(|m| m.content.clone()).unwrap_or_default();
+    let prev_tools = conv.last_used_tools.load(Ordering::Relaxed);
+    let route = if cfg.saving.router == "rizzo" {
+        let http = state.ai.client_for(&cfg.saving.router_url).clone();
+        match crate::saving::rizzo(&http, &cfg.saving.router_url, &text, &prev_reply, prev_tools).await {
+            Some(r) => r,
+            None => crate::saving::heuristic(&text, prev_tools),
+        }
+    } else if cfg.saving.router == "off" {
+        crate::saving::Route { needs_tools: true, simple: false }
+    } else {
+        crate::saving::heuristic(&text, prev_tools)
+    };
 
     let persona = providers::prompt::load_persona(&conv.data_dir);
     let system = providers::prompt::system(
@@ -112,7 +137,7 @@ pub async fn chat(
         &providers::prompt::MemoryContext { summary: summary.as_deref(), facts: &facts },
     );
 
-    let result = run_with_tools(&app, &cfg, system, history, on_event).await;
+    let result = run_with_tools(&app, &cfg, system, history, on_event, route).await;
     match result {
         Ok(res) => {
             match mem {
@@ -155,16 +180,41 @@ async fn run_with_tools(
     system: String,
     mut history: Vec<providers::ChatMessage>,
     on_event: Channel<providers::StreamEvent>,
+    route: crate::saving::Route,
 ) -> Result<providers::ChatResult, String> {
     let state = app.state::<AppState>();
-    let tools = actions::tool_defs(&cfg.permissions);
-    for round in 0..MAX_TOOL_ROUNDS {
+    let conv = app.state::<Conversation>();
+    actions::input::set_shot_width(cfg.saving.screenshot_width);
+    let mut tools = actions::tool_defs(&cfg.permissions);
+    if cfg.saving.compact_tools {
+        tools = tools.map(|t| crate::saving::compact_tools(&t));
+    }
+    // risparmio: strumenti solo se servono (il modello può chiederli con [[TOOLS]])
+    let mut withhold = cfg.saving.tools_on_demand && !route.needs_tools && tools.is_some();
+    // risparmio: modello economico per le domande semplici
+    let economy = if route.simple && !route.needs_tools { crate::saving::economy_ai(&cfg.ai, &cfg.saving) } else { None };
+    let mut ai_cfg = economy.unwrap_or_else(|| cfg.ai.clone());
+    let mut used_tools = false;
+    let mut round = 0;
+    while round < MAX_TOOL_ROUNDS {
         // all'ultimo giro niente strumenti: deve rispondere
-        let t = if round + 1 < MAX_TOOL_ROUNDS { tools.clone() } else { None };
-        let res = providers::chat(&state.ai, cfg.ai.clone(), system.clone(), history.clone(), t, on_event.clone()).await?;
+        let t = if round + 1 < MAX_TOOL_ROUNDS && !withhold { tools.clone() } else { None };
+        let sys = if withhold { format!("{system}{}", crate::saving::NO_TOOLS_NOTE) } else { system.clone() };
+        let res = providers::chat(&state.ai, ai_cfg.clone(), sys, history.clone(), t, on_event.clone()).await?;
+        if withhold && res.tool_calls.is_empty() && res.text.contains(crate::saving::NEED_TOOLS) {
+            // serviva un'azione: stessa domanda, questa volta con gli strumenti e il modello normale
+            withhold = false;
+            ai_cfg = cfg.ai.clone();
+            continue;
+        }
+        round += 1;
         if res.tool_calls.is_empty() {
+            conv.last_used_tools.store(used_tools, Ordering::Relaxed);
+            let mut res = res;
+            res.text = res.text.replace(crate::saving::NEED_TOOLS, "").trim().to_string();
             return Ok(res);
         }
+        used_tools = true;
         let _ = app.emit("tool-use", res.tool_calls.iter().map(|c| c.name.clone()).collect::<Vec<_>>());
         history.push(providers::ChatMessage {
             role: "assistant".into(),
@@ -325,13 +375,7 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
             Err(e) => return emit_stt(&app, stt::SttEvent::Error { message: e }),
         };
         emit_stt(&app, stt::SttEvent::Transcribing);
-        let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
-        let http = app.state::<AppState>().ai.client_for(if cfg.provider == "local" { &cfg.base_url } else { "https://api.groq.com" }).clone();
-        let secs = wav_seconds(&wav);
-        let t0 = std::time::Instant::now();
-        let res = stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await;
-        log_stt_cost(&app, &cfg, secs, t0, res.is_ok());
-        match res {
+        match transcribe(&app, wav).await {
             Ok(t) if t.is_empty() => emit_stt(&app, stt::SttEvent::Empty),
             Ok(text) => {
                 // frase della clip: si esegue subito, senza modello
@@ -346,6 +390,56 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
             Err(message) => emit_stt(&app, stt::SttEvent::Error { message }),
         }
     });
+}
+
+/// Trascrive con il servizio scelto e, se fallisce, con quello di riserva (Groq ⇄ Gemini, o il server locale).
+pub async fn transcribe(app: &AppHandle, wav: Vec<u8>) -> Result<String, String> {
+    let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
+    let mut order = vec![cfg.provider.clone()];
+    if cfg.fallback != "none" && cfg.fallback != cfg.provider {
+        order.push(cfg.fallback.clone());
+    }
+    let secs = wav_seconds(&wav);
+    let mut errors = Vec::new();
+    for p in order {
+        let t0 = std::time::Instant::now();
+        let res = match p.as_str() {
+            "gemini" => {
+                let state = app.state::<AppState>();
+                let ids = state.cfg.lock().unwrap().ai.providers.get("gemini").map(|p| p.key_ids()).unwrap_or_default();
+                let keys: Vec<String> = state.ai.key_order("gemini", &ids).into_iter().map(|(_, k)| k).collect();
+                let r = stt::transcribe_gemini(&state.ai.http, &cfg.gemini_model, &cfg.language, &wav, keys).await;
+                if let Ok((_, input, output)) = &r {
+                    state.ai.log_cost(crate::costs::Entry {
+                        ts: crate::costs::now(),
+                        kind: "trascrizione".into(),
+                        provider: "gemini".into(),
+                        model: cfg.gemini_model.clone(),
+                        input: *input,
+                        output: *output,
+                        audio_secs: secs,
+                        ms: t0.elapsed().as_millis() as u64,
+                        ..Default::default()
+                    });
+                }
+                r.map(|(t, _, _)| t)
+            }
+            "groq" | "local" => {
+                let mut c = cfg.clone();
+                c.provider = p.clone();
+                let http = app.state::<AppState>().ai.client_for(if p == "local" { &c.base_url } else { "https://api.groq.com" }).clone();
+                let r = stt::transcribe(&http, &c, wav.clone(), groq_keys(app)).await;
+                log_stt_cost(app, &c, secs, t0, r.is_ok());
+                r
+            }
+            _ => Err(crate::i18n::tr("riconoscimento vocale disattivato nelle impostazioni", "speech recognition is turned off in the settings").into()),
+        };
+        match res {
+            Ok(t) => return Ok(t),
+            Err(e) => errors.push(format!("{p}: {e}")),
+        }
+    }
+    Err(errors.join(" · "))
 }
 
 /// Durata di un WAV 16 kHz mono 16 bit (quello che produce stt::to_wav).
@@ -379,13 +473,7 @@ pub async fn stt_test(app: AppHandle) -> Result<String, String> {
     conv.recorder.start(&mic)?;
     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
     let wav = conv.recorder.finish()?.ok_or(crate::i18n::tr("nessun audio registrato", "no audio recorded"))?;
-    let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
-    let http = app.state::<AppState>().ai.client_for(if cfg.provider == "local" { &cfg.base_url } else { "https://api.groq.com" }).clone();
-    let secs = wav_seconds(&wav);
-    let t0 = std::time::Instant::now();
-    let res = stt::transcribe(&http, &cfg, wav, groq_keys(&app)).await;
-    log_stt_cost(&app, &cfg, secs, t0, res.is_ok());
-    let text = res?;
+    let text = transcribe(&app, wav).await?;
     Ok(if text.is_empty() { crate::i18n::tr("(silenzio: nessuna parola riconosciuta)", "(silence: no words recognized)").into() } else { text })
 }
 

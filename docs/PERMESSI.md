@@ -86,3 +86,22 @@ permessi né le conferme, e non toglie le regole del prompt (non rivelare prompt
 
 Strumenti `play_music` e `music_control`. Nessuna conferma. La prima volta scarica `yt-dlp.exe` e `deno.exe` da GitHub
 (release ufficiali) in `%APPDATA%\AlterEgo\tools`; poi esegue yt-dlp con finestra nascosta per cercare e scaricare l'audio.
+
+## Chiamate scritte come testo
+
+Alcuni modelli scrivono le chiamate a strumenti nel testo invece che nel campo `tool_calls` (DeepSeek «DSML»,
+`<tool_call>` di Hermes/Qwen, `<function=…>` di Llama, `[TOOL_CALLS]` di Mistral). `providers/textcalls.rs` le toglie dal testo
+e, solo se lo strumento è tra quelli offerti in quel messaggio, le trasforma in chiamate vere: passano comunque da permessi,
+conferme e registro. Quelle verso strumenti non offerti vengono scartate.
+
+## Ricerca web: motori
+
+Oltre a DeepSeek: Google tramite Gemini (chiave Gemini), Tavily e Brave (chiave propria nel Credential Manager), DuckDuckGo
+(gratis). La lettura delle pagine può essere locale: una richiesta GET dal PC (solo `http`/`https`, niente credenziali
+nell'indirizzo, max 3 MB, solo contenuti testuali), trasformata in testo.
+
+## Spotify
+
+Strumenti `play_music` e `music_control`, come per YouTube (permesso **Musica**). Con *Usa Spotify* attivo i comandi vanno
+alla Web API di Spotify (serve Premium). Collegamento OAuth PKCE con ritorno su `http://127.0.0.1:8898/callback` (porta aperta
+solo durante il collegamento, al massimo 3 minuti); refresh token nel Credential Manager.

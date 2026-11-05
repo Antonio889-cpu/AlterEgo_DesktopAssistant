@@ -87,6 +87,26 @@ fn to_wire(system: &str, messages: &[ChatMessage]) -> Vec<Value> {
     out
 }
 
+/// Parametri per chiedere una risposta senza ragionamento ("thinking"), per provider e modello.
+/// None = il provider non ha un modo noto (il ragionamento viene comunque tolto dal testo).
+pub fn thinking_off_params(id: &str, model: &str) -> Option<Value> {
+    let m = model.to_lowercase();
+    match id {
+        // Gemini 2.5 Flash/Flash-Lite: "none" spegne il thinking (2.5 Pro non lo permette: si riprova senza)
+        "gemini" if m.contains("gemma") => None,
+        "gemini" if m.contains("gemini-3") => Some(json!({ "reasoning_effort": "low" })),
+        "gemini" => Some(json!({ "reasoning_effort": "none" })),
+        "openrouter" => Some(json!({ "reasoning": { "enabled": false, "exclude": true } })),
+        "groq" if m.contains("qwen") => Some(json!({ "reasoning_effort": "none", "reasoning_format": "hidden" })),
+        "groq" if m.contains("gpt-oss") => Some(json!({ "reasoning_effort": "low", "include_reasoning": false })),
+        "groq" if m.contains("deepseek") || m.contains("r1") => Some(json!({ "reasoning_format": "hidden" })),
+        "deepseek" => Some(json!({ "thinking": { "type": "disabled" } })),
+        // Ollama ignora i campi sconosciuti; i modelli con thinking lo spengono con `think: false`
+        "ollama" => Some(json!({ "think": false, "reasoning_effort": "none" })),
+        _ => None,
+    }
+}
+
 /// Accumula i frammenti di `tool_calls` che arrivano in streaming.
 #[derive(Default)]
 struct ToolAcc(Vec<ToolCall>);
@@ -151,6 +171,14 @@ pub async fn stream_chat(
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
     }
+    // ragionamento spento: parametri del provider (se li rifiuta si riprova senza e lo si ricorda)
+    let think_key = format!("{}/{}", t.id, t.model);
+    let mut think_params = if t.thinking_off && !ai.no_think_params.lock().unwrap().contains(&think_key) { thinking_off_params(&t.id, &t.model) } else { None };
+    if let (Some(p), Some(o)) = (&think_params, body.as_object_mut()) {
+        for (k, v) in p.as_object().into_iter().flatten() {
+            o.insert(k.clone(), v.clone());
+        }
+    }
     // uso dei token in fondo allo stream (per il pannello Costi; DeepSeek riporta anche la cache).
     // Ollama è gratis; un provider che rifiuta il parametro viene ricordato e non lo riceve più.
     let want_usage = t.id != "ollama" && !ai.no_usage.lock().unwrap().contains(&t.id);
@@ -177,6 +205,19 @@ pub async fn stream_chat(
         }
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
+        let lower = text.to_lowercase();
+        let think_rejected = think_params.is_some()
+            && matches!(status.as_u16(), 400 | 404 | 422)
+            && ["reason", "think", "unrecognized", "unknown", "not supported", "extra", "invalid"].iter().any(|w| lower.contains(w));
+        if think_rejected {
+            ai.no_think_params.lock().unwrap().insert(think_key.clone());
+            if let (Some(o), Some(p)) = (body.as_object_mut(), think_params.take()) {
+                for k in p.as_object().map(|m| m.keys().cloned().collect::<Vec<_>>()).unwrap_or_default() {
+                    o.remove(&k);
+                }
+            }
+            continue;
+        }
         if want_usage && !retried && status.as_u16() == 400 && text.to_lowercase().contains("stream_options") {
             ai.no_usage.lock().unwrap().insert(t.id.clone());
             if let Some(o) = body.as_object_mut() {

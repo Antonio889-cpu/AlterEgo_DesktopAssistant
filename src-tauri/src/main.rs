@@ -13,7 +13,9 @@ mod keys;
 mod memory;
 mod music;
 mod providers;
+mod saving;
 mod sprites;
+mod spotify;
 mod stt;
 mod tray;
 mod update;
@@ -85,6 +87,9 @@ pub struct FrontConfig {
     autostart: bool,
     prices: Vec<config::Price>,
     music: config::MusicConfig,
+    web: config::WebConfig,
+    saving: config::SavingConfig,
+    spotify: config::SpotifyConfig,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -117,6 +122,9 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         autostart: cfg.autostart,
         prices: cfg.prices.clone(),
         music: cfg.music.clone(),
+        web: cfg.web.clone(),
+        saving: cfg.saving.clone(),
+        spotify: cfg.spotify.clone(),
     }
 }
 
@@ -324,6 +332,13 @@ fn costs_export(app: AppHandle) -> Result<String, String> {
     Ok(path.display().to_string())
 }
 
+/// Impostazioni di risparmio token.
+#[tauri::command]
+fn set_saving(app: AppHandle, mut saving: config::SavingConfig) {
+    saving.normalize();
+    update_config(&app, |c| c.saving = saving);
+}
+
 #[tauri::command]
 fn set_prices(app: AppHandle, prices: Vec<config::Price>) {
     update_config(&app, |c| c.prices = prices);
@@ -525,6 +540,15 @@ fn main() {
             update::update_install,
             update::open_link_cmd,
             update::app_version,
+            web::set_web_key,
+            web::web_keys,
+            web::set_web_config,
+            spotify::spotify_connect,
+            spotify::spotify_disconnect,
+            spotify::spotify_settings,
+            spotify::spotify_status,
+            set_saving,
+            saving::rizzo_test,
             assistant::chat,
             assistant::set_persona_options,
             assistant::set_stt,

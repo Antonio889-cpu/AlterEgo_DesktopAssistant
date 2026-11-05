@@ -217,6 +217,65 @@ pub async fn transcribe(http: &reqwest::Client, cfg: &SttConfig, wav: Vec<u8>, g
     Err(last)
 }
 
+/// Trascrizione con Gemini (audio dentro la richiesta `generateContent`), chiavi Gemini in ordine.
+/// Restituisce testo e token (input, output) per il registro dei costi.
+pub async fn transcribe_gemini(http: &reqwest::Client, model: &str, language: &str, wav: &[u8], keys_list: Vec<String>) -> Result<(String, u64, u64), String> {
+    use base64::Engine;
+    if keys_list.is_empty() {
+        return Err(crate::i18n::tr("serve una chiave Gemini (Impostazioni → AI → Gemini)", "a Gemini key is needed (Settings → AI → Gemini)").into());
+    }
+    let model = if model.trim().is_empty() { "gemini-2.5-flash" } else { model.trim() };
+    let lang = if language.trim().is_empty() { "the spoken language".to_string() } else { language.trim().to_string() };
+    let prompt = format!(
+        "Transcribe this audio verbatim (language: {lang}). Output only the transcript, with punctuation, \
+no comments, no quotes. If there is no speech, output nothing."
+    );
+    let mut body = serde_json::json!({
+        "contents": [{ "parts": [
+            { "text": prompt },
+            { "inline_data": { "mime_type": "audio/wav", "data": base64::engine::general_purpose::STANDARD.encode(wav) } }
+        ]}],
+        "generationConfig": { "temperature": 0 }
+    });
+    // niente "thinking" per una trascrizione (2.5 Flash lo permette; se rifiutato si riprova senza)
+    if model.contains("2.5-flash") {
+        body["generationConfig"]["thinkingConfig"] = serde_json::json!({ "thinkingBudget": 0 });
+    }
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent");
+    let mut last = String::new();
+    for key in keys_list {
+        let mut tried_plain = false;
+        loop {
+            let resp = http.post(&url).header("x-goog-api-key", &key).timeout(Duration::from_secs(60)).json(&body).send().await
+                .map_err(|e| format!("Gemini: {}", crate::providers::describe_net_error(&e)))?;
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            if status.is_success() {
+                let v: serde_json::Value = serde_json::from_str(&text).map_err(|_| "Gemini: risposta non valida".to_string())?;
+                let out: String = v
+                    .pointer("/candidates/0/content/parts")
+                    .and_then(|p| p.as_array())
+                    .map(|a| a.iter().filter_map(|p| p.get("text").and_then(|t| t.as_str())).collect::<Vec<_>>().join(""))
+                    .unwrap_or_default();
+                let n = |p: &str| v.pointer(p).and_then(|x| x.as_u64()).unwrap_or(0);
+                return Ok((out.trim().trim_matches('"').to_string(), n("/usageMetadata/promptTokenCount"), n("/usageMetadata/candidatesTokenCount")));
+            }
+            if status.as_u16() == 400 && !tried_plain && text.to_lowercase().contains("think") {
+                body["generationConfig"] = serde_json::json!({ "temperature": 0 });
+                tried_plain = true;
+                continue;
+            }
+            let err = crate::providers::status_error_public(status, &text);
+            last = keys::redact(&format!("Gemini: {}", err.message), Some(&key));
+            if !err.key_problem {
+                return Err(last);
+            }
+            break;
+        }
+    }
+    Err(last)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
