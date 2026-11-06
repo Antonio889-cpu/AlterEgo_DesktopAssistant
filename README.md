@@ -4,11 +4,25 @@
 
 **🌐 Website: [alterego.attentoweb.it](https://alterego.attentoweb.it)** · **🎬 [Trailer](#trailer)**
 
+> [!IMPORTANT]
+> **Fan project · disclaimer**
+>
+> Alter Ego and Alter Net are unofficial fan projects. They are not affiliated with, endorsed or sponsored by Spike Chunsoft.
+> Danganronpa, its characters and its original artwork are © Spike Chunsoft and belong to their owners.
+>
+> Both are free: nothing is sold, and the series' characters and art are used only as a tribute, never to make money.
+> Ko-fi donations support me as a developer, not the project.
+>
+> If you hold the rights and want something changed or removed, [contact me on GitHub](https://github.com/Antonio889-cpu/AlterEgo_DesktopAssistant/issues) and I'll take it down right away.
+>
+> I'm a huge fan of the series and I bought every game. Thank you to Spike Chunsoft, Kazutaka Kodaka, Rui Komatsuzaki and everyone
+> who cooked up this beautiful franchise: this project exists because of you. ♥
+
 A desktop assistant for **Windows 10/11** and **Linux** inspired by *Alter Ego* from Danganronpa: a small CRT-laptop-style window,
 always on top, that you talk to by voice or text. She answers with her own personality, remembers who you are,
 saves game clips with a phrase, plays music, searches the web and, if you allow it, performs actions on your PC.
 
-Unofficial, non-commercial fan project. Interface in English and Italian.
+Interface in English and Italian.
 
 ## Trailer
 
