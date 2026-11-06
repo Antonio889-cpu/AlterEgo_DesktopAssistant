@@ -1,3 +1,10 @@
+## Alter Ego 1.5.0
+
+- First Linux release: AppImage and .deb (x86-64).
+- Rizzo Flow: "Install" button in Settings → AI, and the server starts with Alter Ego.
+
+`AlterEgo_1.5.0_setup.exe` / `AlterEgo_1.5.0_portable.zip` Windows · `AlterEgo_1.5.0_amd64.AppImage` / `AlterEgo_1.5.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.4.1
 
 - Alter Net inside Alter Ego: "open Alter Net", tray or Settings → General. Borderless fullscreen, F11 windowed, Esc twice closes.

@@ -193,18 +193,101 @@ pub mod pointer {
     }
 }
 
+/// Linux: `xdotool` (X11; su Wayland solo per le app XWayland).
 #[cfg(not(windows))]
 pub mod pointer {
-    const NO: &str = "mouse e tastiera simulati funzionano solo su Windows";
-    pub fn screen_size() -> (i32, i32) { (1920, 1080) }
-    pub fn cursor() -> (i32, i32) { (500, 500) }
-    pub fn move_to(_x: i32, _y: i32) -> Result<(), String> { Err(NO.into()) }
-    pub fn click(_b: &str, _d: bool) -> Result<(), String> { Err(NO.into()) }
-    pub fn scroll(_c: i32, _h: bool) -> Result<(), String> { Err(NO.into()) }
-    pub fn type_text(_t: &str) -> Result<(), String> { Err(NO.into()) }
-    pub fn foreground() -> isize { 0 }
-    pub fn set_foreground(_h: isize) {}
-    pub fn foreground_is_ours() -> bool { false }
+    use std::process::Command;
+
+    fn xdo(args: &[&str]) -> Result<String, String> {
+        let out = Command::new("xdotool").args(args).output().map_err(|_| {
+            crate::i18n::tr("su Linux mouse e tastiera simulati usano xdotool: installalo (es. sudo apt install xdotool)", "on Linux simulated mouse and keyboard use xdotool: install it (e.g. sudo apt install xdotool)").to_string()
+        })?;
+        if out.status.success() {
+            Ok(String::from_utf8_lossy(&out.stdout).to_string())
+        } else {
+            Err(format!("xdotool: {}", String::from_utf8_lossy(&out.stderr).trim()))
+        }
+    }
+
+    pub(super) fn keys(names: &[&str]) -> Result<(), String> {
+        xdo(&["key", "--clearmodifiers", &names.join("+")]).map(|_| ())
+    }
+
+    pub fn screen_size() -> (i32, i32) {
+        xdo(&["getdisplaygeometry"])
+            .ok()
+            .and_then(|s| {
+                let mut it = s.split_whitespace().filter_map(|n| n.parse().ok());
+                Some((it.next()?, it.next()?))
+            })
+            .unwrap_or((1920, 1080))
+    }
+
+    pub fn cursor() -> (i32, i32) {
+        // "X=123\nY=456\n…"
+        xdo(&["getmouselocation", "--shell"])
+            .ok()
+            .and_then(|s| {
+                let v = |k: &str| s.lines().find_map(|l| l.strip_prefix(k)).and_then(|n| n.trim().parse().ok());
+                Some((v("X=")?, v("Y=")?))
+            })
+            .unwrap_or((0, 0))
+    }
+
+    pub fn move_to(x: i32, y: i32) -> Result<(), String> {
+        xdo(&["mousemove", &x.to_string(), &y.to_string()]).map(|_| ())
+    }
+
+    pub fn click(button: &str, double: bool) -> Result<(), String> {
+        let b = match button {
+            "right" => "3",
+            "middle" => "2",
+            _ => "1",
+        };
+        if double {
+            xdo(&["click", "--repeat", "2", "--delay", "60", b])
+        } else {
+            xdo(&["click", b])
+        }
+        .map(|_| ())
+    }
+
+    /// Rotella: positivo = su, negativo = giù (in "scatti").
+    pub fn scroll(clicks: i32, horizontal: bool) -> Result<(), String> {
+        let b = match (horizontal, clicks > 0) {
+            (false, true) => "4",
+            (false, false) => "5",
+            (true, true) => "7",
+            (true, false) => "6",
+        };
+        xdo(&["click", "--repeat", &clicks.unsigned_abs().clamp(1, 50).to_string(), "--delay", "20", b]).map(|_| ())
+    }
+
+    pub fn type_text(text: &str) -> Result<(), String> {
+        for (i, line) in text.replace('\r', "").split('\n').enumerate() {
+            if i > 0 {
+                keys(&["Return"])?;
+            }
+            if !line.is_empty() {
+                xdo(&["type", "--delay", "8", "--", line])?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn foreground() -> isize {
+        xdo(&["getactivewindow"]).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0)
+    }
+
+    pub fn set_foreground(h: isize) {
+        if h != 0 {
+            let _ = xdo(&["windowactivate", &h.to_string()]);
+        }
+    }
+
+    pub fn foreground_is_ours() -> bool {
+        xdo(&["getactivewindow", "getwindowpid"]).ok().and_then(|s| s.trim().parse::<u32>().ok()) == Some(std::process::id())
+    }
 }
 
 /// Larghezza massima degli screenshot (Impostazioni → Risparmio token).
@@ -228,8 +311,47 @@ pub fn grid() -> (i32, i32, f64) {
 
 #[cfg(not(windows))]
 mod imp {
-    pub fn press(_vks: &[u16]) -> Result<(), String> {
-        Err("i tasti simulati funzionano solo su Windows".into())
+    /// Codice virtual-key di Windows → nome del tasto X11 (keysym) per xdotool.
+    pub fn keysym(vk: u16) -> Option<String> {
+        Some(match vk {
+            0x11 => "ctrl".into(),
+            0x12 => "alt".into(),
+            0x10 => "shift".into(),
+            0x5B => "super".into(),
+            0x20 => "space".into(),
+            0x0D => "Return".into(),
+            0x09 => "Tab".into(),
+            0x1B => "Escape".into(),
+            0x08 => "BackSpace".into(),
+            0x2D => "Insert".into(),
+            0x2E => "Delete".into(),
+            0x24 => "Home".into(),
+            0x23 => "End".into(),
+            0x21 => "Prior".into(),
+            0x22 => "Next".into(),
+            0x25 => "Left".into(),
+            0x26 => "Up".into(),
+            0x27 => "Right".into(),
+            0x28 => "Down".into(),
+            0x2C => "Print".into(),
+            0x13 => "Pause".into(),
+            0xAF => "XF86AudioRaiseVolume".into(),
+            0xAE => "XF86AudioLowerVolume".into(),
+            0xAD => "XF86AudioMute".into(),
+            0xB0 => "XF86AudioNext".into(),
+            0xB1 => "XF86AudioPrev".into(),
+            0xB3 => "XF86AudioPlay".into(),
+            0x30..=0x39 => ((vk as u8) as char).to_string(),
+            0x41..=0x5A => ((vk as u8) as char).to_ascii_lowercase().to_string(),
+            0x60..=0x69 => format!("KP_{}", vk - 0x60),
+            0x70..=0x87 => format!("F{}", vk - 0x6F),
+            _ => return None,
+        })
+    }
+
+    pub fn press(vks: &[u16]) -> Result<(), String> {
+        let names: Vec<String> = vks.iter().map(|&v| keysym(v).ok_or_else(|| format!("tasto {v:#x} non supportato"))).collect::<Result<_, _>>()?;
+        super::pointer::keys(&names.iter().map(String::as_str).collect::<Vec<_>>())
     }
 }
 
@@ -262,5 +384,14 @@ mod tests {
         assert_eq!(parse_combo("F8").unwrap(), vec![0x77]);
         assert!(parse_combo("Ctrl+").is_err());
         assert!(parse_combo("Ctrl+A+B").is_err());
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn linux_keysyms() {
+        let names: Vec<String> = parse_combo("Ctrl+Shift+F5").unwrap().into_iter().map(|v| super::imp::keysym(v).unwrap()).collect();
+        assert_eq!(names, ["ctrl", "shift", "F5"]);
+        assert_eq!(super::imp::keysym(b'S' as u16).as_deref(), Some("s"));
+        assert_eq!(super::imp::keysym(0x62).as_deref(), Some("KP_2"));
     }
 }

@@ -236,9 +236,32 @@ pub fn windows_voices() -> Result<Vec<Voice>, String> {
     Ok(out)
 }
 
+/// Linux: le voci di sistema sono quelle di espeak-ng.
 #[cfg(not(windows))]
 pub fn windows_voices() -> Result<Vec<Voice>, String> {
-    Err(crate::i18n::tr("voci di Windows disponibili solo su Windows", "Windows voices are only available on Windows").into())
+    let out = std::process::Command::new("espeak-ng").arg("--voices").output().map_err(|_| no_espeak())?;
+    Ok(parse_espeak_voices(&String::from_utf8_lossy(&out.stdout)))
+}
+
+#[cfg(not(windows))]
+fn no_espeak() -> String {
+    crate::i18n::tr(
+        "su Linux la voce di sistema usa espeak-ng: installalo (es. sudo apt install espeak-ng) o scegli Kokoro / un servizio online",
+        "on Linux the system voice uses espeak-ng: install it (e.g. sudo apt install espeak-ng) or pick Kokoro / an online service",
+    )
+    .into()
+}
+
+/// Righe di `espeak-ng --voices`: "Pty Language Age/Gender VoiceName File …".
+#[cfg_attr(windows, allow(dead_code))]
+fn parse_espeak_voices(text: &str) -> Vec<Voice> {
+    text.lines()
+        .skip(1)
+        .filter_map(|l| {
+            let c: Vec<&str> = l.split_whitespace().collect();
+            (c.len() >= 4).then(|| Voice { id: c[1].to_string(), name: format!("{} ({})", c[3].replace('_', " "), c[1]), lang: c[1].to_string() })
+        })
+        .collect()
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -282,13 +305,37 @@ fn windows_synth(text: &str, voice: &str, lang: &str, rate: f64) -> Result<Vec<u
 }
 
 #[cfg(not(windows))]
-fn windows_synth(_text: &str, _voice: &str, _lang: &str, _rate: f64) -> Result<Vec<u8>, String> {
-    Err(crate::i18n::tr("voci di Windows disponibili solo su Windows", "Windows voices are only available on Windows").into())
+fn windows_synth(text: &str, voice: &str, lang: &str, rate: f64) -> Result<Vec<u8>, String> {
+    use std::io::Write;
+    let voices = windows_voices()?;
+    let v = pick_voice(&voices, voice, lang).map(|v| v.id.clone()).unwrap_or_else(|| lang.to_string());
+    let wpm = ((175.0 * rate).round() as i64).clamp(80, 450).to_string();
+    let mut child = std::process::Command::new("espeak-ng")
+        .args(["-v", &v, "-s", &wpm, "--stdout", "--stdin"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|_| no_espeak())?;
+    child.stdin.take().ok_or("stdin")?.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+    let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    if out.stdout.len() < 44 {
+        return Err("espeak-ng non ha prodotto audio".into());
+    }
+    Ok(out.stdout)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn espeak_voice_list() {
+        let v = parse_espeak_voices("Pty Language       Age/Gender VoiceName          File                 Other Languages\n 5  it              --/M      Italian            roa/it\n 2  en-gb           --/M      English_(Great_Britain) gmw/en\n");
+        assert_eq!(v.len(), 2);
+        assert_eq!(v[0].lang, "it");
+        assert_eq!(v[1].name, "English (Great Britain) (en-gb)");
+    }
 
     #[test]
     fn wav_roundtrip_and_streaming_header() {

@@ -1,4 +1,4 @@
-//! Screenshot dello schermo principale (GDI), ridotto a max 1280 px di larghezza, PNG in base64.
+//! Screenshot dello schermo principale (GDI su Windows, grim/gnome-screenshot/scrot… su Linux), ridotto a max 1280 px di larghezza, PNG in base64.
 
 #[cfg(windows)]
 fn capture_rgba() -> Result<(u32, u32, Vec<u8>), String> {
@@ -39,9 +39,58 @@ fn capture_rgba() -> Result<(u32, u32, Vec<u8>), String> {
     }
 }
 
+/// Linux: il primo strumento di cattura disponibile (Wayland o X11), letto come PNG.
 #[cfg(not(windows))]
 fn capture_rgba() -> Result<(u32, u32, Vec<u8>), String> {
-    Err("lo screenshot funziona solo su Windows".into())
+    use std::process::{Command, Stdio};
+    let file = std::env::temp_dir().join(format!("alterego-shot-{}.png", std::process::id()));
+    let f = file.to_string_lossy().to_string();
+    let tools: [(&str, Vec<&str>); 6] = [
+        ("grim", vec![f.as_str()]),
+        ("gnome-screenshot", vec!["-f", f.as_str()]),
+        ("spectacle", vec!["-b", "-n", "-f", "-o", f.as_str()]),
+        ("scrot", vec!["-o", f.as_str()]),
+        ("maim", vec![f.as_str()]),
+        ("import", vec!["-window", "root", f.as_str()]),
+    ];
+    let _ = std::fs::remove_file(&file);
+    let mut tried = false;
+    for (tool, args) in tools {
+        let r = Command::new(tool).args(&args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+        if r.is_ok() {
+            tried = true;
+        }
+        if r.is_ok_and(|s| s.success()) && file.is_file() {
+            break;
+        }
+    }
+    let bytes = std::fs::read(&file).map_err(|_| {
+        if tried {
+            crate::i18n::tr("screenshot non riuscito (su Wayland serve grim o gnome-screenshot)", "screenshot failed (on Wayland you need grim or gnome-screenshot)").to_string()
+        } else {
+            crate::i18n::tr("per gli screenshot su Linux installa grim, gnome-screenshot, scrot o maim", "for screenshots on Linux install grim, gnome-screenshot, scrot or maim").to_string()
+        }
+    })?;
+    let _ = std::fs::remove_file(&file);
+    decode_png(&bytes)
+}
+
+#[cfg_attr(windows, allow(dead_code))]
+fn decode_png(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
+    let mut dec = png::Decoder::new(std::io::Cursor::new(bytes));
+    dec.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
+    let mut reader = dec.read_info().map_err(|e| e.to_string())?;
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).map_err(|e| e.to_string())?;
+    buf.truncate(info.buffer_size());
+    let rgba = match info.color_type {
+        png::ColorType::Rgba => buf,
+        png::ColorType::Rgb => buf.chunks_exact(3).flat_map(|p| [p[0], p[1], p[2], 255]).collect(),
+        png::ColorType::GrayscaleAlpha => buf.chunks_exact(2).flat_map(|p| [p[0], p[0], p[0], 255]).collect(),
+        png::ColorType::Grayscale => buf.iter().flat_map(|&g| [g, g, g, 255]).collect(),
+        png::ColorType::Indexed => return Err("PNG indicizzato non atteso".into()),
+    };
+    Ok((info.width, info.height, rgba))
 }
 
 /// Riduzione semplice (media dei pixel) per stare sotto `max_w`.
@@ -100,5 +149,8 @@ mod tests {
         assert_eq!((w, h, out.len()), (1280, 5, 1280 * 5 * 4));
         let png = super::encode_png(w, h, &out).unwrap();
         assert_eq!(&png[1..4], b"PNG");
+        let (w2, h2, back) = super::decode_png(&png).unwrap();
+        assert_eq!((w2, h2), (1280, 5));
+        assert_eq!(&back[..4], &out[..4]);
     }
 }

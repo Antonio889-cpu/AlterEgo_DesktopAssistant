@@ -4,7 +4,7 @@
 
 **🌐 Sito web: [alterego.attentoweb.it](https://alterego.attentoweb.it)** · **🎬 [Trailer](#trailer)**
 
-Assistente desktop per **Windows 10/11** ispirato ad *Alter Ego* di Danganronpa: una finestrella in stile laptop CRT,
+Assistente desktop per **Windows 10/11** e **Linux** ispirato ad *Alter Ego* di Danganronpa: una finestrella in stile laptop CRT,
 sempre in primo piano, con cui parli a voce o per iscritto. Risponde con il proprio carattere, ricorda chi sei,
 può fare clip dei tuoi giochi con una frase e, se glielo permetti, eseguire piccole azioni sul PC.
 
@@ -129,11 +129,21 @@ Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in ingle
 
 ## Installazione
 
-1. Scarica dalla pagina [Releases](../../releases) l'ultima release (**`v1.2.0`**):
-   l'**installer** `AlterEgo_1.2.0_setup.exe` oppure lo **zip portable** (estrai e avvia `alter-ego.exe`).
-   Aggiornando da una versione precedente impostazioni, chiavi e memoria restano.
+**Windows**
+
+1. Scarica dalla pagina [Releases](../../releases) l'ultima release: l'**installer** `AlterEgo_<versione>_setup.exe`
+   oppure lo **zip portable** (estrai e avvia `alter-ego.exe`). Aggiornando da una versione precedente impostazioni, chiavi e memoria restano.
 2. Windows SmartScreen può avvisare che l'app non è firmata: *Ulteriori informazioni → Esegui comunque*.
 3. Serve **WebView2**, già presente in Windows 10/11 aggiornati.
+
+**Linux** (x86-64; prima versione, provata meno di quella Windows)
+
+- **AppImage**: `chmod +x AlterEgo_<versione>_amd64.AppImage` e avviala. Si aggiorna da sola dalle impostazioni.
+- **Debian/Ubuntu**: `sudo apt install ./AlterEgo_<versione>_amd64.deb`.
+- Per le chiavi serve un portachiavi (GNOME Keyring o KWallet), di solito già presente.
+- Facoltativi: `espeak-ng` (voce di sistema), `xdotool` (mouse e tastiera, solo X11), `grim` o `gnome-screenshot` (screenshot), `yt-dlp`
+  (altrimenti lo scarica Alter Ego), `unzip`.
+- Solo su Windows: Mic-Link (cavo audio virtuale) e le voci di Windows.
 
 L'app compare nella **system tray** (vicino all'orologio), non nella taskbar.
 
@@ -300,7 +310,8 @@ In *Impostazioni → AI e chiavi* c'è la sezione **Risparmio token** (lunghezza
   Se il modello si accorge che gliene serviva uno risponde `[[TOOLS]]` e la domanda si ripete subito con gli strumenti.
 - **Router locale**: decide «serve un'azione?» e «è una domanda semplice?» senza spendere token — parole chiave (gratis)
   oppure [**Rizzo Flow**](https://github.com/Rizzo-AI-Academy/rizzo-flow) di Rizzo AI Academy, un modello locale che risponde a domande tipizzate
-  in ~50 ms senza generare token (`uv run rizzo serve`, predefinito `http://127.0.0.1:8017`).
+  in ~50 ms senza generare token (predefinito `http://127.0.0.1:8017`). Il pulsante **Installa Rizzo Flow** scarica tutto
+  (uv, codice, modello 4B da 4,4 GB o 1.7B da 1,8 GB) e da allora il server parte e si chiude insieme ad Alter Ego.
 - **Modello economico per le domande semplici**: saluti e domande brevi vanno a un provider/modello a tua scelta (model routing).
 - **Descrizioni degli strumenti compatte**, **risposte vecchie accorciate nella cronologia** (in modo deterministico: la cache del provider continua
   a funzionare), **solo i fatti più pertinenti**, **screenshot più piccoli** e **pagine web più corte**.
@@ -312,7 +323,7 @@ I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSee
 
 Il gioco multiplayer **Alter Net** si apre dentro Alter Ego: «apri Alter Net», la voce nella tray o Impostazioni → Generale.
 Finestra a schermo intero senza bordi: **F11** alterna schermo intero e finestra, **Esc due volte** chiude.
-Se il server non risponde si apre la versione offline in giocatore singolo: Alter Ego la scarica da sola dal server la prima volta che giochi online (in `%APPDATA%\AlterNet\offline`).
+Se il server non risponde si apre la versione offline in giocatore singolo: Alter Ego la scarica da sola dal server la prima volta che giochi online (in `%APPDATA%\AlterNet\offline`, su Linux `~/.local/share/AlterNet/offline`).
 «Cambia server…» permette di usare un altro indirizzo.
 
 ## Costi

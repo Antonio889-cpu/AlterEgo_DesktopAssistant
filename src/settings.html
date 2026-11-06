@@ -105,8 +105,20 @@
       </label>
       <label id="sv-rizzo-row">URL di Rizzo Flow <input id="sv-rizzo-url" placeholder="http://127.0.0.1:8017" /> <button id="sv-rizzo-test">Prova</button> <span id="sv-rizzo-result" class="result"></span></label>
       <p class="note sub" id="sv-rizzo-note"><a href="#" id="sv-rizzo-link">Rizzo Flow</a> (Rizzo AI Academy, Apache-2.0) è un modello locale che dà risposte tipizzate senza generare token (~50 ms):
-        Alter Ego gli chiede «serve un'azione?» e «è una domanda semplice?». Installazione: <code>git clone https://github.com/Rizzo-AI-Academy/rizzo-flow</code>,
-        poi nella cartella <code>uv sync --locked</code>, <code>uv run rizzo download</code>, <code>uv run rizzo serve</code>. Se non risponde si usano le parole chiave.</p>
+        Alter Ego gli chiede «serve un'azione?» e «è una domanda semplice?». Se non risponde si usano le parole chiave.</p>
+      <div id="rz-box">
+        <p class="note">Rizzo Flow su questo PC: <b id="rz-state">…</b></p>
+        <div class="actions">
+          <select id="rz-size"><option value="4b">Modello 4B (4,4 GB, più preciso)</option><option value="1.7b">Modello 1.7B (1,8 GB, più leggero)</option></select>
+          <button id="rz-install">⬇ Installa Rizzo Flow</button>
+          <button id="rz-start">▶ Avvia</button>
+          <button id="rz-stop">■ Ferma</button>
+          <button id="rz-dir">Cartella</button>
+        </div>
+        <label class="inline"><input type="checkbox" id="rz-auto" /> Avvia il server di Rizzo Flow insieme ad Alter Ego (si chiude quando esci)</label>
+        <div class="actions"><span id="rz-progress" class="result"></span></div>
+        <p class="note sub">L'installazione scarica uv (se manca), il codice da GitHub e il modello, poi imposta il router su Rizzo Flow. Funziona anche senza GPU, più lento.</p>
+      </div>
       <label>Modello economico per le domande semplici
         <select id="sv-eco-provider"><option value="">Spento</option></select>
         <input id="sv-eco-model" placeholder="es. gemini-2.5-flash-lite" />

@@ -36,8 +36,14 @@ struct Allowed {
 }
 static ALLOWED: Mutex<Allowed> = Mutex::new(Allowed { server: String::new(), offline: None });
 
+/// %APPDATA%\AlterNet su Windows, ~/.local/share/AlterNet su Linux.
 fn data_dir() -> PathBuf {
-    std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir).join("AlterNet")
+    let base = if cfg!(windows) {
+        std::env::var_os("APPDATA").map(PathBuf::from)
+    } else {
+        std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share")))
+    };
+    base.unwrap_or_else(std::env::temp_dir).join("AlterNet")
 }
 
 pub fn server_url() -> String {

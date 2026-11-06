@@ -14,6 +14,7 @@ mod keys;
 mod memory;
 mod music;
 mod providers;
+mod rizzo;
 mod saving;
 mod sprites;
 mod spotify;
@@ -462,6 +463,7 @@ fn main() {
             *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap() = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
+            rizzo::autostart(&handle);
             window::create_main(&handle)?;
             tray::create(&handle)?;
             for e in hotkeys::register(&handle, &hk) {
@@ -543,6 +545,12 @@ fn main() {
             update::app_version,
             alternet::alternet_open,
             alternet::alternet_info,
+            rizzo::rizzo_status,
+            rizzo::rizzo_install,
+            rizzo::rizzo_start,
+            rizzo::rizzo_stop,
+            rizzo::rizzo_settings,
+            rizzo::rizzo_open_dir,
             web::set_web_key,
             web::web_keys,
             web::set_web_config,
@@ -598,6 +606,7 @@ fn main() {
             if let tauri::RunEvent::Exit = event {
                 // il server Kokoro avviato da noi si chiude con l'app
                 app.state::<audio::kokoro::Kokoro>().stop();
+                rizzo::stop(app);
             }
         });
 }

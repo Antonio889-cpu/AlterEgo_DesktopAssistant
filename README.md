@@ -4,7 +4,7 @@
 
 **🌐 Website: [alterego.attentoweb.it](https://alterego.attentoweb.it)** · **🎬 [Trailer](#trailer)**
 
-A desktop assistant for **Windows 10/11** inspired by *Alter Ego* from Danganronpa: a small CRT-laptop-style window,
+A desktop assistant for **Windows 10/11** and **Linux** inspired by *Alter Ego* from Danganronpa: a small CRT-laptop-style window,
 always on top, that you talk to by voice or text. She answers with her own personality, remembers who you are,
 saves game clips with a phrase, plays music, searches the web and, if you allow it, performs actions on your PC.
 
@@ -129,11 +129,21 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 
 ## Installation
 
-1. From the [Releases](../../releases) page download the latest release (**`v1.2.0`**):
-   the **installer** `AlterEgo_1.2.0_setup.exe` or the **portable zip** (extract it and run `alter-ego.exe`).
-   When updating from an older version, settings, keys and memory are kept.
+**Windows**
+
+1. From the [Releases](../../releases) page download the latest release: the **installer** `AlterEgo_<version>_setup.exe`
+   or the **portable zip** (extract it and run `alter-ego.exe`). When updating from an older version, settings, keys and memory are kept.
 2. Windows SmartScreen may warn that the app is not signed: *More info → Run anyway*.
 3. **WebView2** is required; it is already included in up-to-date Windows 10/11.
+
+**Linux** (x86-64; first version, less tested than Windows)
+
+- **AppImage**: `chmod +x AlterEgo_<version>_amd64.AppImage` and run it. It updates itself from the settings.
+- **Debian/Ubuntu**: `sudo apt install ./AlterEgo_<version>_amd64.deb`.
+- Keys need a keyring (GNOME Keyring or KWallet), usually already there.
+- Optional: `espeak-ng` (system voice), `xdotool` (mouse and keyboard, X11 only), `grim` or `gnome-screenshot` (screenshots), `yt-dlp`
+  (otherwise Alter Ego downloads it), `unzip`.
+- Windows only: Mic-Link (virtual audio cable) and Windows voices.
 
 The app shows up in the **system tray** (next to the clock), not in the taskbar.
 
@@ -299,7 +309,8 @@ every search shows up in the Costs tab.
   If the model realizes it needed one it answers `[[TOOLS]]` and the question is repeated right away with the tools.
 - **Local router**: decides "is an action needed?" and "is this a simple question?" without spending tokens — keywords (free)
   or [**Rizzo Flow**](https://github.com/Rizzo-AI-Academy/rizzo-flow) by Rizzo AI Academy, a local model that answers typed questions
-  in ~50 ms with zero generated tokens (`uv run rizzo serve`, default `http://127.0.0.1:8017`).
+  in ~50 ms with zero generated tokens (default `http://127.0.0.1:8017`). The **Install Rizzo Flow** button downloads everything
+  (uv, code, 4B model at 4.4 GB or 1.7B at 1.8 GB) and from then on the server starts and stops together with Alter Ego.
 - **Cheap model for simple questions**: greetings and short questions go to a provider/model of your choice (model routing).
 - **Compact tool descriptions**, **shorter old answers in the history** (deterministic, so the provider cache keeps working),
   **only the most relevant facts**, **smaller screenshots** and **shorter web pages**.
@@ -311,7 +322,7 @@ Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini)
 
 The **Alter Net** multiplayer game opens inside Alter Ego: “open Alter Net”, the tray item or Settings → General.
 Borderless fullscreen window: **F11** toggles fullscreen and windowed, **Esc twice** closes.
-If the server doesn't answer, the offline single-player version opens: Alter Ego downloads it from the server the first time you play online (into `%APPDATA%\AlterNet\offline`).
+If the server doesn't answer, the offline single-player version opens: Alter Ego downloads it from the server the first time you play online (into `%APPDATA%\AlterNet\offline`, on Linux `~/.local/share/AlterNet/offline`).
 “Change server…” lets you use another address.
 
 ## Costs

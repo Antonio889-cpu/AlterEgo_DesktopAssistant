@@ -79,7 +79,9 @@ pub async fn check(app: &AppHandle) -> Result<UpdateInfo, String> {
         return Err(crate::tr!("GitHub ha risposto {} (nessuna release pubblica?)", "GitHub answered {} (no public release?)", res.status()));
     }
     let r: GhRelease = res.json().await.map_err(|e| e.to_string())?;
-    let setup = r.assets.iter().find(|a| a.name.to_lowercase().ends_with("_setup.exe"));
+    // Windows: l'installer; Linux: l'AppImage (si sostituisce da sola)
+    let suffix = if cfg!(windows) { "_setup.exe" } else { ".appimage" };
+    let setup = r.assets.iter().find(|a| a.name.to_lowercase().ends_with(suffix));
     Ok(UpdateInfo {
         current: VERSION.into(),
         latest: r.tag_name.trim_start_matches('v').to_string(),
@@ -104,6 +106,19 @@ pub async fn install(app: &AppHandle) -> Result<String, String> {
     if !info.newer {
         status(app, "");
         return Ok(crate::tr!("Alter Ego è già aggiornata (versione {}).", "Alter Ego is up to date (version {}).", info.current));
+    }
+    #[cfg(not(windows))]
+    let appimage = std::env::var_os("APPIMAGE").map(std::path::PathBuf::from).filter(|p| p.is_file());
+    #[cfg(not(windows))]
+    if appimage.is_none() {
+        // pacchetto .deb o build a mano: si aggiorna dal sito delle release
+        status(app, "");
+        let _ = open_link("releases");
+        return Ok(crate::tr!(
+            "C'è la versione {}: ho aperto la pagina della release, scarica il pacchetto .deb o l'AppImage.",
+            "Version {} is out: I opened the release page, download the .deb package or the AppImage.",
+            info.latest
+        ));
     }
     let Some((name, url)) = info.setup_url.clone() else {
         return Err(crate::tr!("la release {} non ha l'installer: scaricalo da {}", "release {} has no installer: download it from {}", info.latest, info.page));
@@ -141,11 +156,35 @@ pub async fn install(app: &AppHandle) -> Result<String, String> {
             None => {}
         }
     }
-    let path = std::env::temp_dir().join(&name);
-    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    let path = {
+        let path = std::env::temp_dir().join(&name);
+        std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+        path
+    };
+    // Linux: la nuova AppImage prende il posto di quella in uso
+    #[cfg(not(windows))]
+    let path = {
+        use std::os::unix::fs::PermissionsExt;
+        let target = appimage.clone().unwrap_or_default();
+        let tmp = target.with_extension("new");
+        std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+        std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
+        std::fs::rename(&tmp, &target).map_err(|e| e.to_string())?;
+        target
+    };
     crate::actions::log(app, "aggiornamento", &format!("{} → {}", info.current, info.latest), "installer avviato");
     status(app, crate::i18n::tr("Avvio l'installer…", "Starting the installer…"));
+    #[cfg(windows)]
     std::process::Command::new(&path).spawn().map_err(|e| crate::tr!("installer non avviato: {e}", "installer did not start: {e}"))?;
+    // la nuova versione parte quando questa è chiusa (istanza singola)
+    #[cfg(not(windows))]
+    std::process::Command::new("sh")
+        .arg("-c")
+        .arg("sleep 4; exec \"$0\"")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| crate::tr!("nuova versione non avviata: {e}", "new version did not start: {e}"))?;
     let app2 = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(1500));

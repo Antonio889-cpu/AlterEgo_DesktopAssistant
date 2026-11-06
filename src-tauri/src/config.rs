@@ -491,6 +491,22 @@ impl SavingConfig {
     }
 }
 
+/// Rizzo Flow installato da Alter Ego (vedi rizzo.rs).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct RizzoConfig {
+    /// Avvia `rizzo serve` all'avvio di Alter Ego.
+    pub autostart: bool,
+    /// Taglia del modello: "4b" (più preciso) o "1.7b" (più leggero).
+    pub size: String,
+}
+
+impl Default for RizzoConfig {
+    fn default() -> Self {
+        Self { autostart: false, size: "4b".into() }
+    }
+}
+
 /// Spotify Web API (serve Spotify Premium per controllare la riproduzione).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
 #[serde(default)]
@@ -570,6 +586,7 @@ pub struct Config {
     pub saving: SavingConfig,
     /// Spotify (utenti Premium): controllo della riproduzione via Web API.
     pub spotify: SpotifyConfig,
+    pub rizzo: RizzoConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -603,6 +620,7 @@ impl Default for Config {
             web: WebConfig::default(),
             saving: SavingConfig::default(),
             spotify: SpotifyConfig::default(),
+            rizzo: RizzoConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
             last_monitor: None,

@@ -850,8 +850,55 @@ $("sv-rizzo-test").onclick = async (e) => {
   const r = $("sv-rizzo-result");
   r.className = "result"; r.textContent = t("Controllo…");
   try { r.textContent = await invoke("rizzo_test", { url: saving.router_url }); r.className = "result ok"; }
-  catch { r.textContent = t("Non raggiungibile: avvialo con «uv run rizzo serve»"); r.className = "result bad"; }
+  catch { r.textContent = t("Non raggiungibile: installalo o avvialo qui sotto"); r.className = "result bad"; }
 };
+// ---------- rizzo flow sul pc ----------
+async function rizzoStatus() {
+  let st;
+  try { st = (await invoke("rizzo_status")) || {}; } catch (_) { return; }
+  const state = st.installing ? t("installazione in corso…")
+    : !st.installed ? t("non installato")
+    : st.running ? t("installato, server attivo")
+    : st.managed ? t("installato, server in avvio…")
+    : t("installato, server spento");
+  $("rz-state").textContent = state;
+  $("rz-size").value = st.size || "4b";
+  $("rz-auto").checked = !!st.autostart;
+  $("rz-install").textContent = st.installed ? t("⟳ Reinstalla / aggiorna") : t("⬇ Installa Rizzo Flow");
+  $("rz-install").disabled = !!st.installing;
+  $("rz-start").disabled = !st.installed || st.running || !!st.installing;
+  $("rz-stop").disabled = !st.managed;
+}
+function rizzoSettings() { invoke("rizzo_settings", { autostart: $("rz-auto").checked, size: $("rz-size").value }).catch(() => {}); }
+$("rz-auto").onchange = rizzoSettings;
+$("rz-size").onchange = rizzoSettings;
+$("rz-install").onclick = async () => {
+  const p = $("rz-progress");
+  p.className = "result"; p.textContent = t("Chiedo conferma…");
+  $("rz-install").disabled = true;
+  try {
+    p.textContent = await invoke("rizzo_install", { size: $("rz-size").value });
+    p.className = "result ok";
+    saving.router = "rizzo"; fillSaving({ saving });
+  } catch (e) { p.textContent = String(e); p.className = "result bad"; }
+  rizzoStatus();
+};
+$("rz-start").onclick = async () => {
+  try { await invoke("rizzo_start"); $("rz-progress").textContent = t("Avvio il server (il modello impiega un po' a caricarsi)…"); } catch (e) { $("rz-progress").textContent = String(e); $("rz-progress").className = "result bad"; }
+  rizzoStatus();
+};
+$("rz-stop").onclick = async () => { await invoke("rizzo_stop").catch(() => {}); rizzoStatus(); };
+$("rz-dir").onclick = () => invoke("rizzo_open_dir").catch(() => {});
+listen("rizzo-status", (e) => {
+  const { phase, text } = e.payload || {};
+  const p = $("rz-progress");
+  p.textContent = text || "";
+  p.className = phase === "error" ? "result bad" : phase === "done" ? "result ok" : "result";
+  if (phase !== "install") rizzoStatus();
+});
+rizzoStatus();
+setInterval(rizzoStatus, 5000);
+
 function applySavingPreset(p, thinking) {
   Object.assign(saving, p);
   ai.thinking = thinking; $("thinking").value = thinking; saveAi();

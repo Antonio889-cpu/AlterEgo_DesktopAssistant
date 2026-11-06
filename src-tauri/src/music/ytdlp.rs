@@ -8,6 +8,8 @@ use std::{
 };
 
 const YTDLP_URL: &str = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+const YTDLP_LINUX_URL: &str = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
+const DENO_LINUX_URL: &str = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip";
 const DENO_URL: &str = "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip";
 
 pub struct Tools {
@@ -75,8 +77,7 @@ pub async fn ensure(http: &reqwest::Client, data_dir: &Path, status: impl Fn(&st
     let dir = tools_dir(data_dir);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     if !cfg!(windows) {
-        // fuori da Windows: quello installato nel sistema
-        return Ok(Tools { ytdlp: PathBuf::from("yt-dlp"), deno: None });
+        return ensure_unix(http, &dir, status).await;
     }
     let ytdlp = dir.join("yt-dlp.exe");
     if !ytdlp.exists() {
@@ -109,6 +110,50 @@ pub async fn ensure(http: &reqwest::Client, data_dir: &Path, status: impl Fn(&st
     }
     Ok(Tools { ytdlp, deno: deno.exists().then_some(deno) })
 }
+
+/// Linux: yt-dlp del sistema se c'è, altrimenti il binario ufficiale (yt-dlp_linux) e Deno nella cartella strumenti.
+async fn ensure_unix(http: &reqwest::Client, dir: &Path, status: impl Fn(&str)) -> Result<Tools, String> {
+    let system = PathBuf::from("yt-dlp");
+    let system_ok = command(&system).arg("--version").output().await.is_ok_and(|o| o.status.success());
+    let ytdlp = if system_ok {
+        system
+    } else {
+        let p = dir.join("yt-dlp");
+        if !p.exists() {
+            status(crate::i18n::tr("Scarico yt-dlp (solo la prima volta)…", "Downloading yt-dlp (first time only)…"));
+            download(http, YTDLP_LINUX_URL, &p).await?;
+            make_executable(&p);
+        }
+        p
+    };
+    let deno_sys = PathBuf::from("deno");
+    if command(&deno_sys).arg("--version").output().await.is_ok_and(|o| o.status.success()) {
+        return Ok(Tools { ytdlp, deno: Some(deno_sys) });
+    }
+    let deno = dir.join("deno");
+    if !deno.exists() {
+        status(crate::i18n::tr("Scarico Deno, serve a yt-dlp per YouTube (solo la prima volta)…", "Downloading Deno, yt-dlp needs it for YouTube (first time only)…"));
+        let zip = dir.join("deno.zip");
+        if download(http, DENO_LINUX_URL, &zip).await.is_ok() {
+            let ok = command(Path::new("unzip")).arg("-o").arg("-q").arg(&zip).arg("-d").arg(dir).status().await.is_ok_and(|s| s.success());
+            let _ = std::fs::remove_file(&zip);
+            if ok {
+                make_executable(&deno);
+            } else {
+                eprintln!("estrazione di Deno non riuscita (serve unzip): yt-dlp proverà senza");
+            }
+        }
+    }
+    Ok(Tools { ytdlp, deno: deno.exists().then_some(deno) })
+}
+
+#[cfg(unix)]
+fn make_executable(p: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o755));
+}
+#[cfg(not(unix))]
+fn make_executable(_p: &Path) {}
 
 /// Aggiorna yt-dlp (YouTube cambia spesso: le versioni vecchie smettono di funzionare).
 pub async fn update(tools: &Tools) -> Result<(), String> {

@@ -87,6 +87,13 @@ e un nuovo indirizzo si accetta solo dalla pagina locale «Cambia server». Se i
 la pagina manda l'elenco dei file che ha caricato e Alter Ego scarica dal server solo quelli sotto `/game/` e `/Everyfile/`
 (estensioni di immagini, audio, font, html/js/css/json) in `%APPDATA%\AlterNet\offline`; si usa solo dopo un download senza errori.
 
+## Rizzo Flow
+
+Il pulsante **Installa Rizzo Flow** (Impostazioni → AI e chiavi → Risparmio token) chiede **sempre** conferma, poi esegue:
+l'installer ufficiale di `uv` (solo se manca), `git clone` di Rizzo Flow (o lo zip di GitHub) nella cartella dati locale dell'app,
+`uv sync --locked` e `uv run rizzo download`. Con «Avvia con Alter Ego» il server `rizzo serve` parte all'avvio, solo su
+`127.0.0.1`, e viene chiuso all'uscita. Non è un'azione del modello: lo strumento non è disponibile ad Alter Ego.
+
 ## Senza filtri
 
 Impostazione della personalità: il prompt chiede al modello di eseguire anche quando non è d'accordo. Non tocca il sistema dei
