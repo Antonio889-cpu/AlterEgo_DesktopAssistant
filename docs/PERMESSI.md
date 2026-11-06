@@ -77,6 +77,14 @@ controllo e installazione degli aggiornamenti. Le frasi brevi più comuni ("apri
 sono riconosciute in locale, senza modello. **Aggiornamento**: scarica l'installer della release da GitHub, controlla lo SHA-256
 con `SHA256SUMS.txt`, chiede **sempre** conferma (anche con "Non chiedere conferma"), poi lo avvia e chiude l'app.
 
+## Alter Net
+
+Finestra del gioco Alter Net (`apri Alter Net`, tray, Impostazioni → Generale), con un profilo WebView2 separato in
+`%APPDATA%\AlterNet\WebView2`. La pagina può navigare solo verso il server (`%APPDATA%\AlterNet\server.txt`, altrimenti
+`http://attentoweb.ddns.net:8080/`), i file dentro la cartella `offline/` dell'app, `about:` e `data:`; nuove finestre negate;
+nessun accesso ai comandi di Alter Ego. Ogni indirizzo passa dalla stessa validazione del client Alter Net (`http(s)://host[:porta]/`)
+e un nuovo indirizzo si accetta solo dalla pagina locale «Cambia server». Se il server non risponde (test TCP, 3 s) si apre la copia offline.
+
 ## Senza filtri
 
 Impostazione della personalità: il prompt chiede al modello di eseguire anche quando non è d'accordo. Non tocca il sistema dei

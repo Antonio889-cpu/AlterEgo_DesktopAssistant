@@ -51,6 +51,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let sound = radio(app, tr("Suoni dialogo", "Dialogue sounds"), "blip", &[("dr", tr("Blip stile Danganronpa", "Danganronpa-style blips")), ("soft", tr("Blip morbidi", "Soft blips")), ("off", tr("Muto", "Muted"))], &cfg.audio.blips)?;
     let voice = CheckMenuItem::with_id(app, "tts", tr("Voce (TTS)", "Voice (TTS)"), true, cfg.audio.tts != "off", None::<&str>)?;
     let venue = MenuItem::with_id(app, "venue", "Music Venue", true, None::<&str>)?;
+    let alternet = MenuItem::with_id(app, "alternet", "Alter Net", true, None::<&str>)?;
     let links = Submenu::with_items(
         app,
         tr("Info e aggiornamenti", "About and updates"),
@@ -68,7 +69,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[&show, &talk, &settings, &venue, &demo, &sep, &click, &opacity, &look, &sound, &voice, &reset, &links, &sep2, &quit],
+        &[&show, &talk, &settings, &venue, &alternet, &demo, &sep, &click, &opacity, &look, &sound, &voice, &reset, &links, &sep2, &quit],
     )?;
     *state.tray_click_item.lock().unwrap() = Some(click);
     Ok(menu)
@@ -104,6 +105,14 @@ fn on_menu(app: &AppHandle, id: &str) {
         }),
         "reset" => window::reset_geometry(app),
         "venue" => crate::music::open_venue(app),
+        "alternet" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = crate::alternet::open(&app, false).await {
+                    let _ = app.emit("app-say", format!("[worried]\n{e}"));
+                }
+            });
+        }
         "site" => {
             let _ = crate::update::open_link("site");
         }

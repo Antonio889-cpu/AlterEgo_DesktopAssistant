@@ -15,6 +15,9 @@ pub const ACTIONS: &[&str] = &[
     "player_smaller",
     "player_size",
     "open_settings",
+    "open_alter_net",
+    "close_alter_net",
+    "alter_net_server",
     "hide_alter_ego",
     "click_through_on",
     "click_through_off",
@@ -69,6 +72,9 @@ pub async fn run(app: &AppHandle, action: &str, value: Option<f64>) -> Result<St
             let w = app.state::<AppState>().cfg.lock().unwrap().music.player_width;
             Ok(crate::tr!("Lettore largo {:.0} px.", "Player is {:.0} px wide.", w))
         }
+        "open_alter_net" => crate::alternet::open(app, false).await,
+        "alter_net_server" => crate::alternet::open(app, true).await,
+        "close_alter_net" => Ok(if crate::alternet::close(app) { tr("Alter Net chiuso.", "Alter Net closed.") } else { tr("Alter Net non era aperto.", "Alter Net wasn't open.") }.into()),
         "open_settings" => window::open_settings(app).map(|_| tr("Impostazioni aperte.", "Settings opened.").into()).map_err(|e| e.to_string()),
         "hide_alter_ego" => {
             window::hide_main(app, false);
@@ -147,6 +153,8 @@ pub fn quick_match(text: &str) -> Option<&'static str> {
         ("open_player", &["apri il lettore", "apri il lettore audio", "apri il lettore musicale", "mostra il lettore", "open the player", "open the music player", "show the player"]),
         ("player_bigger", &["ingrandisci il lettore", "lettore più grande", "make the player bigger", "bigger player"]),
         ("player_smaller", &["rimpicciolisci il lettore", "lettore più piccolo", "make the player smaller", "smaller player"]),
+        ("open_alter_net", &["apri alter net", "apri alternet", "avvia alter net", "gioca ad alter net", "open alter net", "open alternet", "launch alter net", "play alter net"]),
+        ("close_alter_net", &["chiudi alter net", "chiudi alternet", "close alter net", "close alternet"]),
         ("open_settings", &["apri le impostazioni", "apri impostazioni", "open settings", "open the settings"]),
         ("open_website", &["apri il sito", "apri il sito web", "apri il tuo sito", "open the website", "open your website", "open the site"]),
         ("open_github", &["apri github", "apri il github", "apri la pagina github", "open github", "open the github page"]),
@@ -186,6 +194,8 @@ mod tests {
         assert_eq!(quick_match("Alter Ego, chiudi il lettore audio per favore"), Some("close_player"));
         assert_eq!(quick_match("close the music player please"), Some("close_player"));
         assert_eq!(quick_match("pausa"), Some("music:pause"));
+        assert_eq!(quick_match("Apri Alter Net"), Some("open_alter_net"));
+        assert_eq!(quick_match("chiudi alternet"), Some("close_alter_net"));
         assert_eq!(quick_match("apri il sito di repubblica"), None);
         assert_eq!(quick_match("cosa pensi della music venue di ieri sera"), None);
     }

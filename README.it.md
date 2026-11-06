@@ -34,6 +34,7 @@ Progetto fan non ufficiale e non commerciale. Interfaccia in italiano e in ingle
 - [Musica](#musica)
 - [Ricerca web](#ricerca-web)
 - [Risparmio token](#risparmio-token)
+- [Alter Net](#alter-net)
 - [Costi](#costi)
 - [Clip vocali](#clip-vocali)
 - [Azioni sul PC e permessi](#azioni-sul-pc-e-permessi)
@@ -306,6 +307,13 @@ In *Impostazioni → AI e chiavi* c'è la sezione **Risparmio token** (lunghezza
 - **Massimo risparmio** accende tutto insieme; **Predefinite** torna indietro.
 
 I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSeek, Gemini): prima la parte fissa, la cronologia si sposta a scatti.
+
+## Alter Net
+
+Il gioco multiplayer **Alter Net** si apre dentro Alter Ego: «apri Alter Net», la voce nella tray o Impostazioni → Generale.
+Finestra a schermo intero senza bordi: **F11** alterna schermo intero e finestra, **Esc due volte** chiude.
+Se il server non risponde si apre la versione offline in giocatore singolo (cartella `offline/` accanto all'app).
+«Cambia server…» permette di usare un altro indirizzo.
 
 ## Costi
 

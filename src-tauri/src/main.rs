@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod actions;
+mod alternet;
 mod appctl;
 mod assistant;
 mod audio;
@@ -540,6 +541,8 @@ fn main() {
             update::update_install,
             update::open_link_cmd,
             update::app_version,
+            alternet::alternet_open,
+            alternet::alternet_info,
             web::set_web_key,
             web::web_keys,
             web::set_web_config,

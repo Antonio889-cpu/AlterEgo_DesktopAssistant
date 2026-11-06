@@ -922,6 +922,18 @@ $("sp-connect").onclick = async (e) => {
 $("sp-disconnect").onclick = async () => { await invoke("spotify_disconnect"); spotifyStatus(); };
 $("sp-enabled").onchange = (e) => invoke("spotify_settings", { enabled: e.target.checked });
 
+// ---------- alter net ----------
+async function alterNetInfo() {
+  try {
+    const i = (await invoke("alternet_info")) || {};
+    $("an-server").textContent = i.server || "";
+    $("an-offline").textContent = i.offline ? t("copia offline presente") : t("copia offline non installata");
+  } catch (_) {}
+}
+alterNetInfo();
+$("an-open").onclick = () => invoke("alternet_open", { change: false }).catch(() => {});
+$("an-change").onclick = () => invoke("alternet_open", { change: true }).catch(() => {});
+
 // ---------- info e aggiornamenti ----------
 invoke("app_version").then((v) => { $("app-version").textContent = v; }).catch(() => {});
 $("link-site").onclick = () => invoke("open_link_cmd", { which: "site" });

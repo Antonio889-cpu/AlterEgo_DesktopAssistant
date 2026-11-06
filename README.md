@@ -34,6 +34,7 @@ Unofficial, non-commercial fan project. Interface in English and Italian.
 - [Music](#music)
 - [Web search](#web-search)
 - [Token saving](#token-saving)
+- [Alter Net](#alter-net)
 - [Costs](#costs)
 - [Voice clips](#voice-clips)
 - [PC actions and permissions](#pc-actions-and-permissions)
@@ -305,6 +306,13 @@ every search shows up in the Costs tab.
 - **Maximum saving** turns on everything at once; **Defaults** goes back.
 
 Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini): the fixed part comes first, history moves in steps.
+
+## Alter Net
+
+The **Alter Net** multiplayer game opens inside Alter Ego: “open Alter Net”, the tray item or Settings → General.
+Borderless fullscreen window: **F11** toggles fullscreen and windowed, **Esc twice** closes.
+If the server doesn't answer, the offline single-player version opens (`offline/` folder next to the app).
+“Change server…” lets you use another address.
 
 ## Costs
 

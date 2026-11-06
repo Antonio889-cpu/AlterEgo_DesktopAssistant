@@ -187,8 +187,8 @@ pub fn tool_defs(p: &Permissions) -> Option<Value> {
     if p.app_control {
         t.push(func(
             "app_control",
-            "Controlla l'app Alter Ego stessa (non il PC): finestre, lettore musicale, Music Venue, aspetto, link, aggiornamenti, impostazioni. \
-Usalo quando l'utente chiede qualcosa sull'app (es. \"apri music venue\", \"chiudi il lettore audio\", \"ingrandisci il lettore\", \"apri il sito\", \"aggiorna\").",
+            "Controlla l'app Alter Ego stessa (non il PC): finestre, lettore musicale, Music Venue, il gioco Alter Net, aspetto, link, aggiornamenti, impostazioni. \
+Usalo quando l'utente chiede qualcosa sull'app (es. \"apri music venue\", \"apri alter net\", \"chiudi il lettore audio\", \"ingrandisci il lettore\", \"apri il sito\", \"aggiorna\").",
             obj(json!({
                 "action": { "type": "string", "enum": crate::appctl::ACTIONS },
                 "value": { "type": "number", "description": "solo per opacity (20-100) e player_size (420-1200 px)" }
