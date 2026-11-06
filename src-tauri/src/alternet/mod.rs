@@ -10,7 +10,10 @@
 //! - La pagina parla con l'app con `window.ipc.postMessage("fullscreen" | "server:<url>" | "offline")`:
 //!   lo script iniettato intercetta questi messaggi e li passa attraverso il titolo del documento.
 //!   F11 alterna schermo intero e finestra (sempre senza bordi), Esc due volte chiude.
+//! - La copia offline non è distribuita con l'app: la costruisce `sync` scaricando dal server, mentre si gioca online,
+//!   i file che il gioco ha usato (oppure si mette a mano una cartella `offline/` accanto all'exe).
 
+pub mod sync;
 pub mod url;
 
 use base64::Engine;
@@ -55,7 +58,7 @@ pub fn offline_dir(app: &AppHandle) -> Option<PathBuf> {
     if let Some(exe_dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
         dirs.push(exe_dir.join("offline"));
     }
-    dirs.into_iter().find(|d| d.join(GAME).is_file())
+    dirs.into_iter().find(|d| d.join(GAME).is_file()).or_else(sync::ready)
 }
 
 fn norm_component(c: &Component) -> String {
@@ -111,13 +114,30 @@ fn start_page(server: &str, change: bool, offline: bool) -> Url {
 const BRIDGE: &str = r#"(function () {
   if (window.__alternetBridge) return;
   window.__alternetBridge = true;
-  var TAG = '\u2063alternet:', n = 0;
+  var TAG = '\u2063alternet:', n = 0, saved = null, timer = 0;
   function relay(m) {
-    var old = document.title;
-    if (old.indexOf(TAG) === 0) old = '';
+    if (saved === null) saved = document.title;
     document.title = TAG + (++n) + ':' + m;
-    setTimeout(function () { if (document.title.indexOf(TAG) === 0) document.title = old; }, 80);
+    clearTimeout(timer);
+    timer = setTimeout(function () { if (document.title.indexOf(TAG) === 0) document.title = saved; saved = null; }, 80);
   }
+  // elenco delle risorse caricate dal gioco online, per la copia offline
+  try { performance.setResourceTimingBufferSize(20000); } catch (e) {}
+  function sendAssets() {
+    if (!/^https?:$/.test(location.protocol) || !/\/game\/(index\.html)?$/.test(location.pathname)) return;
+    var list = [location.pathname], seen = {};
+    try {
+      performance.getEntriesByType('resource').forEach(function (e) {
+        var u = new URL(e.name);
+        if (u.origin === location.origin && !seen[u.pathname]) { seen[u.pathname] = 1; list.push(u.pathname); }
+      });
+    } catch (e) {}
+    var s = JSON.stringify(list), parts = [];
+    for (var i = 0; i < s.length; i += 8000) parts.push(s.slice(i, i + 8000));
+    var k = 0;
+    (function next() { if (k < parts.length) { relay('assets:' + k + '/' + parts.length + ':' + parts[k]); k++; setTimeout(next, 50); } })();
+  }
+  addEventListener('load', function () { setTimeout(sendAssets, 8000); setTimeout(sendAssets, 90000); });
   function ours(s) { return typeof s === 'string' && (s === 'fullscreen' || s === 'offline' || s.indexOf('server:') === 0); }
   try {
     var wv = window.chrome && window.chrome.webview;
@@ -139,7 +159,16 @@ const BRIDGE: &str = r#"(function () {
 })();"#;
 
 fn on_message(w: WebviewWindow, msg: String) {
-    let from_start = w.url().map(|u| u.scheme() == "data").unwrap_or(false);
+    let here = w.url().ok();
+    let from_start = here.as_ref().is_some_and(|u| u.scheme() == "data");
+    if let Some(chunk) = msg.strip_prefix("assets:") {
+        // solo dal gioco sul server attuale
+        let server = ALLOWED.lock().unwrap().server.clone();
+        if here.as_ref().is_some_and(|u| !server.is_empty() && u.as_str().starts_with(&server)) {
+            sync::on_chunk(w.app_handle(), server, chunk);
+        }
+        return;
+    }
     match msg.as_str() {
         "fullscreen" => {
             let full = w.is_fullscreen().unwrap_or(false);

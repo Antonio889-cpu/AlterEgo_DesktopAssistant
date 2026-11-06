@@ -311,7 +311,7 @@ Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini)
 
 The **Alter Net** multiplayer game opens inside Alter Ego: “open Alter Net”, the tray item or Settings → General.
 Borderless fullscreen window: **F11** toggles fullscreen and windowed, **Esc twice** closes.
-If the server doesn't answer, the offline single-player version opens (`offline/` folder next to the app).
+If the server doesn't answer, the offline single-player version opens: Alter Ego downloads it from the server the first time you play online (into `%APPDATA%\AlterNet\offline`).
 “Change server…” lets you use another address.
 
 ## Costs

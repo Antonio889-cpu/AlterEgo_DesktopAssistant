@@ -312,7 +312,7 @@ I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSee
 
 Il gioco multiplayer **Alter Net** si apre dentro Alter Ego: «apri Alter Net», la voce nella tray o Impostazioni → Generale.
 Finestra a schermo intero senza bordi: **F11** alterna schermo intero e finestra, **Esc due volte** chiude.
-Se il server non risponde si apre la versione offline in giocatore singolo (cartella `offline/` accanto all'app).
+Se il server non risponde si apre la versione offline in giocatore singolo: Alter Ego la scarica da sola dal server la prima volta che giochi online (in `%APPDATA%\AlterNet\offline`).
 «Cambia server…» permette di usare un altro indirizzo.
 
 ## Costi

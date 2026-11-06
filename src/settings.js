@@ -927,7 +927,7 @@ async function alterNetInfo() {
   try {
     const i = (await invoke("alternet_info")) || {};
     $("an-server").textContent = i.server || "";
-    $("an-offline").textContent = i.offline ? t("copia offline presente") : t("copia offline non installata");
+    $("an-offline").textContent = i.offline ? t("copia offline presente") : t("copia offline non ancora pronta: si crea da sola giocando online");
   } catch (_) {}
 }
 alterNetInfo();

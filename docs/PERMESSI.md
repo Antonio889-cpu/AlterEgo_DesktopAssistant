@@ -83,7 +83,9 @@ Finestra del gioco Alter Net (`apri Alter Net`, tray, Impostazioni → Generale)
 `%APPDATA%\AlterNet\WebView2`. La pagina può navigare solo verso il server (`%APPDATA%\AlterNet\server.txt`, altrimenti
 `http://attentoweb.ddns.net:8080/`), i file dentro la cartella `offline/` dell'app, `about:` e `data:`; nuove finestre negate;
 nessun accesso ai comandi di Alter Ego. Ogni indirizzo passa dalla stessa validazione del client Alter Net (`http(s)://host[:porta]/`)
-e un nuovo indirizzo si accetta solo dalla pagina locale «Cambia server». Se il server non risponde (test TCP, 3 s) si apre la copia offline.
+e un nuovo indirizzo si accetta solo dalla pagina locale «Cambia server». Se il server non risponde (test TCP, 3 s) si apre la copia offline. La copia offline non è distribuita con l'app: mentre si gioca online
+la pagina manda l'elenco dei file che ha caricato e Alter Ego scarica dal server solo quelli sotto `/game/` e `/Everyfile/`
+(estensioni di immagini, audio, font, html/js/css/json) in `%APPDATA%\AlterNet\offline`; si usa solo dopo un download senza errori.
 
 ## Senza filtri
 
