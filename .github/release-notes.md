@@ -1,3 +1,10 @@
+## Alter Ego 1.4.1
+
+- Alter Net inside Alter Ego: "open Alter Net", tray or Settings → General. Borderless fullscreen, F11 windowed, Esc twice closes.
+- Offline single player when the server is down (the copy is downloaded from the server the first time you play online).
+
+`AlterEgo_1.4.1_setup.exe` installer · `AlterEgo_1.4.1_portable.zip` portable · `SHA256SUMS.txt`
+
 ## Alter Ego 1.4.0
 
 - Fix: tool calls written as text (DeepSeek "DSML" etc.) are executed, not shown; `<think>` hidden.
