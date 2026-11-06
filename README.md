@@ -325,6 +325,11 @@ Borderless fullscreen window: **F11** toggles fullscreen and windowed, **Esc twi
 If the server doesn't answer, the offline single-player version opens: Alter Ego downloads it from the server the first time you play online (into `%APPDATA%\AlterNet\offline`, on Linux `~/.local/share/AlterNet/offline`).
 “Change server…” lets you use another address.
 
+| | |
+|---|---|
+| ![Alter Net: avatar select](docs/screenshots/en/alternet-select.png) | ![Alter Net: talking to a character](docs/screenshots/en/alternet-npc.jpg) |
+| ![Alter Net: two players chatting](docs/screenshots/en/alternet-chat.jpg) | ![Alter Net opened from Alter Ego (“open alter net”)](docs/screenshots/alternet-in-alterego.jpg) |
+
 ## Costs
 
 *Settings → Costs* records every paid request in `%APPDATA%\AlterEgo\costs.jsonl`:

@@ -326,6 +326,11 @@ Finestra a schermo intero senza bordi: **F11** alterna schermo intero e finestra
 Se il server non risponde si apre la versione offline in giocatore singolo: Alter Ego la scarica da sola dal server la prima volta che giochi online (in `%APPDATA%\AlterNet\offline`, su Linux `~/.local/share/AlterNet/offline`).
 «Cambia server…» permette di usare un altro indirizzo.
 
+| | |
+|---|---|
+| ![Alter Net: scelta dell'avatar](docs/screenshots/alternet-select.png) | ![Alter Net: dialogo con un personaggio](docs/screenshots/alternet-npc.jpg) |
+| ![Alter Net: due giocatori si parlano in chat](docs/screenshots/alternet-chat.jpg) | ![Alter Net aperto da Alter Ego («apri alter net»)](docs/screenshots/alternet-in-alterego.jpg) |
+
 ## Costi
 
 *Impostazioni → Costi* registra ogni richiesta a pagamento in `%APPDATA%\AlterEgo\costs.jsonl`:
