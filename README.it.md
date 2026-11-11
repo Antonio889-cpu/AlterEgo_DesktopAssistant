@@ -584,6 +584,28 @@ cd src-tauri && cargo test
 # AE_SQL_TEST="127.0.0.1,1433|sa|password|database" cargo test real_server
 ```
 
+**Mappa del codice per lo sviluppo** ([Graphify](https://github.com/Graphify-Labs/graphify)): un grafo di conoscenza di tutto il progetto
+(Rust, JS, documenti) costruito in locale senza AI, per fare domande sul codice invece di leggere i file uno per uno
+(meno token anche per gli assistenti AI). L'output resta in `graphify-out/` (ignorato da git).
+
+```bash
+uv tool install graphifyy
+```
+
+```bash
+graphify update .
+```
+
+```bash
+graphify query "come chiede conferma il ciclo degli strumenti" --budget 1500
+```
+
+```bash
+graphify path "run_with_tools" "confirm_always"
+```
+
+Con Claude Code, Cursor e altri assistenti, `graphify install --project` aggiunge al repository la skill `/graphify`.
+
 **Struttura**
 
 ```

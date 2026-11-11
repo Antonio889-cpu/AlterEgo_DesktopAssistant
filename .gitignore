@@ -5,3 +5,4 @@ assets/sfx/dr_*
 *.log
 .env
 dist/
+graphify-out/
