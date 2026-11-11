@@ -301,12 +301,31 @@ pub fn shot_width() -> u32 {
     SHOT_W.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// Griglia delle coordinate usata dal modello: quella dello screenshot (ridotto a `shot_width`).
-/// Restituisce (larghezza, altezza, fattore griglia→schermo).
+/// Griglia delle coordinate usata dal modello: quella dello screenshot (largo `shot_width`,
+/// con rapporto esatto, non arrotondato). Restituisce (larghezza, altezza, fattore griglia→schermo).
 pub fn grid() -> (i32, i32, f64) {
-    let (w, h) = pointer::screen_size();
-    let f = ((w as f64) / shot_width() as f64).ceil().max(1.0);
-    ((w as f64 / f) as i32, (h as f64 / f) as i32, f)
+    grid_for(pointer::screen_size(), shot_width())
+}
+
+fn grid_for((w, h): (i32, i32), shot_w: u32) -> (i32, i32, f64) {
+    let f = (w as f64 / shot_w as f64).max(1.0);
+    ((w as f64 / f).round() as i32, (h as f64 / f).round() as i32, f)
+}
+
+/// Punto della griglia → pixel dello schermo: il centro della cella, non l'angolo
+/// (con un fattore 1,5 l'angolo sbaglia fino a un pixel e mezzo, su pulsanti piccoli conta).
+pub fn to_screen(x: i64, y: i64) -> (i32, i32) {
+    let (gw, gh, f) = grid();
+    let (sw, sh) = pointer::screen_size();
+    let px = ((x.clamp(0, gw as i64 - 1) as f64 + 0.5) * f).floor() as i32;
+    let py = ((y.clamp(0, gh as i64 - 1) as f64 + 0.5) * f).floor() as i32;
+    (px.clamp(0, sw - 1), py.clamp(0, sh - 1))
+}
+
+/// Pixel dello schermo → griglia.
+pub fn to_grid(px: i32, py: i32) -> (i32, i32) {
+    let (_, _, f) = grid();
+    ((px as f64 / f).floor() as i32, (py as f64 / f).floor() as i32)
 }
 
 #[cfg(not(windows))]
@@ -384,6 +403,13 @@ mod tests {
         assert_eq!(parse_combo("F8").unwrap(), vec![0x77]);
         assert!(parse_combo("Ctrl+").is_err());
         assert!(parse_combo("Ctrl+A+B").is_err());
+    }
+
+    #[test]
+    fn grid_ratio() {
+        assert_eq!(super::grid_for((1920, 1080), 1280), (1280, 720, 1.5));
+        assert_eq!(super::grid_for((1280, 720), 1280), (1280, 720, 1.0));
+        assert_eq!(super::grid_for((2560, 1440), 1024), (1024, 576, 2.5));
     }
 
     #[cfg(not(windows))]

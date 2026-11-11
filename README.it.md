@@ -80,13 +80,17 @@ Interfaccia in italiano e in inglese.
 - **Music Venue**: piccola libreria con i brani ascoltati di recente e i preferiti, ricerca e riascolto.
 - **Parla con l'app**: "apri music venue", "chiudi il lettore audio", "apri il sito", "controlla gli aggiornamenti"… tutto ciò che riguarda l'app si fa chiedendolo a lei.
 - **Mouse e tastiera**: se lo permetti, Alter Ego muove il cursore, clicca, scrive e preme tasti (con conferma e stop d'emergenza).
+  Clic precisi: screenshot con righelli numerati e cursore segnato, zoom sui punti piccoli, screenshot di controllo dopo ogni clic e, su Windows, la posizione esatta di pulsanti e campi (UI Automation).
+- **SQL Server** sul tuo PC: quando serve chiede i dati di connessione in un piccolo modulo (la password non va mai al modello AI), legge i dati e, se lo permetti, li modifica; i risultati si vedono anche in una finestra SQL dove puoi scrivere le tue query.
+- **Richieste complesse**: concatena da sola gli strumenti (terminale, file, web, schermo, database) fino a 12 passaggi (regolabili), controlla ogni risultato e cambia strada se qualcosa non va.
 - **Riduzione del rumore** del microfono di Mic-Link (RNNoise, regolabile).
 - **Aggiornamenti**: link al sito e a GitHub nell'app e un tasto per aggiornare all'ultima release.
 - **Ricerca web** con il motore che preferisci: DeepSeek, Google (tramite Gemini), Tavily, Brave o DuckDuckGo (gratis), con fallback.
 - **Spotify** (Premium): "metti *titolo*" può suonare sul tuo Spotify invece che su YouTube.
 - **Risparmio token**: ragionamento spento, strumenti solo quando servono, router locale (parole chiave o Rizzo Flow), modello economico per le domande semplici.
 - **Pannello Costi**: ogni richiesta con token, cache, durata e costo, totali per giorno/mese e per modello, prezzi modificabili, esportazione CSV.
-- **Terminale**: Alter Ego può eseguire comandi PowerShell o cmd, con conferma o in autonomia.
+- **Terminale**: Alter Ego può eseguire comandi PowerShell o cmd (bash su Linux), con conferma o in autonomia; ricorda la cartella di lavoro tra un comando e l'altro.
+- **Log completo** in Impostazioni → Log: richieste al modello, fallback, strumenti con esito e durata, errori. **Avvio silenzioso**: all'accesso parte nascosta nella tray.
 - **Clip vocali**: "Alter Ego clippa" → salva la clip con AMD Adrenalin, NVIDIA App o Medal, **senza passare dall'AI**.
 - **Azioni sul PC** tramite tool calling, tutte spente di default, con conferma per quelle sensibili (disattivabile) e registro consultabile.
 - **Memoria locale** (SQLite): ricorda le conversazioni, fa riassunti, impara fatti su di te.
@@ -208,8 +212,11 @@ Dalla tray cambi anche opacità, sfondo (scanline, circuiti, entrambi), intensit
   La volta dopo si riparte dall'ultima che ha funzionato.
 - **Fallback**: l'ordine dei servizi si cambia con ▲▼. Se uno non risponde (rete, errore server, nessuna chiave valida) prova il successivo.
 - Timeout e 2 tentativi con attesa crescente sugli errori temporanei. Se nessuno risponde, Alter Ego lo dice con l'espressione di errore.
+  **Esc** ferma una risposta che ci mette troppo; uno strumento bloccato viene interrotto dopo un po', e la stessa chiamata ripetuta di continuo viene bloccata.
+- **Impostazioni avanzate** (Impostazioni → AI e chiavi): token massimi per risposta, top P, attesa massima della risposta, passaggi massimi con gli strumenti.
+  Per **Ollama**: finestra di contesto (`num_ctx`), quanto resta caricato il modello e livelli sulla GPU (usano l'API nativa di Ollama).
 - *Carica modelli* scarica l'elenco dei modelli dal servizio: i nomi predefiniti potrebbero non esistere più.
-- Le chiavi stanno nel **Gestore credenziali di Windows** (voce `AlterEgo`), mai in file o log, e il frontend non le vede mai.
+- Le chiavi stanno nel **Gestore credenziali di Windows** (voce `AlterEgo`; su Linux nel portachiavi del sistema), mai in file o log, e il frontend non le vede mai.
 
 **Cache di DeepSeek** (e degli altri servizi con cache automatica del prefisso). DeepSeek fa pagare molto meno i token di input
 che iniziano esattamente come una richiesta precedente. Per questo:
@@ -389,16 +396,17 @@ un'azione senza che tu la veda prima, quindi attivalo solo con azioni e cartelle
 | Funzione | Conferma |
 |---|---|
 | Aprire programmi e siti (da una lista con nomi tuoi) | ⚠ solo fuori lista |
-| Gestione file, solo in cartelle autorizzate | ⚠ sempre |
-| Promemoria, timer, sveglie (notifiche di Windows) | no |
+| Gestione file (elenco, lettura, scrittura, ricerca, spostamento, eliminazione), solo in cartelle autorizzate o, se lo scegli, su **tutto il disco** | ⚠ sempre; eliminazioni e cartelle di sistema chiedono sempre |
+| Promemoria, timer, sveglie (notifiche del sistema) | no |
 | Appunti | ⚠ per leggere |
 | Lettura schermo (screenshot a un modello con visione) | ⚠ sempre |
 | Volume e luminosità | no |
 | Comandi, solo da una lista e scelti per nome | ⚠ sempre |
-| **Terminale**: comandi PowerShell o cmd scritti da Alter Ego (timeout 120 s) | ⚠ sempre, oppure **in autonomia**; i comandi distruttivi chiedono comunque |
+| **Terminale**: comandi PowerShell o cmd (bash o sh su Linux) scritti da Alter Ego (durata massima regolabile, 2 minuti di default) | ⚠ sempre, oppure **in autonomia**; i comandi distruttivi chiedono comunque |
 | Ricerca web (DeepSeek Search/Fetch) | no |
 | Musica (YouTube) | no |
-| **Mouse e tastiera**: sposta, clicca, scorre, scrive, preme tasti | ⚠ ogni azione, oppure **in autonomia**; mouse nell'angolo in alto a sinistra = stop |
+| **Mouse e tastiera**: sposta, clicca, scorre, scrive, preme tasti, legge i controlli di una finestra (Windows) | ⚠ ogni azione, oppure **in autonomia**; mouse nell'angolo in alto a sinistra = stop |
+| **Database SQL Server** su questo PC: connessione (modulo), lettura; **modifiche** solo se le permetti | modifiche ⚠ sempre; DROP/TRUNCATE e DELETE/UPDATE senza WHERE sempre |
 | **Comandi dell'app** ("apri music venue", "chiudi il lettore"…), solo Alter Ego stessa, **acceso di default** | no (l'aggiornamento chiede sempre) |
 
 Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli tecnici in [docs/PERMESSI.md](docs/PERMESSI.md).
@@ -527,6 +535,8 @@ python tools/mock_openai.py
 
 ```bash
 cd src-tauri && cargo test
+# facoltativo, con un SQL Server vero (es. l'immagine mcr.microsoft.com/mssql/server):
+# AE_SQL_TEST="127.0.0.1,1433|sa|password|database" cargo test real_server
 ```
 
 **Struttura**

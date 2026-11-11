@@ -91,6 +91,7 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") answerConfirm(false);
     return; // Invio/Spazio agiscono sul pulsante con il focus
   }
+  if (e.key === "Escape" && Chat.cancel()) return; // ferma la risposta in corso
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
     Dialog.advance();
@@ -209,6 +210,10 @@ window.addEventListener("contextmenu", (e) => e.preventDefault());
 (async () => {
   applyConfig(await invoke("get_config"));
   await document.fonts.load('5vh "DotGothic16"');
+  // avvio silenzioso: finestra nascosta, niente saluto (né blip) finché non la apri
+  let visible = true;
+  try { visible = await appWindow.isVisible(); } catch {}
+  if (!visible) return;
   tvOn();
   const name = config.user_name.trim();
   State.setEmotion("happy");

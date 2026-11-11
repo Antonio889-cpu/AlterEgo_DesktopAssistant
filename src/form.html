@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Alter Ego</title>
+  <link rel="stylesheet" href="settings.css" />
+  <style>
+    main { padding: 14px 18px 18px; }
+    #intro { margin-top: 0; }
+    form label { flex-direction: column; align-items: stretch; gap: 4px; }
+    form label.inline { flex-direction: row; align-items: center; }
+    form input:not([type=checkbox]), form select { min-width: 0; width: 100%; }
+    .buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+    #ok { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <header><h1 id="title">ALTER EGO</h1></header>
+  <main>
+    <p class="note" id="intro"></p>
+    <form id="form" autocomplete="off"></form>
+    <div class="buttons"><button type="button" id="cancel">Annulla</button><button type="submit" form="form" id="ok">OK</button></div>
+  </main>
+  <script src="i18n.js"></script>
+  <script src="form.js"></script>
+</body>
+</html>

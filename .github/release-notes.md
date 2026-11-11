@@ -1,3 +1,14 @@
+## Alter Ego 1.6.0
+
+- More precise clicks: screenshots with coordinate rulers and the cursor marked, zoom, check after each click, exact controls on Windows.
+- SQL Server on your PC: connection form (the password stays local), queries, results window.
+- Complex requests: up to 12 tool steps (adjustable); Esc stops an answer; no more stalls on hung tools.
+- Terminal: bash on Linux, keeps the working folder, adjustable timeout. Optional access to the whole disk.
+- Silent start in the tray, "always on top" switch, full log in Settings → Log.
+- Ollama: context window, keep-alive, GPU layers; max tokens, top P, timeout. Linux texts no longer mention Windows.
+
+`AlterEgo_1.6.0_setup.exe` / `AlterEgo_1.6.0_portable.zip` Windows · `AlterEgo_1.6.0_amd64.AppImage` / `AlterEgo_1.6.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.5.0
 
 - First Linux release: AppImage and .deb (x86-64).

@@ -1,4 +1,4 @@
-"""Server finto compatibile OpenAI per i test: /ok, /fail500, /flaky (429 poi ok), /badkey (401), /keycheck (solo 'Bearer good'), /tools (tool calling), /audio/transcriptions, /audio/speech (WAV 24 kHz), /health. Porta 18080."""
+"""Server finto compatibile OpenAI per i test: /ok, /fail500, /flaky (429 poi ok), /badkey (401), /keycheck (solo 'Bearer good'), /tools (tool calling), /api/chat (Ollama nativo), /audio/transcriptions, /audio/speech (WAV 24 kHz), /health. Porta 18080."""
 import json, os, struct, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 calls = {"flaky": 0}
@@ -33,6 +33,20 @@ class H(BaseHTTPRequestHandler):
             wav = b"RIFF" + struct.pack("<I", 36 + len(pcm)) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, 24000, 48000, 2, 16) + b"data" + struct.pack("<I", len(pcm)) + pcm
             self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("Content-Length", str(len(wav))); self.end_headers(); self.wfile.write(wav)
             return
+        if self.path.endswith("/api/chat"):
+            # API nativa di Ollama (NDJSON): risponde con le opzioni ricevute, o con una chiamata a strumento
+            if body.get("tools") and body["messages"][-1]["role"] != "tool":
+                lines = [{"message": {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "list_reminders", "arguments": {}}}]}, "done": False},
+                         {"message": {"role": "assistant", "content": ""}, "done": True, "prompt_eval_count": 10, "eval_count": 2}]
+            else:
+                o = body.get("options", {})
+                text = f"[happy]\nctx={o.get('num_ctx')} keep={body.get('keep_alive')} think={body.get('think')}"
+                lines = [{"message": {"role": "assistant", "content": text[:10]}, "done": False},
+                         {"message": {"role": "assistant", "content": text[10:]}, "done": False},
+                         {"message": {"role": "assistant", "content": ""}, "done": True, "prompt_eval_count": 12, "eval_count": 5}]
+            data = "".join(json.dumps(l) + "\n" for l in lines).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/x-ndjson"); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
+            return
         mode = self.path.split("/")[1]
         if mode == "keycheck" and self.headers.get("Authorization") != "Bearer good":
             return self._json(429 if "quota" in self.headers.get("Authorization", "") else 401, {"error": {"message": "bad key"}})
@@ -49,6 +63,8 @@ class H(BaseHTTPRequestHandler):
                 call = {"name": "play_music", "arguments": json.dumps({"query": last.split("metti", 1)[1].strip()})}
             elif "cerca" in last:
                 call = {"name": "web_search", "arguments": json.dumps({"query": last.split("cerca", 1)[1].strip(), "count": 3})}
+            elif "database" in last:
+                call = {"name": "sql_query", "arguments": json.dumps({"query": "SELECT TOP 2 Nome, Saldo FROM Clienti ORDER BY Saldo DESC"})}
             elif "comando" in last:
                 call = {"name": "run_shell", "arguments": json.dumps({"shell": "cmd", "command": "echo ciao-dal-terminale"})}
             else:

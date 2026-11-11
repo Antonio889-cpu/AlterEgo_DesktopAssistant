@@ -1,16 +1,19 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale, Music Venue)",
+  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale, Music Venue, modulo, finestra SQL)",
   "windows": [
     "main",
     "settings",
     "player",
-    "venue"
+    "venue",
+    "form",
+    "sqlview"
   ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
-    "core:window:allow-start-resize-dragging"
+    "core:window:allow-start-resize-dragging",
+    "core:window:allow-close"
   ]
 }

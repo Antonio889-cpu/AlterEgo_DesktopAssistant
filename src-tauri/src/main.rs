@@ -4,10 +4,12 @@
 mod actions;
 mod alternet;
 mod appctl;
+mod applog;
 mod assistant;
 mod audio;
 mod config;
 mod costs;
+mod form;
 mod hotkeys;
 mod i18n;
 mod keys;
@@ -18,6 +20,7 @@ mod rizzo;
 mod saving;
 mod sprites;
 mod spotify;
+mod sql;
 mod stt;
 mod tray;
 mod update;
@@ -54,7 +57,7 @@ pub fn flush_config(app: &AppHandle) {
     if state.dirty.swap(false, Ordering::Relaxed) {
         let cfg = state.cfg.lock().unwrap().clone();
         if let Err(e) = config::save(&state.cfg_path, &cfg) {
-            eprintln!("salvataggio config fallito: {e}");
+            applog::error("config", &format!("salvataggio config fallito: {e}"));
             state.dirty.store(true, Ordering::Relaxed);
         }
     }
@@ -87,6 +90,11 @@ pub struct FrontConfig {
     clip: config::ClipConfig,
     audio: config::AudioConfig,
     autostart: bool,
+    start_hidden: bool,
+    always_on_top: bool,
+    /// "windows" o "linux": l'interfaccia mostra i testi giusti per il sistema.
+    os: &'static str,
+    sql: config::SqlConfig,
     prices: Vec<config::Price>,
     music: config::MusicConfig,
     web: config::WebConfig,
@@ -122,6 +130,10 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         clip: cfg.clip.clone(),
         audio: cfg.audio.clone(),
         autostart: cfg.autostart,
+        start_hidden: cfg.start_hidden,
+        always_on_top: cfg.always_on_top,
+        os: if cfg!(windows) { "windows" } else { "linux" },
+        sql: cfg.sql.clone(),
         prices: cfg.prices.clone(),
         music: cfg.music.clone(),
         web: cfg.web.clone(),
@@ -400,14 +412,30 @@ fn set_look(
     });
 }
 
-/// Avvio con Windows (spento di default).
+/// Argomento con cui il sistema avvia Alter Ego all'accesso (vedi `start_hidden`).
+const AUTOSTART_ARG: &str = "--autostart";
+
+/// Avvio con il sistema (spento di default).
 #[tauri::command]
 fn set_autostart(app: AppHandle, on: bool) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let al = app.autolaunch();
     if on { al.enable() } else { al.disable() }.map_err(|e| e.to_string())?;
     update_config(&app, |c| c.autostart = on);
+    applog::info("app", if on { "avvio automatico attivato" } else { "avvio automatico disattivato" });
     Ok(())
+}
+
+/// Avvio silenzioso e "sempre in primo piano".
+#[tauri::command]
+fn set_window_prefs(app: AppHandle, start_hidden: bool, always_on_top: bool) {
+    update_config(&app, |c| {
+        c.start_hidden = start_hidden;
+        c.always_on_top = always_on_top;
+    });
+    if let Some(w) = app.get_webview_window(window::MAIN) {
+        let _ = w.set_always_on_top(always_on_top);
+    }
 }
 
 fn main() {
@@ -421,11 +449,14 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _, _| window::show_main(app)))
         .plugin(hotkeys::plugin())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .setup(|app| {
             let cfg_path = config::config_path(&app.path().config_dir()?);
             let data_dir = cfg_path.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+            applog::init(app.handle(), &data_dir);
             app.manage(actions::Actions::new(&data_dir));
+            app.manage(form::Forms::default());
+            app.manage(sql::Sql::default());
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
@@ -447,6 +478,10 @@ fn main() {
                 let _ = config::save(&cfg_path, &cfg);
             }
             let hk = cfg.hotkeys.clone();
+            // avviata dal sistema all'accesso con "avvio silenzioso": resta nella tray
+            let from_autostart = std::env::args().any(|a| a == AUTOSTART_ARG);
+            let start_visible = !(from_autostart && cfg.start_hidden);
+            let (autostart_on, on_top) = (cfg.autostart, cfg.always_on_top);
             app.manage(AppState {
                 cfg: Mutex::new(cfg),
                 cfg_path,
@@ -464,10 +499,20 @@ fn main() {
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             rizzo::autostart(&handle);
-            window::create_main(&handle)?;
+            window::create_main(&handle, start_visible, on_top)?;
+            if !start_visible {
+                applog::info("app", "avvio silenzioso: finestra nascosta, Alter Ego è nella tray");
+            }
+            // registrazione dell'avvio automatico aggiornata (le versioni prima della 1.6 non passavano l'argomento)
+            if autostart_on {
+                use tauri_plugin_autostart::ManagerExt;
+                if let Err(e) = handle.autolaunch().enable() {
+                    applog::warn("app", &format!("avvio automatico non aggiornato: {e}"));
+                }
+            }
             tray::create(&handle)?;
             for e in hotkeys::register(&handle, &hk) {
-                eprintln!("hotkey non registrata: {e}");
+                applog::warn("tasti", &format!("hotkey non registrata: {e}"));
             }
             window::spawn_saver(handle.clone());
             actions::spawn_reminder_loop(handle.clone());
@@ -484,6 +529,7 @@ fn main() {
             WindowEvent::Destroyed if win.label() == music::PLAYER || win.label() == music::VENUE => {
                 music::window_destroyed(win.app_handle(), win.label())
             }
+            WindowEvent::Destroyed if win.label() == form::LABEL => form::closed(win.app_handle()),
             // Alt+F4 nasconde invece di chiudere: si esce solo dalla tray.
             WindowEvent::CloseRequested { api, .. } if win.label() == window::MAIN => {
                 api.prevent_close();
@@ -592,7 +638,21 @@ fn main() {
             actions::actions_log,
             actions::clear_actions_log,
             set_autostart,
+            set_window_prefs,
             set_look,
+            applog::app_log,
+            applog::app_log_clear,
+            applog::app_log_path,
+            form::form_spec,
+            form::form_submit,
+            sql::sql_view_open,
+            sql::sql_status,
+            sql::sql_last,
+            sql::sql_settings,
+            sql::sql_connect_ui,
+            sql::sql_disconnect_ui,
+            sql::sql_run_user,
+            assistant::chat_cancel,
             window::tv_done,
             assistant::load_user_sprites,
             assistant::import_sprite_sheet,

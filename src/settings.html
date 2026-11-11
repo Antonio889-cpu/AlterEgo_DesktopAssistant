@@ -18,6 +18,7 @@
     <button data-tab="perms">Permessi</button>
     <button data-tab="costs">Costi</button>
     <button data-tab="log">Registro</button>
+    <button data-tab="applog">Log</button>
   </nav>
   <main>
     <section data-tab="general">
@@ -25,7 +26,7 @@
       <label>Il tuo nome <input id="user-name" maxlength="40" placeholder="es. Makoto" /></label>
       <label>Tag nome nel dialogo <input id="name-tag" maxlength="24" placeholder="Alter Ego" /></label>
       <label>Lingua dell'interfaccia
-        <select id="ui-language"><option value="auto">Automatica (lingua di Windows)</option><option value="it">Italiano</option><option value="en">English</option></select>
+        <select id="ui-language"><option value="auto">Automatica (lingua del sistema)</option><option value="it">Italiano</option><option value="en">English</option></select>
       </label>
       <button id="save-general">Salva</button>
       <h3>Aspetto</h3>
@@ -44,8 +45,11 @@
       <label>Attesa a pagina completa <input id="auto-advance-secs" type="range" min="0.5" max="15" step="0.5" /> <output id="auto-advance-val"></output></label>
       <p class="note">Al tempo scelto si aggiunge il tempo di lettura della pagina; se la voce sta ancora parlando, aspetta che finisca.</p>
       <h3>Avvio</h3>
-      <label class="inline"><input type="checkbox" id="autostart" /> Avvia Alter Ego all'accesso a Windows</label>
+      <label class="inline"><input type="checkbox" id="autostart" /> <span data-os="windows">Avvia Alter Ego all'accesso a Windows</span><span data-os="linux">Avvia Alter Ego all'accesso al desktop</span></label>
+      <label class="inline sub"><input type="checkbox" id="start-hidden" /> <b>Avvio silenzioso</b>: all'accesso parte nascosta, solo l'icona nella tray (si apre con la tray o con Ctrl+Alt+A)</label>
       <span id="autostart-result" class="result"></span>
+      <h3>Finestra</h3>
+      <label class="inline"><input type="checkbox" id="always-on-top" /> Sempre in primo piano sopra le altre finestre</label>
       <h3>Alter Net</h3>
       <p class="note">Il gioco multiplayer Alter Net, in una finestra a schermo intero senza bordi. Server: <b id="an-server">…</b> · <span id="an-offline"></span></p>
       <div class="actions">
@@ -71,7 +75,7 @@
       <h2>Intelligenza artificiale</h2>
       <p class="note">I provider vengono provati dall'alto in basso: se uno fallisce o va in rate limit si passa al successivo.
         Ogni servizio può avere <b>più chiavi</b>: se una è esaurita, in rate limit o non valida, passa alla successiva.
-        Le chiavi sono salvate nel <b>Credential Manager di Windows</b>, mai in file.</p>
+        <span data-os="windows">Le chiavi sono salvate nel <b>Credential Manager di Windows</b>, mai in file.</span><span data-os="linux">Le chiavi sono salvate nel <b>portachiavi del sistema</b> (Secret Service / keyutils), mai in file.</span></p>
       <div class="row">
         <label>Temperatura <input id="temperature" type="range" min="0" max="1.5" step="0.05" /> <output id="temperature-val"></output></label>
         <label>Messaggi di contesto <input id="max-history" type="number" min="2" max="50" /></label>
@@ -84,6 +88,39 @@
       </label>
       <p class="note">I tag <code>&lt;think&gt;</code> e le chiamate a strumenti scritte come testo (es. DeepSeek «DSML») non compaiono più nel dialogo:
         le chiamate valide vengono eseguite normalmente (passando dai Permessi).</p>
+      <details id="ai-advanced">
+        <summary>Impostazioni avanzate</summary>
+        <div class="row">
+          <label>Token massimi per risposta <input id="ai-max-tokens" type="number" min="0" max="200000" step="256" placeholder="0 = predefinito" style="max-width:130px;min-width:0" /></label>
+          <label>Top P <input id="ai-top-p" type="number" min="0.05" max="1" step="0.05" style="max-width:90px;min-width:0" /></label>
+        </div>
+        <div class="row">
+          <label>Attesa massima della risposta (s) <input id="ai-timeout" type="number" min="10" max="600" step="5" style="max-width:90px;min-width:0" /></label>
+          <label>Passaggi massimi con gli strumenti <input id="ai-tool-rounds" type="number" min="2" max="40" style="max-width:90px;min-width:0" /></label>
+        </div>
+        <p class="note sub">Passaggi: quante volte di fila può usare strumenti per una sola richiesta (le richieste complesse ne usano di più).
+          Se un provider non risponde entro l'attesa massima si passa al successivo.</p>
+        <h3>Ollama</h3>
+        <label>Finestra di contesto (token)
+          <select id="ol-ctx">
+            <option value="0">Quella del modello (predefinita)</option>
+            <option value="4096">4 096</option><option value="8192">8 192</option><option value="16384">16 384</option>
+            <option value="32768">32 768</option><option value="65536">65 536</option><option value="131072">131 072</option>
+            <option value="custom">Altro…</option>
+          </select>
+          <input id="ol-ctx-custom" type="number" min="512" max="1048576" step="1024" style="max-width:120px;min-width:0" />
+        </label>
+        <label>Modello in memoria dopo una risposta
+          <select id="ol-keep">
+            <option value="">Predefinito di Ollama (5 minuti)</option>
+            <option value="30m">30 minuti</option><option value="2h">2 ore</option>
+            <option value="-1">Sempre (finché Ollama è aperto)</option><option value="0">Scarica subito</option>
+          </select>
+        </label>
+        <label>Livelli sulla GPU <input id="ol-gpu" type="number" min="-1" max="999" style="max-width:90px;min-width:0" /> <span class="note">-1 = automatico, 0 = solo CPU</span></label>
+        <p class="note sub">Una finestra di contesto più grande ricorda più conversazione e risultati degli strumenti, ma usa più memoria (RAM/VRAM).
+          Con almeno una di queste opzioni Alter Ego parla con Ollama tramite la sua API nativa (<code>/api/chat</code>).</p>
+      </details>
       <ol id="providers"></ol>
       <p class="note" id="ai-usage"></p>
       <h3>Risparmio token</h3>
@@ -231,10 +268,11 @@
           <option value="openai">Servizio compatibile OpenAI (/audio/speech)</option>
         </select>
       </label>
-      <label id="tts-voice-row">Voce di Windows <select id="tts-voice"></select></label>
+      <label id="tts-voice-row"><span data-os="windows">Voce di Windows</span><span data-os="linux">Voce di sistema (espeak-ng)</span> <select id="tts-voice"></select></label>
       <div id="tts-kokoro">
         <p class="note"><b>Kokoro-82M</b> (hexgrad, licenza Apache-2.0) gira sul tuo PC: niente chiavi, niente internet dopo il primo download.
-          L'installazione crea un ambiente Python dedicato in <code>%APPDATA%\AlterEgo\kokoro</code> (~2 GB con PyTorch, modello ~330 MB).</p>
+          <span data-os="windows">L'installazione crea un ambiente Python dedicato in <code>%APPDATA%\AlterEgo\kokoro</code> (~2 GB con PyTorch, modello ~330 MB).</span>
+          <span data-os="linux">Su Linux l'installazione automatica non c'è: avvia Kokoro-FastAPI (o un server compatibile) e metti qui sotto il suo URL.</span></p>
         <div class="actions"><span id="kokoro-state" class="result">…</span></div>
         <div class="actions">
           <button id="kokoro-install">Installa Kokoro</button>
@@ -248,7 +286,7 @@
         <label>URL server <input id="kokoro-url" placeholder="http://127.0.0.1:8880/v1" /></label>
         <p class="note">Hai già <b>Kokoro-FastAPI</b>? Metti il suo URL e spegni "Avvia il server insieme ad Alter Ego".</p>
       </div>
-      <p class="note" id="tts-voice-note">Per una voce italiana: Impostazioni di Windows → Ora e lingua → Voce → Aggiungi voci (es. Elsa, Cosimo).</p>
+      <p class="note" id="tts-voice-note"><span data-os="windows">Per una voce italiana: Impostazioni di Windows → Ora e lingua → Voce → Aggiungi voci (es. Elsa, Cosimo).</span><span data-os="linux">Le voci di sistema usano espeak-ng: installalo (es. <code>sudo apt install espeak-ng</code>). Per una voce più naturale usa Kokoro.</span></p>
       <div id="tts-openai">
         <label>URL <input id="tts-url" placeholder="http://localhost:8880/v1" /></label>
         <label>Modello <input id="tts-model" placeholder="tts-1" /></label>
@@ -280,20 +318,27 @@
       <label>Client ID <input id="sp-client" autocomplete="off" spellcheck="false" placeholder="es. 3f2a…" /></label>
       <div class="actions"><button id="sp-connect">Collega account</button> <button id="sp-disconnect">Scollega</button> <span id="sp-status" class="result"></span></div>
       <label class="inline"><input type="checkbox" id="sp-enabled" /> Usa Spotify per «metti…», pausa, avanti e volume</label>
-      <p class="note sub">I brani suonati su Spotify finiscono anche nei recenti della Music Venue. Il token resta nel Credential Manager di Windows.</p>
+      <p class="note sub">I brani suonati su Spotify finiscono anche nei recenti della Music Venue. <span data-os="windows">Il token resta nel Credential Manager di Windows.</span><span data-os="linux">Il token resta nel portachiavi del sistema.</span></p>
     </section>
 
     <section data-tab="voice">
       <h2>Mic-Link</h2>
       <p class="note">Crea un microfono virtuale, <b>AlterEgo Link Audio</b>, che contiene <b>il tuo microfono + la voce di Alter Ego</b>.
         Sceglilo come microfono in Discord, OBS, giochi… e gli altri sentiranno anche lei.</p>
-      <ol class="steps">
+      <ol class="steps" data-os="linux">
+        <li>Crea un cavo virtuale con PipeWire/PulseAudio (resta fino al riavvio; per renderlo fisso aggiungi i comandi al tuo avvio):<br />
+          <code>pactl load-module module-null-sink sink_name=alterego_link sink_properties=device.description=AlterEgo_Link_Audio</code><br />
+          <code>pactl load-module module-remap-source master=alterego_link.monitor source_name=alterego_mic source_properties=device.description=AlterEgo_Link_Audio_Mic</code></li>
+        <li>Attiva Mic-Link qui sotto, scegli il tuo microfono e come cavo virtuale <b>AlterEgo_Link_Audio</b>.</li>
+        <li>Nelle altre app scegli <b>AlterEgo_Link_Audio_Mic</b> come microfono.</li>
+      </ol>
+      <ol class="steps" data-os="windows">
         <li>Installa il driver gratuito <b>VB-CABLE</b> (VB-Audio, donationware) e riavvia il PC. <button id="vb-download">Apri la pagina di VB-CABLE</button></li>
         <li>Rinomina il cavo in «AlterEgo Link Audio» (chiede i permessi di amministratore). <button id="link-rename">Rinomina</button></li>
         <li>Attiva Mic-Link qui sotto e scegli il tuo microfono.</li>
         <li>Nelle altre app scegli <b>AlterEgo Link Audio</b> come microfono.</li>
       </ol>
-      <div class="actions"><span id="link-driver" class="result"></span></div>
+      <div class="actions" data-os="windows"><span id="link-driver" class="result"></span></div>
       <label class="inline"><input type="checkbox" id="link-enabled" /> Mic-Link attivo</label>
       <label>Microfono da mixare <select id="link-mic"></select></label>
       <label>Cavo virtuale (lato uscita) <select id="link-cable"></select></label>
@@ -308,8 +353,8 @@
       <p class="note">Filtro RNNoise sul microfono di Mic-Link, in locale. <b>Intensità</b>: quanto rumore togliere.
         <b>Soglia voce</b>: sotto questa probabilità di voce il microfono si abbassa (0 = mai). Se tagli l'inizio delle parole, abbassala.</p>
       <div class="actions"><span id="link-status" class="result"></span></div>
-      <p class="note">Il microfono resta usabile anche dal push-to-talk. Se dopo l'installazione di VB-CABLE non senti più niente,
-        Windows lo ha messo come uscita predefinita: rimetti i tuoi altoparlanti in Impostazioni → Sistema → Audio.</p>
+      <p class="note">Il microfono resta usabile anche dal push-to-talk.<span data-os="windows"> Se dopo l'installazione di VB-CABLE non senti più niente,
+        Windows lo ha messo come uscita predefinita: rimetti i tuoi altoparlanti in Impostazioni → Sistema → Audio.</span></p>
     </section>
 
     <section data-tab="hotkeys">
@@ -350,9 +395,11 @@
         <p class="note">Senza conferma quelli della lista; ⚠ conferma per altri siti. Nome = come lo chiami a voce; destinazione = percorso .exe, collegamento o URL.</p>
         <div class="list" data-list="open_allowlist" data-cols="Nome|Percorso o URL"></div></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="files" /> <b>Gestione file</b> ⚠</label>
-        <p class="note">Leggere, scrivere, elencare ed eliminare file solo in queste cartelle. Conferma sempre.</p>
-        <div class="list" data-list="folders" data-cols="Cartella autorizzata"></div></div>
-      <div class="perm"><label class="inline"><input type="checkbox" data-perm="reminders" /> <b>Promemoria, timer e sveglie</b> (notifiche di Windows)</label></div>
+        <p class="note">Leggere, scrivere, cercare, spostare ed eliminare file solo in queste cartelle. Conferma ogni volta (salvo «Non chiedere conferma»).</p>
+        <div class="list" data-list="folders" data-cols="Cartella autorizzata"></div>
+        <label class="inline sub"><input type="checkbox" data-perm="files_all" /> <b>Tutto il disco</b>: qualsiasi file e cartella del PC, non solo quelli in lista</label>
+        <p class="note sub">Le eliminazioni e le modifiche nelle cartelle di sistema (<span data-os="windows">C:\Windows, Programmi…</span><span data-os="linux">/etc, /usr, /boot…</span>) chiedono sempre conferma.</p></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="reminders" /> <b>Promemoria, timer e sveglie</b> (notifiche del sistema)</label></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="clipboard" /> <b>Appunti</b> (⚠ conferma per leggere)</label></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="screen" /> <b>Lettura schermo</b> ⚠ (screenshot al modello con visione)</label></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="volume" /> <b>Volume e luminosità</b></label></div>
@@ -381,18 +428,31 @@
         <label class="sub" id="web-tavily-row">Chiave Tavily <input type="password" id="web-tavily-key" autocomplete="off" placeholder="tvly-…" /> <button id="web-tavily-save">Salva</button> <span id="web-tavily-st" class="result"></span></label>
         <label class="sub" id="web-brave-row">Chiave Brave <input type="password" id="web-brave-key" autocomplete="off" /> <button id="web-brave-save">Salva</button> <span id="web-brave-st" class="result"></span></label></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="music" /> <b>Musica</b> (cerca su YouTube e suona)</label>
-        <p class="note">Al primo uso scarica <b>yt-dlp</b> e <b>Deno</b> da GitHub in <code>%APPDATA%\AlterEgo\tools</code>. I brani restano in una cache (ultimi 30).</p></div>
+        <p class="note">Al primo uso scarica <b>yt-dlp</b> e <b>Deno</b> da GitHub in <code data-os="windows">%APPDATA%\AlterEgo\tools</code><code data-os="linux">~/.config/AlterEgo/tools</code> (se non sono già installati). I brani restano in una cache (ultimi 30).</p></div>
       <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="input" /> <b>Mouse e tastiera</b> ⚠ (muove il cursore, clicca, scrive, preme tasti)</label>
         <p class="note">Va bene insieme a <b>Lettura schermo</b>, così vede dove cliccare. Ogni azione chiede conferma e poi rimette in primo piano la finestra di prima.
           <b>Stop d'emergenza</b>: porta il mouse nell'angolo in alto a sinistra dello schermo.</p>
-        <label class="inline sub"><input type="checkbox" data-perm="input_autonomous" /> <b>In autonomia</b>: senza chiedere conferma per ogni azione</label></div>
+        <label class="inline sub"><input type="checkbox" data-perm="input_autonomous" /> <b>In autonomia</b>: senza chiedere conferma per ogni azione</label>
+        <label class="inline sub"><input type="checkbox" data-perm="input_grid" /> Righelli con le coordinate e cursore cerchiato negli screenshot (clic molto più precisi)</label>
+        <label class="inline sub"><input type="checkbox" data-perm="input_feedback" /> Screenshot di controllo dopo ogni clic (serve «Lettura schermo»; più token, meno errori)</label>
+        <p class="note sub">Per i punti piccoli Alter Ego ingrandisce la zona prima di cliccare.<span data-os="windows"> Nelle app di Windows legge anche la posizione esatta di pulsanti e campi (UI Automation).</span><span data-os="linux"> Su Linux serve <code>xdotool</code> (X11; su Wayland solo per le app XWayland).</span></p></div>
       <div class="perm"><label class="inline"><input type="checkbox" data-perm="app_control" /> <b>Comandi dell'app</b> («apri music venue», «chiudi il lettore», «apri il sito»…)</label>
         <p class="note">Riguardano solo Alter Ego (finestre, lettore, aspetto, link, aggiornamento), non il PC. Le frasi brevi più comuni funzionano anche senza modello AI.</p></div>
-      <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="terminal" /> <b>Terminale</b> ⚠ (PowerShell e cmd, comandi scritti da Alter Ego)</label>
-        <p class="note">Alter Ego può eseguire qualsiasi comando non interattivo (timeout 120 s) e leggerne l'output.</p>
+      <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="terminal" /> <b>Terminale</b> ⚠ (<span data-os="windows">PowerShell e cmd</span><span data-os="linux">bash e sh</span>, comandi scritti da Alter Ego)</label>
+        <p class="note">Alter Ego può eseguire qualsiasi comando non interattivo e leggerne l'output. Ricorda la cartella di lavoro tra un comando e l'altro.</p>
+        <label class="sub">Durata massima di un comando
+          <select id="term-timeout"><option value="60">1 minuto</option><option value="120">2 minuti</option><option value="300">5 minuti</option><option value="900">15 minuti</option><option value="1800">30 minuti</option></select>
+        </label>
         <label class="inline sub"><input type="checkbox" data-perm="terminal_autonomous" /> <b>In autonomia</b>: senza chiedere conferma</label>
         <p class="note">Anche in autonomia, i comandi potenzialmente distruttivi (formattazioni, cancellazioni ricorsive, registro di sistema,
-          utenti, spegnimento, download da internet…) chiedono sempre conferma.</p></div>
+          utenti, spegnimento, download da internet<span data-os="linux">, sudo</span>…) chiedono sempre conferma.</p></div>
+      <div class="perm danger-zone"><label class="inline"><input type="checkbox" data-perm="sql" /> <b>Database SQL Server</b> (su questo PC)</label>
+        <p class="note">Alter Ego si collega a SQL Server su questo computer e legge i dati (SELECT). Quando serve una connessione apre un modulo:
+          server, database, utente e password li scrivi tu e <b>la password non va al modello AI</b>. Si accettano solo server locali.</p>
+        <label class="inline sub"><input type="checkbox" data-perm="sql_write" /> <b>Modifiche</b> ⚠: anche INSERT, UPDATE, DELETE, CREATE, ALTER… (conferma ogni volta; DROP, TRUNCATE e DELETE/UPDATE senza WHERE sempre)</label>
+        <label class="inline sub"><input type="checkbox" id="sql-window" /> Mostra i risultati nella finestra SQL</label>
+        <label class="sub">Righe mandate al modello per ogni query <select id="sql-rows"><option value="20">20</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select></label>
+        <div class="actions sub"><button id="sql-open">Apri la finestra SQL</button> <span id="sql-state" class="result"></span></div></div>
     </section>
 
     <section data-tab="costs">
@@ -419,6 +479,20 @@
       <h2>Registro azioni</h2>
       <div class="actions"><button id="log-refresh">Aggiorna</button> <button id="log-clear" class="danger">Svuota</button></div>
       <table id="log-table"><thead><tr><th>Quando</th><th>Azione</th><th>Dettaglio</th><th>Esito</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section data-tab="applog">
+      <h2>Log completo</h2>
+      <p class="note">Tutto quello che succede: richieste al modello, provider usati e fallback, strumenti con esito e durata, errori, avvisi.
+        Chiavi e password non finiscono mai qui. Utile per capire perché qualcosa non va (e da allegare a una segnalazione).</p>
+      <div class="actions">
+        <select id="al-level"><option value="all">Tutto</option><option value="warn">Avvisi ed errori</option><option value="error">Solo errori</option></select>
+        <input id="al-query" placeholder="Cerca…" style="max-width:220px" />
+        <label class="inline" style="margin:0"><input type="checkbox" id="al-live" checked /> In tempo reale</label>
+        <button id="al-refresh">Aggiorna</button> <button id="al-copy">Copia</button> <button id="al-folder">Cartella</button> <button id="al-clear" class="danger">Svuota</button>
+        <span id="al-result" class="result"></span>
+      </div>
+      <div class="scroll"><table id="al-table" class="grid"><thead><tr><th>Quando</th><th>Livello</th><th>Area</th><th>Messaggio</th></tr></thead><tbody></tbody></table></div>
     </section>
   </main>
 

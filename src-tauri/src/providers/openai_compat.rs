@@ -51,7 +51,7 @@ pub fn status_error(status: reqwest::StatusCode, body: &str, sent_tools: bool) -
     }
 }
 
-fn net_error(e: reqwest::Error) -> ProviderError {
+pub fn net_error(e: reqwest::Error) -> ProviderError {
     let msg = if e.is_connect() {
         crate::i18n::tr("connessione impossibile", "cannot connect").to_string()
     } else if e.is_timeout() {
@@ -171,6 +171,12 @@ pub async fn stream_chat(
     if let Some(tools) = tools {
         body["tools"] = tools.clone();
     }
+    if t.max_tokens > 0 {
+        body["max_tokens"] = json!(t.max_tokens);
+    }
+    if t.top_p < 1.0 {
+        body["top_p"] = json!(t.top_p);
+    }
     // ragionamento spento: parametri del provider (se li rifiuta si riprova senza e lo si ricorda)
     let think_key = format!("{}/{}", t.id, t.model);
     let mut think_params = if t.thinking_off && !ai.no_think_params.lock().unwrap().contains(&think_key) { thinking_off_params(&t.id, &t.model) } else { None };
@@ -190,8 +196,8 @@ pub async fn stream_chat(
     }
     let started = std::time::Instant::now();
     // Ollama può impiegare molto a caricare il modello la prima volta.
-    let first_timeout = Duration::from_secs(if t.id == "ollama" { 120 } else { 45 });
-    let idle_timeout = Duration::from_secs(30);
+    let first_timeout = Duration::from_secs(if t.id == "ollama" { t.timeout_secs.max(120) } else { t.timeout_secs });
+    let idle_timeout = Duration::from_secs(t.timeout_secs.clamp(30, 120));
 
     let mut retried = false;
     let resp = loop {

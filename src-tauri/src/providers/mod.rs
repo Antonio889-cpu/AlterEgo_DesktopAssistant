@@ -8,6 +8,7 @@
 //! Ordine dei tentativi: provider (ordine di fallback) → chiavi del provider
 //! (rotazione su 401/402/403/429) → retry con backoff su errori temporanei.
 
+mod ollama;
 mod openai_compat;
 pub mod prompt;
 pub mod textcalls;
@@ -120,6 +121,20 @@ pub struct Target {
     pub temperature: f64,
     /// Chiede al modello di non "pensare" (parametri diversi per provider).
     pub thinking_off: bool,
+    /// Token massimi della risposta (0 = default del provider).
+    pub max_tokens: u32,
+    /// 1.0 = non inviato.
+    pub top_p: f64,
+    /// Attesa massima della prima parte della risposta.
+    pub timeout_secs: u64,
+    /// Opzioni di Ollama per l'API nativa (solo Ollama, solo se servono).
+    pub ollama: Option<crate::config::OllamaOpts>,
+}
+
+impl Target {
+    fn basic(id: &str, base: String, key: Option<String>) -> Self {
+        Self { id: id.into(), base, key, model: String::new(), temperature: 0.0, thinking_off: false, max_tokens: 0, top_p: 1.0, timeout_secs: 45, ollama: None }
+    }
 }
 
 /// Classifica una risposta HTTP non riuscita (stesse regole della chat).
@@ -325,6 +340,7 @@ pub async fn chat(
             continue;
         }
         let fail = |failures: &mut Vec<String>, msg: String| {
+            crate::applog::warn("ai", &format!("{id}: {msg}"));
             let _ = events.send(StreamEvent::Fallback { from: id.clone(), reason: msg.clone() });
             failures.push(format!("{id}: {msg}"));
         };
@@ -341,7 +357,18 @@ pub async fn chat(
         let mut last_msg = String::new();
 
         for (k_pos, (k_index, key)) in key_list.into_iter().enumerate() {
-            let mut target = Target { id: id.clone(), base: base.clone(), key, model: model.clone(), temperature: cfg.temperature, thinking_off: cfg.thinking == "off" };
+            let mut target = Target {
+                id: id.clone(),
+                base: base.clone(),
+                key,
+                model: model.clone(),
+                temperature: cfg.temperature,
+                thinking_off: cfg.thinking == "off",
+                max_tokens: cfg.max_tokens,
+                top_p: cfg.top_p,
+                timeout_secs: cfg.timeout_secs,
+                ollama: (id == "ollama" && cfg.ollama.native()).then(|| cfg.ollama.clone()),
+            };
             if target.model.is_empty() {
                 // Ollama senza modello scelto: usa il primo installato.
                 match openai_compat::list_models(ai.client_for(&target.base), &target).await {
@@ -366,7 +393,12 @@ pub async fn chat(
                     return Err("richiesta annullata".into());
                 }
                 let _ = events.send(StreamEvent::Start { provider: id.clone(), model: target.model.clone() });
-                match openai_compat::stream_chat(ai, gen, &target, &system, &messages, use_tools.as_ref(), &events).await {
+                let reply = if target.ollama.is_some() {
+                    ollama::stream_chat(ai, gen, &target, &system, &messages, use_tools.as_ref(), &events).await
+                } else {
+                    openai_compat::stream_chat(ai, gen, &target, &system, &messages, use_tools.as_ref(), &events).await
+                };
+                match reply {
                     Ok(reply) => {
                         // via il "pensiero" e le chiamate a strumenti scritte come testo
                         let allowed = use_tools.as_ref().map(textcalls::tool_names).unwrap_or_default();
@@ -416,7 +448,7 @@ pub async fn list_models(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<Vec<String
     let base = base_url(cfg, id)?;
     let mut last = String::from("nessuna chiave");
     for (_, key) in keys_for(ai, cfg, id)? {
-        let t = Target { id: id.into(), base: base.clone(), key, model: String::new(), temperature: 0.0, thinking_off: false };
+        let t = Target::basic(id, base.clone(), key);
         match openai_compat::list_models(ai.client_for(&t.base), &t).await {
             Ok(v) => return Ok(v),
             Err(e) => last = keys::redact(&e.message, t.key.as_deref()),
@@ -586,6 +618,24 @@ mod tests {
         let (ch, log) = channel();
         chat(&ai, c, "s".into(), user("x"), None, ch).await.unwrap();
         assert_eq!(log.lock().unwrap().iter().filter(|e| e.contains("chiave successiva")).count(), 0);
+    }
+
+    #[tokio::test]
+    async fn ollama_native_options() {
+        let ai = Ai::new();
+        let mut c = cfg(&[("ollama", "http://127.0.0.1:18080/ok/v1")]);
+        c.ollama = crate::config::OllamaOpts { num_ctx: 32768, keep_alive: "30m".into(), num_gpu: -1 };
+        c.thinking = "off".into();
+        let (ch, log) = channel();
+        let r = chat(&ai, c.clone(), "s".into(), user("x"), None, ch).await.unwrap();
+        assert_eq!(r.text, "[happy]\nctx=32768 keep=30m think=False");
+        assert!(log.lock().unwrap().iter().filter(|e| e.contains("delta")).count() >= 2);
+        // chiamata a strumento nel formato nativo
+        let tools = serde_json::json!([{ "type": "function", "function": { "name": "list_reminders", "parameters": {} } }]);
+        let (ch, _) = channel();
+        let r = chat(&ai, c, "s".into(), user("x"), Some(tools), ch).await.unwrap();
+        assert_eq!(r.tool_calls[0].name, "list_reminders");
+        assert_eq!(r.tool_calls[0].arguments, "{}");
     }
 
     #[test]

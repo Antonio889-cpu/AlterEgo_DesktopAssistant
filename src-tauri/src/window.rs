@@ -20,13 +20,14 @@ const RATIO: f64 = 16.0 / 9.0;
 const HANDLE_LOGICAL: f64 = 34.0;
 const MIN_WIDTH_LOGICAL: f64 = 320.0;
 
-pub fn create_main(app: &AppHandle) -> tauri::Result<WebviewWindow> {
+/// `visible` = false con l'avvio silenzioso (si apre dalla tray o con la hotkey).
+pub fn create_main(app: &AppHandle, visible: bool, on_top: bool) -> tauri::Result<WebviewWindow> {
     let win = WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html".into()))
         .title("Alter Ego")
         .decorations(false)
         .transparent(true)
         .shadow(false)
-        .always_on_top(true)
+        .always_on_top(on_top)
         .skip_taskbar(true)
         .resizable(true)
         .focused(false)
@@ -39,7 +40,9 @@ pub fn create_main(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     // Prima la posizione (sceglie il monitor e quindi il DPI), poi la dimensione.
     win.set_position(PhysicalPosition::new(geo.x, geo.y))?;
     win.set_size(PhysicalSize::new(geo.width, geo.height))?;
-    win.show()?;
+    if visible {
+        win.show()?;
+    }
     Ok(win)
 }
 

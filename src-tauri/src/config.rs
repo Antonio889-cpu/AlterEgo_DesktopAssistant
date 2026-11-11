@@ -67,6 +67,41 @@ pub struct AiConfig {
     pub max_history: usize,
     /// Ragionamento dei modelli "thinking": "hide" (si usa ma non si vede) o "off" (spento, meno token).
     pub thinking: String,
+    /// Token massimi di una risposta (0 = decide il provider).
+    pub max_tokens: u32,
+    /// Nucleus sampling (1.0 = non inviato).
+    pub top_p: f64,
+    /// Secondi di attesa per la prima parte della risposta (Ollama aspetta almeno 120 s: carica il modello).
+    pub timeout_secs: u64,
+    /// Passaggi massimi con gli strumenti per una sola richiesta (richieste complesse).
+    pub tool_rounds: usize,
+    pub ollama: OllamaOpts,
+}
+
+/// Opzioni di Ollama che l'endpoint compatibile OpenAI non accetta: con almeno una impostata
+/// si usa l'API nativa `/api/chat` (vedi providers::ollama).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct OllamaOpts {
+    /// Finestra di contesto in token (0 = quella del modello).
+    pub num_ctx: u32,
+    /// Quanto resta caricato il modello dopo una richiesta ("" = default di Ollama, es. "30m", "-1" = sempre).
+    pub keep_alive: String,
+    /// Livelli del modello sulla GPU (-1 = decide Ollama, 0 = solo CPU).
+    pub num_gpu: i32,
+}
+
+impl Default for OllamaOpts {
+    fn default() -> Self {
+        Self { num_ctx: 0, keep_alive: String::new(), num_gpu: -1 }
+    }
+}
+
+impl OllamaOpts {
+    /// Serve l'API nativa?
+    pub fn native(&self) -> bool {
+        self.num_ctx > 0 || !self.keep_alive.trim().is_empty() || self.num_gpu >= 0
+    }
 }
 
 impl Default for AiConfig {
@@ -86,6 +121,11 @@ impl Default for AiConfig {
             temperature: 0.7,
             max_history: 12,
             thinking: "hide".into(),
+            max_tokens: 0,
+            top_p: 1.0,
+            timeout_secs: 45,
+            tool_rounds: 12,
+            ollama: OllamaOpts::default(),
         }
     }
 }
@@ -113,6 +153,13 @@ impl AiConfig {
         if !["hide", "off"].contains(&self.thinking.as_str()) {
             self.thinking = "hide".into();
         }
+        self.max_tokens = self.max_tokens.min(200_000);
+        self.top_p = if self.top_p <= 0.0 { 1.0 } else { self.top_p.clamp(0.05, 1.0) };
+        self.timeout_secs = self.timeout_secs.clamp(10, 600);
+        self.tool_rounds = self.tool_rounds.clamp(2, 40);
+        self.ollama.num_ctx = if self.ollama.num_ctx == 0 { 0 } else { self.ollama.num_ctx.clamp(512, 1_048_576) };
+        self.ollama.keep_alive = self.ollama.keep_alive.trim().chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').take(8).collect();
+        self.ollama.num_gpu = self.ollama.num_gpu.clamp(-1, 999);
     }
 }
 
@@ -203,6 +250,19 @@ pub struct Permissions {
     /// Comandi dell'app a voce/testo ("apri Music Venue", "chiudi il lettore"…). Riguardano solo
     /// Alter Ego, non il PC: acceso di default.
     pub app_control: bool,
+    /// Gestione file su tutto il disco, non solo nelle cartelle in lista
+    /// (le eliminazioni e le scritture nelle cartelle di sistema chiedono sempre conferma).
+    pub files_all: bool,
+    /// Dopo un clic manda al modello uno screenshot di controllo (serve anche "Lettura schermo").
+    pub input_feedback: bool,
+    /// Righelli con le coordinate e posizione del cursore disegnati negli screenshot.
+    pub input_grid: bool,
+    /// Secondi massimi per un comando del terminale.
+    pub terminal_timeout: u64,
+    /// Database SQL Server su questo PC: lettura (SELECT).
+    pub sql: bool,
+    /// SQL Server: anche comandi che modificano dati o struttura (chiedono conferma).
+    pub sql_write: bool,
 }
 
 impl Default for Permissions {
@@ -226,6 +286,12 @@ impl Default for Permissions {
             input: false,
             input_autonomous: false,
             app_control: true,
+            files_all: false,
+            input_feedback: true,
+            input_grid: true,
+            terminal_timeout: 120,
+            sql: false,
+            sql_write: false,
         }
     }
 }
@@ -541,14 +607,53 @@ impl Default for WebConfig {
     }
 }
 
+/// Ultima connessione a SQL Server (la password, se scelto "ricorda", sta nel Credential Manager).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct SqlConfig {
+    /// "localhost", "localhost\\SQLEXPRESS", "127.0.0.1,1433"…
+    pub server: String,
+    pub database: String,
+    /// "windows" (accesso integrato, solo Windows) o "sql" (utente e password).
+    pub auth: String,
+    pub user: String,
+    /// Certificato del server considerato attendibile (normale per i server locali).
+    pub trust_cert: bool,
+    /// Password salvata nel Credential Manager.
+    pub remember: bool,
+    /// I risultati delle query si aprono anche nella finestra SQL.
+    pub show_window: bool,
+    /// Righe massime restituite al modello per una query.
+    pub max_rows: usize,
+}
+
+impl Default for SqlConfig {
+    fn default() -> Self {
+        Self {
+            server: "localhost".into(),
+            database: String::new(),
+            auth: if cfg!(windows) { "windows".into() } else { "sql".into() },
+            user: String::new(),
+            trust_cert: true,
+            remember: false,
+            show_window: true,
+            max_rows: 50,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct Config {
     /// Opacità della finestra, 0.2–1.0.
     pub opacity: f64,
     pub hotkeys: Hotkeys,
-    /// Avvio con Windows: disattivato di default (non ancora implementato).
+    /// Avvio con il sistema (spento di default).
     pub autostart: bool,
+    /// Con l'avvio automatico parte nascosta: solo l'icona nella tray.
+    pub start_hidden: bool,
+    /// Finestra sempre in primo piano.
+    pub always_on_top: bool,
     /// Nome dell'utente, usato da Alter Ego nelle risposte.
     pub user_name: String,
     /// Tag nome mostrato nel box dialogo.
@@ -587,6 +692,7 @@ pub struct Config {
     /// Spotify (utenti Premium): controllo della riproduzione via Web API.
     pub spotify: SpotifyConfig,
     pub rizzo: RizzoConfig,
+    pub sql: SqlConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -599,6 +705,8 @@ impl Default for Config {
             opacity: 1.0,
             hotkeys: Hotkeys::default(),
             autostart: false,
+            start_hidden: true,
+            always_on_top: true,
             user_name: String::new(),
             name_tag: "Alter Ego".into(),
             ui_language: "auto".into(),
@@ -621,6 +729,7 @@ impl Default for Config {
             saving: SavingConfig::default(),
             spotify: SpotifyConfig::default(),
             rizzo: RizzoConfig::default(),
+            sql: SqlConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
             last_monitor: None,
@@ -666,6 +775,11 @@ impl Config {
         self.audio.tts_volume = self.audio.tts_volume.clamp(0.0, 1.0);
         self.audio.tts_rate = self.audio.tts_rate.clamp(0.5, 2.0);
         self.clip.phrases.retain(|p| !p.trim().is_empty());
+        self.permissions.terminal_timeout = self.permissions.terminal_timeout.clamp(10, 1800);
+        if !["windows", "sql"].contains(&self.sql.auth.as_str()) || (!cfg!(windows) && self.sql.auth == "windows") {
+            self.sql.auth = "sql".into();
+        }
+        self.sql.max_rows = self.sql.max_rows.clamp(1, 1000);
     }
 }
 

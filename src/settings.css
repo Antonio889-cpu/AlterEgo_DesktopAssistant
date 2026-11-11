@@ -108,3 +108,12 @@ label.sub { margin-left: 26px; }
 #cost-table { font-size: 12.5px; }
 #cost-table td:nth-child(3) { white-space: normal; word-break: break-word; min-width: 140px; }
 #cost-table th, #cost-table td { padding: 3px 5px; }
+
+/* testi e parti valide solo su un sistema (body.os-windows / body.os-linux, vedi settings.js) */
+body.os-linux [data-os="windows"], body.os-windows [data-os="linux"] { display: none !important; }
+.actions.sub { margin-left: 26px; }
+details#ai-advanced { margin: 10px 0; border: 1px solid #1d3d1f; border-radius: 6px; padding: 6px 10px; }
+details#ai-advanced summary { cursor: pointer; color: var(--accent); }
+#al-table td:last-child { white-space: pre-wrap; word-break: break-word; }
+#al-table tr.error td { color: var(--bad); }
+#al-table tr.warn td { color: var(--warn); }

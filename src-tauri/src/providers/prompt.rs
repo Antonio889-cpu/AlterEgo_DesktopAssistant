@@ -47,6 +47,45 @@ fn personality(cfg: &Config) -> String {
     format!("{conf} {warm}")
 }
 
+/// Come usare gli strumenti attivi (cambia solo con i Permessi: resta nel prefisso in cache).
+fn tool_guide(cfg: &Config) -> String {
+    let p = &cfg.permissions;
+    let any = p.open || p.files || p.terminal || p.web || p.input || p.screen || p.sql || p.shell;
+    if !any {
+        return String::new();
+    }
+    let mut g = format!(
+        "\n## Uso degli strumenti\n\
+- Richieste complesse: procedi da sola, passo dopo passo. Scegli lo strumento giusto per ogni passo, guarda il risultato e decidi il passo successivo; \
+combina strumenti diversi (terminale, file, web, schermo, database) quando serve. Puoi chiamare insieme più strumenti indipendenti.\n\
+- Se un passo fallisce leggi l'errore e prova un'altra strada invece di ripetere la stessa chiamata. Hai al massimo {} passaggi.\n\
+- Alla fine rispondi con un riepilogo breve: cosa hai fatto, cosa hai trovato, cosa non è riuscito.\n",
+        cfg.ai.tool_rounds
+    );
+    if p.terminal {
+        g.push_str(
+            "- Terminale: è un terminale vero su questo PC. Usalo con sicurezza e senza chiedere all'utente di eseguire comandi al posto tuo. \
+Comandi non interattivi; controlla codice di uscita e output; per output lunghi filtra (Select-Object -First, Select-String, head, grep).\n",
+        );
+    }
+    if p.input {
+        g.push_str(
+            "- Mouse: prima guarda (screenshot). Le coordinate si leggono dai righelli numerati, non si stimano. \
+Per pulsanti piccoli o testo minuto usa zoom_screen sulla zona e clicca con le coordinate dei righelli dello zoom. \
+Su Windows ui_elements dà il centro esatto dei controlli: preferiscilo quando la finestra lo supporta. \
+Dopo il clic controlla lo screenshot di verifica (cerchio rosso = cursore) e correggi se serve. \
+Per scrivere in un campo: clicca nel campo, poi type_text.\n",
+        );
+    }
+    if p.sql {
+        g.push_str(
+            "- SQL Server: se non sei connessa usa sql_connect (l'utente scrive i dati in un modulo; non chiedere mai la password in chat). \
+Esplora con INFORMATION_SCHEMA, usa TOP per le tabelle grandi, e riassumi i risultati a parole (la tabella completa la vede nella finestra SQL).\n",
+        );
+    }
+    g
+}
+
 pub struct MemoryContext<'a> {
     pub summary: Option<&'a str>,
     pub facts: &'a [String],
@@ -90,6 +129,7 @@ Esempio:\n[happy]\nCiao! Che bello sentirti.\n---EN---\nHi! I'm so glad to hear 
 - Azioni sul PC: solo con gli strumenti che ti vengono forniti e solo se l'utente lo chiede. Passano dal sistema di permessi; se un permesso viene negato, accettalo senza insistere.\n\
 - Dopo aver usato uno strumento rispondi sempre con il formato obbligatorio.\n",
     );
+    s.push_str(&tool_guide(cfg));
 
     // ---- da qui in giù: parti che possono cambiare ----
     s.push_str("\n## Personalità attuale\n");

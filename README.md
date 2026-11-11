@@ -80,13 +80,17 @@ Interface in English and Italian.
 - **Music Venue**: a small library with recently played tracks and favorites, search and replay.
 - **Talk to the app**: "open music venue", "close the audio player", "open the website", "check for updates"… everything about the app can be done by asking her.
 - **Mouse and keyboard**: if you allow it, Alter Ego moves the cursor, clicks, types and presses keys (with confirmation and an emergency stop).
+  Precise clicks: screenshots with numbered rulers and the cursor marked, zoom on small targets, a check screenshot after each click and, on Windows, the exact position of buttons and fields (UI Automation).
+- **SQL Server** on your PC: when needed she asks for the connection details in a small form (the password never goes to the AI model), reads data, and with your permission changes it; results also show up in a SQL window where you can write your own queries.
+- **Complex requests**: she chains tools by herself (terminal, files, web, screen, database) for up to 12 steps (adjustable), checks each result and changes approach when something fails.
 - **Noise suppression** for the Mic-Link microphone (RNNoise, adjustable).
 - **Updates**: website and GitHub links in the app and a button to update to the latest release.
 - **Web search** with your choice of engine: DeepSeek, Google (via Gemini), Tavily, Brave or DuckDuckGo (free), with fallback.
 - **Spotify** (Premium): "play *title*" can play on your Spotify instead of YouTube.
 - **Token saving**: thinking off, tools only when needed, local router (keywords or Rizzo Flow), cheap model for simple questions.
 - **Costs panel**: every request with tokens, cache, duration and cost; daily/monthly totals and per-model summary, editable prices, CSV export.
-- **Terminal**: Alter Ego can run PowerShell or cmd commands, with confirmation or autonomously.
+- **Terminal**: Alter Ego can run PowerShell or cmd commands (bash on Linux), with confirmation or autonomously; she keeps the working folder between commands.
+- **Full log** in Settings → Log: model requests, fallbacks, tools with result and duration, errors. **Silent start**: at login she starts hidden in the tray.
 - **Voice clips**: "Alter Ego clip that" → saves the clip with AMD Adrenalin, NVIDIA App or Medal, **without going through the AI**.
 - **PC actions** through tool calling, all off by default, with confirmation for sensitive ones (can be turned off) and a browsable log.
 - **Local memory** (SQLite): remembers conversations, writes summaries, learns facts about you.
@@ -207,8 +211,11 @@ From the tray you can also change opacity, background (scanlines, circuits, both
   Next time it starts from the last one that worked.
 - **Fallback**: change the order of the services with ▲▼. If one doesn't answer (network, server error, no valid key), the next one is tried.
 - Timeouts and 2 retries with increasing waits on temporary errors. If nobody answers, Alter Ego says so with her error expression.
+  **Esc** stops an answer that is taking too long; a tool that hangs is stopped after a while, and the same call repeated over and over is blocked.
+- **Advanced settings** (Settings → AI & keys): max tokens per answer, top P, max wait for the answer, max tool steps.
+  For **Ollama**: context window (`num_ctx`), how long the model stays loaded and GPU layers (these use Ollama's native API).
 - *Load models* downloads the list of models from the service: the default names may no longer exist.
-- Keys are stored in the **Windows Credential Manager** (entry `AlterEgo`), never in files or logs, and the frontend never sees them.
+- Keys are stored in the **Windows Credential Manager** (entry `AlterEgo`; on Linux in the system keyring), never in files or logs, and the frontend never sees them.
 
 **DeepSeek cache** (and other services with automatic prefix caching). DeepSeek charges much less for input tokens
 that start exactly like a previous request. That's why:
@@ -388,16 +395,17 @@ an action before you see it, so only turn it on with actions and folders you're 
 | Feature | Confirmation |
 |---|---|
 | Open programs and websites (from a list with your own names) | ⚠ only outside the list |
-| File management, only in allowed folders | ⚠ always |
-| Reminders, timers, alarms (Windows notifications) | no |
+| File management (list, read, write, search, move, delete), only in allowed folders or, if you choose, the **whole disk** | ⚠ always; deletes and system folders always ask |
+| Reminders, timers, alarms (system notifications) | no |
 | Clipboard | ⚠ for reading |
 | Screen reading (screenshot to a vision model) | ⚠ always |
 | Volume and brightness | no |
 | Commands, only from a list and chosen by name | ⚠ always |
-| **Terminal**: PowerShell or cmd commands written by Alter Ego (120 s timeout) | ⚠ always, or **autonomous**; destructive commands still ask |
+| **Terminal**: PowerShell or cmd (bash or sh on Linux) commands written by Alter Ego (adjustable timeout, 2 minutes by default) | ⚠ always, or **autonomous**; destructive commands still ask |
 | Web search (DeepSeek Search/Fetch) | no |
 | Music (YouTube) | no |
-| **Mouse and keyboard**: move, click, scroll, type, press keys | ⚠ every action, or **autonomous**; mouse in the top-left corner = stop |
+| **Mouse and keyboard**: move, click, scroll, type, press keys, read the controls of a window (Windows) | ⚠ every action, or **autonomous**; mouse in the top-left corner = stop |
+| **SQL Server database** on this PC: connect (form), read; **changes** only if you allow them | changes ⚠ always; DROP/TRUNCATE and DELETE/UPDATE without WHERE always |
 | **App commands** ("open music venue", "close the player"…), only Alter Ego itself, **on by default** | no (updating always asks) |
 
 Every action, even a denied one, goes to **Settings → Log**. Technical details (in Italian) in [docs/PERMESSI.md](docs/PERMESSI.md).
@@ -526,6 +534,8 @@ python tools/mock_openai.py
 
 ```bash
 cd src-tauri && cargo test
+# optional, with a real SQL Server (e.g. the mcr.microsoft.com/mssql/server image):
+# AE_SQL_TEST="127.0.0.1,1433|sa|password|database" cargo test real_server
 ```
 
 **Structure**

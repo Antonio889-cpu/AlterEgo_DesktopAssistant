@@ -8,19 +8,24 @@ Tutte le azioni sono **spente di default**. Si attivano in *Impostazioni → Per
 2. Le azioni nascono solo da **tool calling strutturato** (nome strumento + argomenti JSON validati), mai da testo libero.
 3. Le azioni con ⚠ aprono una finestra di conferma nel box di Alter Ego. Il pulsante con il focus è **Nega**.
    Esc = Nega. Nessuna risposta in 60 secondi = Nega.
-4. Ogni azione (anche negata o fallita) va in `%APPDATA%\AlterEgo\actions.log`, consultabile in *Impostazioni → Registro*.
-   Del contenuto dei file si registra solo il percorso.
+4. Ogni azione (anche negata o fallita) va in `%APPDATA%\AlterEgo\actions.log` (Linux: `~/.config/AlterEgo/actions.log`), consultabile in *Impostazioni → Registro*.
+   Del contenuto dei file si registra solo il percorso. Il log completo dell'app (`app.log`, *Impostazioni → Log*) riporta anche esito e durata di ogni strumento;
+   chiavi e password non finiscono mai in nessuno dei due.
 5. Testo letto da file, appunti, schermo o comandi viene passato al modello marcato come **DATO**, con l'istruzione di non eseguire ordini contenuti lì (anti prompt-injection).
+6. Ogni strumento ha un tempo massimo (durata del terminale + 2 minuti): se si blocca viene interrotto e il modello riceve l'errore.
+   La stessa chiamata con gli stessi argomenti ripetuta più di due volte viene bloccata, e dopo un permesso negato o lo stop d'emergenza
+   il modello non riceve altri strumenti per quella risposta. **Esc** nella finestra principale interrompe la risposta e nega le conferme in attesa.
 
 ## Funzioni
 
 | Funzione | Strumenti | Conferma | Limiti |
 |---|---|---|---|
 | Aprire programmi e siti | `open_target` | ⚠ solo fuori lista | Lista nome → percorso/URL. Fuori lista solo URL http(s). |
-| Gestione file | `list_dir`, `read_file`, `write_file`, `delete_file` | ⚠ sempre | Solo dentro le cartelle autorizzate (percorsi risolti, niente `..`). Lettura max 64 KB. |
-| Promemoria, timer, sveglie | `set_reminder`, `list_reminders`, `cancel_reminder` | no | Da 1 minuto a 7 giorni. Notifica di Windows + Alter Ego lo dice. |
+| Gestione file | `list_dir`, `read_file`, `write_file`, `delete_file`, `find_files`, `make_dir`, `move_path` | ⚠ sempre | Solo dentro le cartelle autorizzate (percorsi risolti, niente `..`), oppure **Tutto il disco**. Lettura max 64 KB. Eliminazioni e scritture nelle cartelle di sistema chiedono sempre conferma, anche con «Non chiedere conferma». |
+| Promemoria, timer, sveglie | `set_reminder`, `list_reminders`, `cancel_reminder` | no | Da 1 minuto a 7 giorni. Notifica del sistema + Alter Ego lo dice. |
 | Appunti | `read_clipboard`, `write_clipboard` | ⚠ per leggere | Solo testo. |
-| Lettura schermo | `take_screenshot` | ⚠ sempre | Serve un provider con "visione" spuntata. Alter Ego si nasconde durante lo scatto. |
+| Lettura schermo | `take_screenshot`, `zoom_screen` | ⚠ sempre | Serve un provider con "visione" spuntata. Alter Ego si nasconde durante lo scatto. |
+| Database SQL Server | `sql_connect`, `sql_query`, `sql_disconnect` | modifiche ⚠ | Vedi sotto. |
 | Volume e luminosità | `set_volume`, `set_brightness` | no | Volume con i tasti multimediali; luminosità solo su schermi di portatili. |
 | Comandi | `run_command` | ⚠ sempre | Solo comandi della lista (nome → comando), scelti per nome. Mai testo libero. |
 
@@ -42,17 +47,19 @@ Rischio: il modello può essere spinto da un testo letto (file, appunti, schermo
 non la vedi prima che parta. Il prompt di sistema dice di trattare quei testi come dati, ma non è una garanzia:
 attivalo solo con azioni, cartelle e comandi che ti va bene far eseguire in automatico.
 
-## Terminale (PowerShell e cmd)
+## Terminale (PowerShell e cmd, bash e sh su Linux)
 
 Strumento `run_shell`: Alter Ego scrive un comando non interattivo e lo esegue in PowerShell (`-NoProfile -NonInteractive`)
-o in cmd, nella tua cartella utente, con finestra nascosta e timeout di 120 secondi. Riceve l'output (massimo 6000 caratteri)
-come **dato**.
+o in cmd (su Linux in bash o sh), con finestra nascosta e durata massima regolabile (2 minuti di default, fino a 30).
+Parte dalla cartella utente e ricorda la cartella di lavoro tra un comando e l'altro (anche dopo un `cd`). Riceve codice di uscita
+e output (inizio e fine se è lungo, 8000 caratteri) come **dato**. La descrizione dello strumento dice al modello sistema, versione e shell.
 
 - Spento di default. Con il permesso attivo chiede conferma per ogni comando.
 - **In autonomia**: esegue senza chiedere. Anche così chiedono **sempre** conferma i comandi che contengono, per esempio:
   `format`, `diskpart`, `bcdedit`, `cipher /w`, `vssadmin delete`, `reg delete HKLM`, `Remove-Item -Recurse`, `rd /s`, `del /s`,
   `takeown`, `icacls`, spegnimento/riavvio, gestione utenti, `Set-ExecutionPolicy`, download (`Invoke-WebRequest`, `curl`)
-  e comandi codificati (`-EncodedCommand`). È una rete di sicurezza, non una garanzia: un comando dannoso scritto in altro modo passa.
+  e comandi codificati (`-EncodedCommand`); su Linux anche `rm -r`/`rm -f`, `sudo`, `mkfs`, `dd`, `systemctl`, `chmod -R`, `wget`, `| sh`.
+  È una rete di sicurezza, non una garanzia: un comando dannoso scritto in altro modo passa.
 - Ogni comando, eseguito o negato, finisce nel Registro.
 
 ## Ricerca web
@@ -63,11 +70,38 @@ torna al modello come dato.
 
 ## Mouse e tastiera
 
-Strumenti `mouse_move`, `mouse_click`, `mouse_scroll`, `type_text`, `press_keys` (SendInput di Windows). Spento di default.
-Le coordinate sono nella griglia dello screenshot (`take_screenshot`, max 1280 px) e vengono riportate ai pixel dello schermo.
+Strumenti `mouse_move`, `mouse_click`, `mouse_scroll`, `type_text`, `press_keys` (SendInput di Windows, xdotool su Linux) e, su Windows,
+`ui_elements`. Spento di default.
+Le coordinate sono nella griglia dello screenshot (larga come impostato in *Risparmio token*, rapporto esatto) e vengono riportate al
+**centro** del punto corrispondente sullo schermo. Per cliccare dove serve:
+
+- gli screenshot hanno **righelli numerati** (x in alto, y a sinistra, linee tratteggiate) e il **cursore cerchiato in rosso**:
+  il modello legge le coordinate invece di stimarle (si può spegnere);
+- `zoom_screen` ingrandisce una zona con i pixel veri e righelli nelle stesse coordinate (chiede conferma come lo screenshot);
+- dopo un clic arriva uno **screenshot di controllo** (serve anche *Lettura schermo*; si può spegnere);
+- `ui_elements` (Windows) legge con UI Automation nome, tipo e centro esatto dei controlli della finestra in primo piano
+  (o di quella indicata per titolo). Il filtro passa allo script PowerShell come variabile d'ambiente, mai dentro il codice.
+
 Conferma per ogni azione, a meno di **In autonomia**. Dopo la conferma torna in primo piano la finestra di prima.
 **Stop d'emergenza**: se il cursore è nell'angolo in alto a sinistra l'azione viene rifiutata.
 `type_text` e `press_keys` senza coordinate si rifiutano se in primo piano c'è la finestra di Alter Ego.
+
+## Database SQL Server
+
+Strumenti `sql_connect`, `sql_query`, `sql_disconnect` (driver [tiberius](https://github.com/prisma/tiberius), Rust). Spento di default.
+
+- **Solo server su questo PC**: `localhost`, `127.0.0.1`, `::1`, `.`, `(local)` o il nome del computer, con istanza (`localhost\SQLEXPRESS`)
+  o porta (`127.0.0.1,1433`). Altri indirizzi vengono rifiutati.
+- `sql_connect` apre un **modulo** in una finestra: server, database, tipo di accesso (account di Windows o utente SQL), utente, password.
+  Li scrive l'utente; il modello può solo proporre server, database e utente. **La password non passa dal modello**, non va in
+  `config.json` né nei log; con «Ricorda la password» va nel Credential Manager (Linux: portachiavi).
+- **Lettura** (permesso *Database SQL Server*): `SELECT` e simili, senza conferma. Al modello arrivano al massimo le righe scelte
+  (50 di default, max 200) come **dato**; la finestra SQL ne mostra fino a 1000.
+- **Modifiche** (permesso a parte, spento di default): `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `ALTER`, `EXEC`… chiedono conferma;
+  `DROP`, `TRUNCATE`, `SHUTDOWN`, `KILL`, `RESTORE`, `DBCC`, `xp_…` e `DELETE`/`UPDATE` **senza `WHERE`** chiedono **sempre** conferma.
+  Il tipo si decide togliendo commenti e stringhe e cercando le parole chiave: con il permesso *Modifiche* spento si eseguono solo letture.
+- Query ferma più di 120 secondi: interrotta, connessione chiusa.
+- Nella **finestra SQL** l'utente vede le query di Alter Ego e può scrivere le sue (senza conferma, con gli stessi permessi).
 
 ## Comandi dell'app
 

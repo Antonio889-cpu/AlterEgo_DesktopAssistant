@@ -301,6 +301,8 @@ function showTab(name) {
   if (name === "voice" && audio) { refreshDevices().then(refreshAudioStatus); if (audio.tts === "kokoro") refreshKokoro(); }
   if (name === "ai") refreshUsage();
   if (name === "costs") refreshCosts();
+  if (name === "applog") refreshAppLog();
+  if (name === "perms") refreshSqlState();
 }
 
 /** Token e cache dei provider da quando l'app è aperta (DeepSeek riporta la cache). */
@@ -344,6 +346,21 @@ function fillLook(cfg) {
   $("auto-advance-secs").value = cfg.auto_advance_secs;
   $("auto-advance-val").textContent = cfg.auto_advance_secs.toFixed(1) + " s";
   $("autostart").checked = cfg.autostart;
+  $("start-hidden").checked = cfg.start_hidden;
+  $("start-hidden").disabled = !cfg.autostart;
+  $("always-on-top").checked = cfg.always_on_top;
+}
+const saveWindowPrefs = () => invoke("set_window_prefs", { startHidden: $("start-hidden").checked, alwaysOnTop: $("always-on-top").checked });
+$("start-hidden").onchange = saveWindowPrefs;
+$("always-on-top").onchange = saveWindowPrefs;
+
+// ---------- testi per il sistema operativo ----------
+function applyOs(cfg) {
+  const linux = cfg.os === "linux";
+  document.body.classList.toggle("os-linux", linux);
+  document.body.classList.toggle("os-windows", !linux);
+  const o = $("tts").querySelector('option[value="windows"]');
+  if (o && linux) o.textContent = t("Voci di sistema (espeak-ng, offline)");
 }
 ["look-opacity", "look-int", "auto-advance-secs"].forEach((id) => ($(id).oninput = saveLook));
 ["look-bg", "look-dlg", "look-fx", "look-tv", "auto-advance"].forEach((id) => ($(id).onchange = saveLook));
@@ -376,9 +393,9 @@ async function refreshDevices() {
   try { devices = await invoke("audio_devices"); } catch (e) { $("dev-status").textContent = String(e); return; }
   const outs = devices.outputs.filter((n) => n !== devices.cable_render);
   const ins = devices.inputs.filter((n) => n !== devices.cable_capture);
-  fillDeviceSelect($("out-device"), outs, audio.output_device, t("Predefinito di Windows{dev}", { dev: devices.default_output ? " (" + devices.default_output + ")" : "" }));
-  fillDeviceSelect($("in-device"), ins, audio.input_device, t("Predefinito di Windows{dev}", { dev: devices.default_input ? " (" + devices.default_input + ")" : "" }));
-  fillDeviceSelect($("link-mic"), ins, audio.mic_link.mic_device, "Microfono predefinito di Windows");
+  fillDeviceSelect($("out-device"), outs, audio.output_device, t("Predefinito del sistema{dev}", { dev: devices.default_output ? " (" + devices.default_output + ")" : "" }));
+  fillDeviceSelect($("in-device"), ins, audio.input_device, t("Predefinito del sistema{dev}", { dev: devices.default_input ? " (" + devices.default_input + ")" : "" }));
+  fillDeviceSelect($("link-mic"), ins, audio.mic_link.mic_device, "Microfono predefinito del sistema");
   fillDeviceSelect($("link-cable"), devices.outputs, audio.mic_link.cable_device, t("Automatico{dev}", { dev: devices.cable_render ? " (" + devices.cable_render + ")" : t(" (nessun cavo trovato)") }));
   const d = $("link-driver");
   if (!devices.cable_render) { d.textContent = "VB-CABLE non trovato: installalo (punto 1) e riavvia il PC."; d.className = "result bad"; }
@@ -800,12 +817,68 @@ function fillPerms(cfg) {
     if (e.target.checked && !confirm(t("Alter Ego eseguirà le azioni attivate senza chiederti conferma. Continuare?"))) { e.target.checked = false; return; }
     perms.auto_approve = e.target.checked; savePerms();
   };
+  const risky = {
+    files_all: "Alter Ego potrà leggere, scrivere e spostare qualsiasi file del PC (con conferma, salvo «Non chiedere conferma»). Continuare?",
+    sql_write: "Alter Ego potrà modificare dati e struttura dei database (con conferma). Continuare?",
+  };
   document.querySelectorAll("input[data-perm]").forEach((c) => {
     c.checked = !!perms[c.dataset.perm];
-    c.onchange = () => { perms[c.dataset.perm] = c.checked; savePerms(); };
+    c.onchange = () => {
+      if (c.checked && risky[c.dataset.perm] && !confirm(t(risky[c.dataset.perm]))) { c.checked = false; return; }
+      perms[c.dataset.perm] = c.checked; savePerms(); refreshSqlState();
+    };
   });
   document.querySelectorAll(".list[data-list]").forEach(renderList);
+  const tt = $("term-timeout");
+  const v = String(perms.terminal_timeout || 120);
+  if (![...tt.options].some((o) => o.value === v)) tt.append(Object.assign(document.createElement("option"), { value: v, textContent: v + " s" }));
+  tt.value = v;
+  tt.onchange = () => { perms.terminal_timeout = +tt.value; savePerms(); };
+  $("sql-window").checked = cfg.sql.show_window;
+  $("sql-rows").value = String(cfg.sql.max_rows);
+  if (!$("sql-rows").value) $("sql-rows").value = "50";
 }
+const saveSql = () => invoke("sql_settings", { showWindow: $("sql-window").checked, maxRows: +$("sql-rows").value });
+$("sql-window").onchange = saveSql;
+$("sql-rows").onchange = saveSql;
+$("sql-open").onclick = () => invoke("sql_view_open");
+listen("sql-status", () => refreshSqlState());
+async function refreshSqlState() {
+  try {
+    const s = await invoke("sql_status");
+    $("sql-state").textContent = s.connected ? t("Connesso: {label}", { label: s.label }) : t("Non connesso");
+  } catch {}
+}
+
+// ---------- impostazioni avanzate AI e Ollama ----------
+const CTX_PRESETS = ["0", "4096", "8192", "16384", "32768", "65536", "131072"];
+function fillAdvanced() {
+  $("ai-max-tokens").value = ai.max_tokens || 0;
+  $("ai-top-p").value = ai.top_p ?? 1;
+  $("ai-timeout").value = ai.timeout_secs ?? 45;
+  $("ai-tool-rounds").value = ai.tool_rounds ?? 12;
+  const o = ai.ollama || (ai.ollama = { num_ctx: 0, keep_alive: "", num_gpu: -1 });
+  const preset = CTX_PRESETS.includes(String(o.num_ctx));
+  $("ol-ctx").value = preset ? String(o.num_ctx) : "custom";
+  $("ol-ctx-custom").value = o.num_ctx || "";
+  $("ol-ctx-custom").style.display = preset ? "none" : "";
+  $("ol-keep").value = ["", "30m", "2h", "-1", "0"].includes(o.keep_alive) ? o.keep_alive : "";
+  $("ol-gpu").value = o.num_gpu ?? -1;
+}
+const clampNum = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
+$("ai-max-tokens").onchange = (e) => { ai.max_tokens = Math.round(clampNum(e.target.value, 0, 200000, 0)); saveAi(); };
+$("ai-top-p").onchange = (e) => { ai.top_p = clampNum(e.target.value, 0.05, 1, 1); saveAi(); };
+$("ai-timeout").onchange = (e) => { ai.timeout_secs = Math.round(clampNum(e.target.value, 10, 600, 45)); saveAi(); };
+$("ai-tool-rounds").onchange = (e) => { ai.tool_rounds = Math.round(clampNum(e.target.value, 2, 40, 12)); saveAi(); };
+$("ol-ctx").onchange = (e) => {
+  const custom = e.target.value === "custom";
+  $("ol-ctx-custom").style.display = custom ? "" : "none";
+  if (custom) { $("ol-ctx-custom").focus(); return; }
+  ai.ollama.num_ctx = +e.target.value; saveAi();
+};
+$("ol-ctx-custom").onchange = (e) => { ai.ollama.num_ctx = Math.round(clampNum(e.target.value, 512, 1048576, 0)); saveAi(); };
+$("ol-keep").onchange = (e) => { ai.ollama.keep_alive = e.target.value; saveAi(); };
+$("ol-gpu").onchange = (e) => { ai.ollama.num_gpu = Math.round(clampNum(e.target.value, -1, 999, -1)); saveAi(); };
 
 // ---------- ragionamento e risparmio token ----------
 $("thinking").onchange = (e) => { ai.thinking = e.target.value; saveAi(); };
@@ -1017,10 +1090,56 @@ async function refreshLog() {
   }
 }
 $("log-refresh").onclick = refreshLog;
+
+// ---------- log completo ----------
+const LEVELS = { info: "info", warn: "avviso", error: "errore", debug: "debug" };
+let alRows = [];
+function alRow(r) {
+  const tr = document.createElement("tr");
+  tr.className = r.level;
+  [fmtDate(r.ts), t(LEVELS[r.level] || r.level), r.area, r.msg].forEach((v) => tr.append(Object.assign(document.createElement("td"), { textContent: v ?? "" })));
+  return tr;
+}
+function alMatch(r) {
+  const lv = $("al-level").value, q = $("al-query").value.trim().toLowerCase();
+  if (lv === "warn" && !["warn", "error"].includes(r.level)) return false;
+  if (lv === "error" && r.level !== "error") return false;
+  return !q || (r.msg || "").toLowerCase().includes(q) || (r.area || "").toLowerCase().includes(q);
+}
+async function refreshAppLog() {
+  alRows = await invoke("app_log", { limit: 1500, level: $("al-level").value, query: $("al-query").value.trim() });
+  const tb = document.querySelector("#al-table tbody");
+  tb.innerHTML = "";
+  if (!alRows.length) { tb.innerHTML = '<tr><td colspan="4" class="note">' + t("niente da mostrare") + "</td></tr>"; return; }
+  const frag = document.createDocumentFragment();
+  alRows.forEach((r) => frag.append(alRow(r)));
+  tb.append(frag);
+}
+let alSearch = null;
+$("al-level").onchange = refreshAppLog;
+$("al-query").oninput = () => { clearTimeout(alSearch); alSearch = setTimeout(refreshAppLog, 250); };
+$("al-refresh").onclick = refreshAppLog;
+$("al-clear").onclick = async () => { if (confirm(t("Svuotare il log completo?"))) { await invoke("app_log_clear"); refreshAppLog(); } };
+$("al-folder").onclick = () => invoke("open_data_dir");
+$("al-copy").onclick = async () => {
+  const text = alRows.slice().reverse().map((r) => `${fmtDate(r.ts)}\t${r.level}\t${r.area}\t${r.msg}`).join("\n");
+  try { await navigator.clipboard.writeText(text); $("al-result").textContent = t("copiato"); $("al-result").className = "result ok"; }
+  catch (e) { $("al-result").textContent = String(e); $("al-result").className = "result bad"; }
+};
+listen("app-log", (e) => {
+  const sec = document.querySelector('main section[data-tab="applog"]');
+  if (!$("al-live").checked || sec.hidden || !alMatch(e.payload)) return;
+  const tb = document.querySelector("#al-table tbody");
+  if (tb.querySelector("td.note")) tb.innerHTML = "";
+  alRows.unshift(e.payload);
+  tb.prepend(alRow(e.payload));
+  while (tb.children.length > 1500) tb.lastChild.remove();
+});
 $("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle azioni?"))) { await invoke("clear_actions_log"); refreshLog(); } };
 
 (async () => {
   const cfg = await invoke("get_config");
+  applyOs(cfg);
   applyLang(cfg);
   fillLook(cfg);
   fillAudio(cfg);
@@ -1041,6 +1160,7 @@ $("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle
   $("temperature-val").textContent = ai.temperature.toFixed(2);
   $("max-history").value = ai.max_history;
   $("thinking").value = ai.thinking || "hide";
+  fillAdvanced();
   fillSaving(cfg);
   fillWeb(cfg);
   fillSpotify(cfg);

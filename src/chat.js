@@ -63,6 +63,13 @@ const Chat = (() => {
       await Dialog.say(shown);
     } catch (err) {
       busy = false;
+      if (/^(interrotto|stopped)/.test(String(err))) {
+        State.setEmotion("embarrassed");
+        State.setMode("speaking");
+        await Dialog.say(t("Va bene, mi fermo qui."));
+        State.settle();
+        return;
+      }
       State.setEmotion("error");
       State.setMode("speaking");
       const name = window.appConfig?.user_name?.trim();
@@ -106,7 +113,7 @@ const Chat = (() => {
   }
 
   function openInput() {
-    if (busy) return;
+    if (busy) { notify(t("Sto ancora lavorando… premi Esc per interrompere.")); return; }
     invoke("focus_main");
     State.setMode("listening");
     Dialog.suspend(true);
@@ -135,17 +142,29 @@ const Chat = (() => {
   });
   input.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== input) closeInput(); }, 150));
 
-  /** Alter Ego sta usando strumenti (azioni PC). */
-  function onToolUse(names) {
+  /** Interrompe la risposta in corso (Esc). */
+  function cancel() {
+    if (!busy) return false;
+    invoke("chat_cancel");
+    notify(t("Interrompo…"));
+    return true;
+  }
+
+  /** Alter Ego sta usando strumenti (azioni PC). `p`: { names, round, max } (o solo l'elenco dei nomi). */
+  function onToolUse(p) {
+    const names = Array.isArray(p) ? p : p.names;
+    const step = Array.isArray(p) || !p.round ? "" : ` (${p.round}/${p.max})`;
     const labels = { open_target: "apro", list_dir: "guardo la cartella", read_file: "leggo il file", write_file: "scrivo il file",
       delete_file: "elimino il file", set_reminder: "imposto il promemoria", list_reminders: "controllo i promemoria",
       cancel_reminder: "annullo il promemoria", read_clipboard: "leggo gli appunti", write_clipboard: "copio negli appunti",
       take_screenshot: "guardo lo schermo", set_volume: "regolo il volume", set_brightness: "regolo la luminosità", run_command: "eseguo il comando",
       run_shell: "uso il terminale", web_search: "cerco sul web", web_fetch: "leggo la pagina", play_music: "cerco la musica", music_control: "controllo la musica",
-      mouse_move: "muovo il mouse", mouse_click: "clicco", mouse_scroll: "scorro", type_text: "scrivo", press_keys: "premo i tasti", app_control: "sistemo l'app" };
+      mouse_move: "muovo il mouse", mouse_click: "clicco", mouse_scroll: "scorro", type_text: "scrivo", press_keys: "premo i tasti", app_control: "sistemo l'app",
+      zoom_screen: "guardo da vicino", ui_elements: "leggo i controlli della finestra", find_files: "cerco i file", make_dir: "creo la cartella",
+      move_path: "sposto il file", sql_connect: "mi collego al database", sql_query: "interrogo il database", sql_disconnect: "chiudo il database" };
     State.setMode("thinking");
-    Dialog.pending("⚙ " + names.map((n) => t(labels[n] || n)).join(", "));
+    Dialog.pending("⚙ " + names.map((n) => t(labels[n] || n)).join(", ") + step);
   }
 
-  return { onToolUse, ask, openInput, closeInput, parseReply, notify, onStt };
+  return { onToolUse, cancel, isBusy: () => busy, ask, openInput, closeInput, parseReply, notify, onStt };
 })();
