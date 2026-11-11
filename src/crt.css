@@ -1,0 +1,89 @@
+/* Finestre secondarie (connessione al database, finestra SQL) nello stile di Alter Ego:
+   schermo verde CRT con scanline e bagliore, box di dialogo pixel, scritte DotGothic16. */
+@font-face { font-family: "DotGothic16"; src: url("assets/fonts/DotGothic16-Regular.ttf") format("truetype"); font-display: block; }
+
+:root {
+  --bg-center: #4fae1a; --bg-edge: #164804; --frame: #f6fff2; --glow: rgba(110, 255, 60, .85); --logo: #8dff45;
+  --dlg-border: #0b2200; --dlg-fill-top: #9fe655; --dlg-fill-bottom: #6cc22f; --dlg-text: #0b1d00; --dlg-shadow: rgba(20, 70, 0, .45);
+  --field: #e6ffd0; --bad: #8a0f00; --px: 3px;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: #071407;
+  font: 15px/1.4 "DotGothic16", monospace;
+  color: var(--dlg-text);
+  padding: 8px;
+}
+/* schermo con cornice luminosa */
+.screen {
+  position: relative; min-height: 100%; overflow: hidden;
+  border: 3px solid var(--frame); border-radius: 10px;
+  box-shadow: 0 0 6px 1px var(--glow), 0 0 18px rgba(110, 255, 60, .4), inset 0 0 18px rgba(110, 255, 60, .6);
+  background: radial-gradient(ellipse 80% 75% at 50% 40%, var(--bg-center) 0%, #3b8f12 50%, var(--bg-edge) 100%);
+  padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px;
+}
+.screen::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent 3px, rgba(16, 60, 0, .32) 3px, rgba(16, 60, 0, .32) 5px);
+}
+.screen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 95% 90% at 50% 50%, transparent 60%, rgba(0, 25, 0, .5) 100%);
+}
+.screen > * { position: relative; z-index: 1; }
+h1 { margin: 0; font: 26px "DotGothic16", monospace; letter-spacing: .12em; color: var(--logo);
+  text-shadow: 0 0 6px rgba(141, 255, 69, .9), 2px 2px 0 rgba(0, 40, 0, .6); }
+h1 small { font-size: 15px; letter-spacing: .05em; color: #e9ffd6; text-shadow: 0 0 4px rgba(0, 60, 0, .8); margin-left: 8px; }
+
+/* sopra i box una scanline leggera, come sullo schermo di Alter Ego, ma il testo resta nitido */
+.box > .inner { background-blend-mode: normal; }
+.box::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent 3px, rgba(16, 60, 0, .06) 3px, rgba(16, 60, 0, .06) 5px); }
+
+/* box pixel (come il box di dialogo) */
+.box {
+  position: relative; background: var(--dlg-border); padding: var(--px);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px,
+    100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px),
+    calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px),
+    0 6px, 3px 6px, 3px 3px, 6px 3px);
+}
+.box > .inner { background: linear-gradient(to bottom, var(--dlg-fill-top), var(--dlg-fill-bottom)); padding: 12px 14px; height: 100%; }
+.tag {
+  display: inline-block; font-size: 15px; line-height: 1; padding: 4px 12px 3px; margin: 0 0 8px;
+  border: 2px solid var(--dlg-border); box-shadow: 2px 2px 0 var(--dlg-shadow); text-shadow: 1px 1px 0 var(--dlg-shadow);
+}
+.say { margin: 0; font-size: 16px; text-shadow: 1px 1px 0 var(--dlg-shadow); white-space: pre-wrap; }
+
+/* campi */
+label { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; text-shadow: 1px 1px 0 var(--dlg-shadow); }
+label.inline { flex-direction: row; align-items: center; gap: 8px; }
+input:not([type=checkbox]), select, textarea {
+  font: 14px Consolas, "DejaVu Sans Mono", monospace; color: var(--dlg-text); background: var(--field);
+  border: 2px solid var(--dlg-border); border-radius: 0; padding: 6px 8px; box-shadow: inset 2px 2px 0 rgba(0, 40, 0, .18);
+  width: 100%; min-width: 0;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid #fff; outline-offset: 1px; }
+input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--dlg-border); }
+input::placeholder, textarea::placeholder { color: rgba(11, 29, 0, .5); }
+
+/* pulsanti come quelli della conferma */
+button {
+  font: 15px "DotGothic16", monospace; color: var(--dlg-text); cursor: pointer;
+  background: linear-gradient(to bottom, var(--dlg-fill-top), var(--dlg-fill-bottom));
+  border: 2px solid var(--dlg-border); box-shadow: 2px 2px 0 var(--dlg-shadow); padding: 5px 14px;
+}
+button:hover, button:focus-visible { background: #c8ff8f; outline: none; }
+button:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--dlg-shadow); }
+button:disabled { opacity: .5; cursor: default; transform: none; }
+button.main { font-weight: bold; }
+.buttons { display: flex; gap: 10px; justify-content: flex-end; }
+.bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.status { margin-left: auto; color: #f0ffe4; text-shadow: 0 0 4px rgba(0, 40, 0, .9); }
+.note { font-size: 13px; color: #effde3; text-shadow: 1px 1px 0 rgba(0, 40, 0, .7); margin: 0; }
+.error { color: var(--bad); white-space: pre-wrap; font-size: 14px; }
+.error:empty { display: none; }
+.meta { font-size: 13px; color: #f0ffe4; text-shadow: 1px 1px 0 rgba(0, 40, 0, .8); }
+.meta .by { color: #fff6a8; }

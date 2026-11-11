@@ -65,7 +65,8 @@ pub struct AiConfig {
     pub temperature: f64,
     /// Messaggi recenti inviati come contesto.
     pub max_history: usize,
-    /// Ragionamento dei modelli "thinking": "hide" (si usa ma non si vede) o "off" (spento, meno token).
+    /// Ragionamento dei modelli "thinking": "auto" (spento per le domande semplici), "hide" (si usa ma
+    /// non si vede) o "off" (spento, meno token).
     pub thinking: String,
     /// Token massimi di una risposta (0 = decide il provider).
     pub max_tokens: u32,
@@ -89,18 +90,21 @@ pub struct OllamaOpts {
     pub keep_alive: String,
     /// Livelli del modello sulla GPU (-1 = decide Ollama, 0 = solo CPU).
     pub num_gpu: i32,
+    /// Campionamento consigliato da alcuni modelli (es. LFM3: top_k 50, repeat penalty 1.1). 0 = default.
+    pub top_k: u32,
+    pub repeat_penalty: f64,
 }
 
 impl Default for OllamaOpts {
     fn default() -> Self {
-        Self { num_ctx: 0, keep_alive: String::new(), num_gpu: -1 }
+        Self { num_ctx: 0, keep_alive: String::new(), num_gpu: -1, top_k: 0, repeat_penalty: 0.0 }
     }
 }
 
 impl OllamaOpts {
     /// Serve l'API nativa?
     pub fn native(&self) -> bool {
-        self.num_ctx > 0 || !self.keep_alive.trim().is_empty() || self.num_gpu >= 0
+        self.num_ctx > 0 || !self.keep_alive.trim().is_empty() || self.num_gpu >= 0 || self.top_k > 0 || self.repeat_penalty > 0.0
     }
 }
 
@@ -120,7 +124,7 @@ impl Default for AiConfig {
             ]),
             temperature: 0.7,
             max_history: 12,
-            thinking: "hide".into(),
+            thinking: "auto".into(),
             max_tokens: 0,
             top_p: 1.0,
             timeout_secs: 45,
@@ -150,8 +154,8 @@ impl AiConfig {
         }
         self.temperature = self.temperature.clamp(0.0, 2.0);
         self.max_history = self.max_history.clamp(2, 50);
-        if !["hide", "off"].contains(&self.thinking.as_str()) {
-            self.thinking = "hide".into();
+        if !["auto", "hide", "off"].contains(&self.thinking.as_str()) {
+            self.thinking = "auto".into();
         }
         self.max_tokens = self.max_tokens.min(200_000);
         self.top_p = if self.top_p <= 0.0 { 1.0 } else { self.top_p.clamp(0.05, 1.0) };
@@ -160,6 +164,8 @@ impl AiConfig {
         self.ollama.num_ctx = if self.ollama.num_ctx == 0 { 0 } else { self.ollama.num_ctx.clamp(512, 1_048_576) };
         self.ollama.keep_alive = self.ollama.keep_alive.trim().chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').take(8).collect();
         self.ollama.num_gpu = self.ollama.num_gpu.clamp(-1, 999);
+        self.ollama.top_k = self.ollama.top_k.min(500);
+        self.ollama.repeat_penalty = if self.ollama.repeat_penalty <= 0.0 { 0.0 } else { self.ollama.repeat_penalty.clamp(0.5, 2.0) };
     }
 }
 
@@ -263,6 +269,8 @@ pub struct Permissions {
     pub sql: bool,
     /// SQL Server: anche comandi che modificano dati o struttura (chiedono conferma).
     pub sql_write: bool,
+    /// Mappe dei progetti con Graphify (cartelle della Gestione file).
+    pub graph: bool,
 }
 
 impl Default for Permissions {
@@ -292,6 +300,7 @@ impl Default for Permissions {
             terminal_timeout: 120,
             sql: false,
             sql_write: false,
+            graph: false,
         }
     }
 }
@@ -527,6 +536,11 @@ pub struct SavingConfig {
     /// Modello economico per le domande semplici (provider e modello; vuoto = spento).
     pub economy_provider: String,
     pub economy_model: String,
+    /// Strumenti a gruppi: si mandano solo quelli che servono alla domanda, gli altri il modello
+    /// li carica da solo con `load_tools`.
+    pub tool_groups: bool,
+    /// Nelle richieste lunghe i risultati vecchi degli strumenti (già usati) vengono accorciati.
+    pub loop_compact: bool,
 }
 
 impl Default for SavingConfig {
@@ -542,6 +556,8 @@ impl Default for SavingConfig {
             router_url: "http://127.0.0.1:8017".into(),
             economy_provider: String::new(),
             economy_model: String::new(),
+            tool_groups: true,
+            loop_compact: true,
         }
     }
 }
@@ -607,6 +623,43 @@ impl Default for WebConfig {
     }
 }
 
+/// Ollama gestito da Alter Ego: GPU e avvio (vedi localai.rs).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct LocalConfig {
+    /// "auto", "vulkan", "rocm" o "cpu".
+    pub backend: String,
+    /// GPU Vulkan da usare (GGML_VK_VISIBLE_DEVICES, "" = decide Ollama). Serve sui PC con CPU Intel
+    /// e grafica integrata: senza, Ollama può scegliere l'iGPU invece della scheda AMD.
+    pub vk_device: String,
+    pub flash_attention: bool,
+    /// Cache K/V: "f16", "q8_0" (metà memoria) o "q4_0".
+    pub kv_cache: String,
+    /// Linux + ROCm su schede non in elenco (RX 6600/6700: "10.3.0").
+    pub hsa_override: String,
+    /// Se Ollama è spento, Alter Ego lo avvia insieme a sé.
+    pub autostart: bool,
+}
+
+impl Default for LocalConfig {
+    fn default() -> Self {
+        Self { backend: "auto".into(), vk_device: String::new(), flash_attention: true, kv_cache: "q8_0".into(), hsa_override: String::new(), autostart: true }
+    }
+}
+
+impl LocalConfig {
+    pub fn normalize(&mut self) {
+        if !["auto", "vulkan", "rocm", "cpu"].contains(&self.backend.as_str()) {
+            self.backend = "auto".into();
+        }
+        if !["f16", "q8_0", "q4_0"].contains(&self.kv_cache.as_str()) {
+            self.kv_cache = "q8_0".into();
+        }
+        self.vk_device = self.vk_device.chars().filter(|c| c.is_ascii_digit() || *c == ',' || *c == '-').take(16).collect();
+        self.hsa_override = self.hsa_override.chars().filter(|c| c.is_ascii_digit() || *c == '.').take(10).collect();
+    }
+}
+
 /// Ultima connessione a SQL Server (la password, se scelto "ricorda", sta nel Credential Manager).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
@@ -654,6 +707,8 @@ pub struct Config {
     pub start_hidden: bool,
     /// Finestra sempre in primo piano.
     pub always_on_top: bool,
+    /// Alter Ego sa quali applicazioni principali sono aperte (solo i nomi, in fondo alla domanda).
+    pub apps_context: bool,
     /// Nome dell'utente, usato da Alter Ego nelle risposte.
     pub user_name: String,
     /// Tag nome mostrato nel box dialogo.
@@ -693,6 +748,7 @@ pub struct Config {
     pub spotify: SpotifyConfig,
     pub rizzo: RizzoConfig,
     pub sql: SqlConfig,
+    pub local: LocalConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -707,6 +763,7 @@ impl Default for Config {
             autostart: false,
             start_hidden: true,
             always_on_top: true,
+            apps_context: true,
             user_name: String::new(),
             name_tag: "Alter Ego".into(),
             ui_language: "auto".into(),
@@ -730,6 +787,7 @@ impl Default for Config {
             spotify: SpotifyConfig::default(),
             rizzo: RizzoConfig::default(),
             sql: SqlConfig::default(),
+            local: LocalConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
             last_monitor: None,
@@ -780,6 +838,7 @@ impl Config {
             self.sql.auth = "sql".into();
         }
         self.sql.max_rows = self.sql.max_rows.clamp(1, 1000);
+        self.local.normalize();
     }
 }
 

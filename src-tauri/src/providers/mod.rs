@@ -142,6 +142,11 @@ pub fn status_error_public(status: reqwest::StatusCode, body: &str) -> ProviderE
     openai_compat::status_error(status, body, false)
 }
 
+/// "http://localhost:11434/v1" → "http://localhost:11434" (API nativa di Ollama).
+pub fn ollama_root(base: &str) -> String {
+    ollama::root(base)
+}
+
 /// L'URL punta a questo PC (127.0.0.1, localhost, ::1)?
 pub fn is_loopback(url: &str) -> bool {
     reqwest::Url::parse(url.trim())
@@ -624,7 +629,7 @@ mod tests {
     async fn ollama_native_options() {
         let ai = Ai::new();
         let mut c = cfg(&[("ollama", "http://127.0.0.1:18080/ok/v1")]);
-        c.ollama = crate::config::OllamaOpts { num_ctx: 32768, keep_alive: "30m".into(), num_gpu: -1 };
+        c.ollama = crate::config::OllamaOpts { num_ctx: 32768, keep_alive: "30m".into(), ..Default::default() };
         c.thinking = "off".into();
         let (ch, log) = channel();
         let r = chat(&ai, c.clone(), "s".into(), user("x"), None, ch).await.unwrap();

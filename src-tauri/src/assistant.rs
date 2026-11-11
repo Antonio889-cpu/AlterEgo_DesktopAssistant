@@ -23,6 +23,8 @@ pub struct Conversation {
     pub last_used_tools: AtomicBool,
     /// L'utente ha chiesto di interrompere la risposta in corso (Esc).
     pub cancel: AtomicBool,
+    /// Gruppi di strumenti usati nell'ultima risposta (la domanda dopo spesso continua lì).
+    pub last_groups: Mutex<Vec<&'static str>>,
 }
 
 impl Conversation {
@@ -31,7 +33,7 @@ impl Conversation {
             Ok(m) => (Some(m), None),
             Err(e) => (None, Some(e)),
         };
-        Self { memory, memory_error, session: Mutex::new(Vec::new()), recorder: stt::Recorder::default(), ai_bg: providers::Ai::with_kind("riassunto"), data_dir, last_used_tools: AtomicBool::new(false), cancel: AtomicBool::new(false) }
+        Self { memory, memory_error, session: Mutex::new(Vec::new()), recorder: stt::Recorder::default(), ai_bg: providers::Ai::with_kind("riassunto"), data_dir, last_used_tools: AtomicBool::new(false), cancel: AtomicBool::new(false), last_groups: Mutex::new(Vec::new()) }
     }
 
     fn mem(&self, enabled: bool) -> Option<&Memory> {
@@ -113,6 +115,14 @@ pub async fn chat(
     if let (Some(img), Some(last)) = (image, history.last_mut()) {
         last.image = Some(img);
     }
+    // app aperte: in fondo all'ultima domanda (non nel prompt di sistema, non salvate in memoria)
+    if cfg.apps_context {
+        if let Ok((apps, fg)) = tauri::async_runtime::spawn_blocking(crate::apps::running).await {
+            if let Some(last) = history.last_mut().filter(|m| m.role == "user") {
+                last.content.push_str(&crate::apps::note(&apps, fg.as_deref()));
+            }
+        }
+    }
     // risparmio: risposte vecchie accorciate (deterministico: il prefisso resta in cache)
     if cfg.saving.trim_history {
         crate::saving::trim_history(&mut history, 4, 600);
@@ -142,7 +152,7 @@ pub async fn chat(
     conv.cancel.store(false, Ordering::SeqCst);
     let t0 = std::time::Instant::now();
     crate::applog::info("chat", &format!("domanda ({} caratteri, strumenti: {}, semplice: {})", text.chars().count(), route.needs_tools, route.simple));
-    let result = run_with_tools(&app, &cfg, system, history, on_event, route).await;
+    let result = run_with_tools(&app, &cfg, system, history, on_event, route, &text).await;
     match &result {
         Ok(r) => crate::applog::info("chat", &format!("risposta da {} / {} in {} ms", r.provider, r.model, t0.elapsed().as_millis())),
         Err(e) => crate::applog::error("chat", &format!("nessuna risposta dopo {} ms: {e}", t0.elapsed().as_millis())),
@@ -206,20 +216,48 @@ async fn run_with_tools(
     mut history: Vec<providers::ChatMessage>,
     on_event: Channel<providers::StreamEvent>,
     route: crate::saving::Route,
+    question: &str,
 ) -> Result<providers::ChatResult, String> {
     let state = app.state::<AppState>();
     let conv = app.state::<Conversation>();
     actions::input::set_shot_width(cfg.saving.screenshot_width);
-    let mut tools = actions::tool_defs(&cfg.permissions);
+    let mut all_tools = actions::tool_defs(&cfg.permissions);
     if cfg.saving.compact_tools {
-        tools = tools.map(|t| crate::saving::compact_tools(&t));
+        all_tools = all_tools.map(|t| crate::saving::compact_tools(&t));
     }
+    // strumenti a gruppi: solo quelli che la domanda sembra chiedere, gli altri con load_tools
+    let mut active: Option<Vec<&'static str>> = None;
+    if cfg.saving.tool_groups && all_tools.is_some() {
+        let mut g = crate::saving::pick_groups(question);
+        if g.is_empty() && conv.last_used_tools.load(Ordering::Relaxed) {
+            g = conv.last_groups.lock().unwrap().clone();
+        }
+        if !g.is_empty() {
+            active = Some(g);
+        }
+    }
+    let current = |active: &Option<Vec<&'static str>>| -> Option<serde_json::Value> {
+        match (&all_tools, active) {
+            (Some(all), Some(g)) => Some(actions::select_groups(all, g)),
+            (all, _) => all.clone(),
+        }
+    };
+    let mut tools = current(&active);
     let max_rounds = cfg.ai.tool_rounds.max(2);
+    // ragionamento "automatico": spento per le domande semplici, nascosto per le altre
+    let think = |a: &mut config::AiConfig| {
+        if a.thinking == "auto" {
+            a.thinking = if route.simple { "off".into() } else { "hide".into() };
+        }
+    };
+    let turn_start = history.len();
+    let mut compacted_upto = turn_start;
     // risparmio: strumenti solo se servono (il modello può chiederli con [[TOOLS]])
     let mut withhold = cfg.saving.tools_on_demand && !route.needs_tools && tools.is_some();
     // risparmio: modello economico per le domande semplici
     let economy = if route.simple && !route.needs_tools { crate::saving::economy_ai(&cfg.ai, &cfg.saving) } else { None };
     let mut ai_cfg = economy.unwrap_or_else(|| cfg.ai.clone());
+    think(&mut ai_cfg);
     let mut used_tools = false;
     let mut round = 0;
     // chiamate identiche già fatte (nome + argomenti) e errori di fila: niente cicli infiniti
@@ -246,17 +284,24 @@ async fn run_with_tools(
             // serviva un'azione: stessa domanda, questa volta con gli strumenti e il modello normale
             withhold = false;
             ai_cfg = cfg.ai.clone();
+            think(&mut ai_cfg);
             continue;
         }
         round += 1;
         if res.tool_calls.is_empty() {
             conv.last_used_tools.store(used_tools, Ordering::Relaxed);
+            if used_tools {
+                if let Some(g) = &active {
+                    *conv.last_groups.lock().unwrap() = g.clone();
+                }
+            }
             let mut res = res;
             res.text = res.text.replace(crate::saving::NEED_TOOLS, "").trim().to_string();
             return Ok(res);
         }
         used_tools = true;
         let _ = app.emit("tool-use", ToolUse { names: res.tool_calls.iter().map(|c| c.name.clone()).collect(), round, max: max_rounds });
+        let round_start = history.len();
         history.push(providers::ChatMessage {
             role: "assistant".into(),
             content: res.text.clone(),
@@ -270,6 +315,25 @@ async fn run_with_tools(
             *n += 1;
             let out = if conv.cancel.load(Ordering::SeqCst) {
                 actions::Outcome { text: "ERRORE: interrotto dall'utente".into(), image: None }
+            } else if call.name == actions::LOAD_TOOLS {
+                // carica altri gruppi di strumenti dal passaggio successivo
+                let asked: Vec<String> = serde_json::from_str::<serde_json::Value>(&call.arguments)
+                    .ok()
+                    .and_then(|v| v.get("groups").and_then(|g| g.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()))
+                    .unwrap_or_default();
+                let g = active.get_or_insert_with(Vec::new);
+                let mut added = Vec::new();
+                for (name, _) in actions::GROUPS {
+                    if asked.iter().any(|a| a == name) && !g.contains(name) {
+                        g.push(name);
+                        added.push(*name);
+                    }
+                }
+                // ordine fisso, così la lista resta uguale con gli stessi gruppi
+                g.sort_by_key(|n| actions::GROUPS.iter().position(|(x, _)| x == n));
+                tools = current(&active);
+                crate::applog::info("strumenti", &format!("caricati su richiesta: {}", added.join(", ")));
+                actions::Outcome { text: format!("Strumenti caricati: {}. Ora puoi usarli.", if added.is_empty() { "nessuno di nuovo".into() } else { added.join(", ") }), image: None }
             } else if *n > 2 && !matches!(call.name.as_str(), "take_screenshot" | "mouse_scroll" | "press_keys" | "music_control" | "sql_query") {
                 crate::applog::warn("strumento", &format!("{}: chiamata identica ripetuta, bloccata", call.name));
                 actions::Outcome {
@@ -306,6 +370,11 @@ async fn run_with_tools(
                 image: Some(img),
                 ..Default::default()
             });
+        }
+        // risultati vecchi degli strumenti (già usati): accorciati una volta sola quando diventano tanti,
+        // così il prefisso dei passaggi successivi resta stabile e in cache
+        if cfg.saving.loop_compact && crate::saving::compact_tool_results(&mut history, compacted_upto, round_start, 12_000) {
+            compacted_upto = round_start;
         }
         // le immagini dei passaggi precedenti non servono più: via dalla cronologia (meno token)
         let last_img = history.iter().rposition(|m| m.image.is_some());

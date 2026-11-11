@@ -161,7 +161,8 @@ const Chat = (() => {
       run_shell: "uso il terminale", web_search: "cerco sul web", web_fetch: "leggo la pagina", play_music: "cerco la musica", music_control: "controllo la musica",
       mouse_move: "muovo il mouse", mouse_click: "clicco", mouse_scroll: "scorro", type_text: "scrivo", press_keys: "premo i tasti", app_control: "sistemo l'app",
       zoom_screen: "guardo da vicino", ui_elements: "leggo i controlli della finestra", find_files: "cerco i file", make_dir: "creo la cartella",
-      move_path: "sposto il file", sql_connect: "mi collego al database", sql_query: "interrogo il database", sql_disconnect: "chiudo il database" };
+      move_path: "sposto il file", sql_connect: "mi collego al database", sql_query: "interrogo il database", sql_disconnect: "chiudo il database",
+      load_tools: "prendo altri strumenti", graph_build: "mappo il progetto", graph_ask: "consulto la mappa" };
     State.setMode("thinking");
     Dialog.pending("⚙ " + names.map((n) => t(labels[n] || n)).join(", ") + step);
   }

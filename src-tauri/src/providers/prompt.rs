@@ -50,7 +50,7 @@ fn personality(cfg: &Config) -> String {
 /// Come usare gli strumenti attivi (cambia solo con i Permessi: resta nel prefisso in cache).
 fn tool_guide(cfg: &Config) -> String {
     let p = &cfg.permissions;
-    let any = p.open || p.files || p.terminal || p.web || p.input || p.screen || p.sql || p.shell;
+    let any = p.open || p.files || p.terminal || p.web || p.input || p.screen || p.sql || p.shell || p.graph;
     if !any {
         return String::new();
     }
@@ -59,7 +59,9 @@ fn tool_guide(cfg: &Config) -> String {
 - Richieste complesse: procedi da sola, passo dopo passo. Scegli lo strumento giusto per ogni passo, guarda il risultato e decidi il passo successivo; \
 combina strumenti diversi (terminale, file, web, schermo, database) quando serve. Puoi chiamare insieme più strumenti indipendenti.\n\
 - Se un passo fallisce leggi l'errore e prova un'altra strada invece di ripetere la stessa chiamata. Hai al massimo {} passaggi.\n\
-- Alla fine rispondi con un riepilogo breve: cosa hai fatto, cosa hai trovato, cosa non è riuscito.\n",
+- Alla fine rispondi con un riepilogo breve: cosa hai fatto, cosa hai trovato, cosa non è riuscito.\n\
+- Risparmia token: tra una chiamata e l'altra non scrivere commenti o piani lunghi, chiama direttamente lo strumento; \
+chiedi solo i dati che servono (filtri, TOP, righe precise, offset) invece di interi file o tabelle.\n",
         cfg.ai.tool_rounds
     );
     if p.terminal {
@@ -75,6 +77,12 @@ Per pulsanti piccoli o testo minuto usa zoom_screen sulla zona e clicca con le c
 Su Windows ui_elements dà il centro esatto dei controlli: preferiscilo quando la finestra lo supporta. \
 Dopo il clic controlla lo screenshot di verifica (cerchio rosso = cursore) e correggi se serve. \
 Per scrivere in un campo: clicca nel campo, poi type_text.\n",
+        );
+    }
+    if p.graph {
+        g.push_str(
+            "- Progetti e cartelle di codice: per domande su come è fatto un progetto usa graph_build (una volta) e poi graph_ask, \
+invece di leggere molti file: costa molti meno token. Leggi un file solo per i dettagli che la mappa non dà.\n",
         );
     }
     if p.sql {

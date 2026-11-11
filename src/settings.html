@@ -10,6 +10,7 @@
   <nav id="tabs">
     <button data-tab="general" class="on">Generale</button>
     <button data-tab="ai">AI e chiavi</button>
+    <button data-tab="local">Modelli locali</button>
     <button data-tab="persona">Personalità</button>
     <button data-tab="memory">Memoria</button>
     <button data-tab="voice">Voce e audio</button>
@@ -48,6 +49,9 @@
       <label class="inline"><input type="checkbox" id="autostart" /> <span data-os="windows">Avvia Alter Ego all'accesso a Windows</span><span data-os="linux">Avvia Alter Ego all'accesso al desktop</span></label>
       <label class="inline sub"><input type="checkbox" id="start-hidden" /> <b>Avvio silenzioso</b>: all'accesso parte nascosta, solo l'icona nella tray (si apre con la tray o con Ctrl+Alt+A)</label>
       <span id="autostart-result" class="result"></span>
+      <h3>Contesto</h3>
+      <label class="inline"><input type="checkbox" id="apps-context" /> Alter Ego sa quali applicazioni principali sono aperte (solo i nomi, mai i titoli delle finestre)</label>
+      <p class="note sub">L'elenco va in fondo alla domanda, non nel prompt di sistema: la cache del provider continua a funzionare.</p>
       <h3>Finestra</h3>
       <label class="inline"><input type="checkbox" id="always-on-top" /> Sempre in primo piano sopra le altre finestre</label>
       <h3>Alter Net</h3>
@@ -82,6 +86,7 @@
       </div>
       <label>Ragionamento dei modelli "thinking"
         <select id="thinking">
+          <option value="auto">Automatico (spento per le domande semplici, nascosto per le altre)</option>
           <option value="hide">Nascosto (il modello ragiona, tu vedi solo la risposta)</option>
           <option value="off">Spento (risposte più rapide, meno token)</option>
         </select>
@@ -128,6 +133,8 @@
       <div class="actions"><button id="saving-max">Massimo risparmio</button> <button id="saving-default">Predefinite</button></div>
       <label class="inline"><input type="checkbox" id="sv-tools" /> <b>Strumenti solo quando servono</b>: le definizioni (1–3 mila token) partono solo se la domanda chiede un'azione</label>
       <p class="note sub">Se il modello si accorge che gli serviva uno strumento lo dice e la domanda si ripete subito con gli strumenti: nessuna azione persa.</p>
+      <label class="inline"><input type="checkbox" id="sv-groups" /> <b>Strumenti a gruppi</b>: manda solo i gruppi che la domanda chiede (file, web, schermo…); gli altri li carica lei se servono</label>
+      <label class="inline"><input type="checkbox" id="sv-loop" /> <b>Ragionamenti lunghi compatti</b>: nelle richieste con molti passaggi i risultati vecchi degli strumenti, già usati, vengono accorciati</label>
       <label class="inline"><input type="checkbox" id="sv-compact" /> Descrizioni degli strumenti compatte</label>
       <label class="inline"><input type="checkbox" id="sv-trim" /> Accorcia le risposte vecchie nella cronologia (le ultime restano intere; la cache del provider continua a funzionare)</label>
       <label>Fatti su di te inviati <select id="sv-facts"><option value="0">Tutti</option><option value="20">I 20 più pertinenti</option><option value="10">I 10 più pertinenti</option><option value="5">I 5 più pertinenti</option></select></label>
@@ -164,6 +171,91 @@
       <p class="note privacy"><b>Cosa esce dal PC:</b> solo il prompt di sistema e gli ultimi messaggi della conversazione,
         inviati al provider che risponde. Con Ollama tutto resta sul tuo computer.</p>
     </section>
+    <section data-tab="local">
+      <h2>Modelli locali (Ollama)</h2>
+      <p class="note">I modelli girano sul tuo PC con <b>Ollama</b>: niente chiavi, niente costi, nessun dato esce dal computer.
+        Alter Ego installa Ollama se manca, scarica i modelli e li configura.</p>
+      <div class="local-state"><span id="lo-state" class="result">…</span></div>
+      <div class="actions">
+        <button id="lo-install">⬇ Installa / aggiorna Ollama</button>
+        <button id="lo-start">▶ Avvia</button>
+        <button id="lo-refresh">Aggiorna</button>
+      </div>
+      <label class="inline"><input type="checkbox" id="lo-autostart" /> Avvia Ollama insieme ad Alter Ego quando è il provider attivo</label>
+      <div class="lo-progress" id="lo-progress" hidden><div class="bar"><i id="lo-bar"></i></div><span id="lo-ptext"></span> <button id="lo-cancel" class="small">Annulla</button></div>
+
+      <div class="lfm3">
+        <h3>💧 LFM3 di Liquid AI</h3>
+        <p class="note">Modello da 1,7 miliardi di parametri per agenti locali: <b>strumenti</b>, ragionamento, contesto fino a 256K token,
+          16 lingue tra cui l'italiano. Circa 1 GB in Q4: va anche senza GPU. Licenza LFM Open License v1.0.
+          Liquid AI non lo consiglia per il ragionamento complesso a molti passaggi (è piccolo).</p>
+        <div class="actions">
+          <select id="lfm3-variant"></select>
+          <label class="inline" style="margin:0"><input type="checkbox" id="lfm3-primary" checked /> usalo come modello principale</label>
+          <button id="lfm3-go" class="primary">⬇ Installa e usa LFM3</button>
+        </div>
+      </div>
+
+      <h3>Modelli installati</h3>
+      <table id="lo-models" class="grid"><thead><tr><th>Modello</th><th>Parametri</th><th>Quant.</th><th>Dimensione</th><th>In memoria</th><th></th></tr></thead><tbody></tbody></table>
+
+      <h3>Cerca e scarica</h3>
+      <div class="actions">
+        <select id="lo-source">
+          <option value="library">Libreria ufficiale di Ollama</option>
+          <option value="community">Modelli della community (ollama.com)</option>
+          <option value="huggingface">Hugging Face (GGUF)</option>
+        </select>
+        <input id="lo-query" placeholder="es. qwen, gemma, llama, mistral…" style="max-width:260px" />
+        <button id="lo-search">Cerca</button>
+      </div>
+      <div class="chips" id="lo-chips">
+        <label class="chip"><input type="checkbox" value="abliterated" data-kind="word" /> abliterated</label>
+        <label class="chip"><input type="checkbox" value="uncensored" data-kind="word" /> uncensored</label>
+        <label class="chip"><input type="checkbox" value="heretic" data-kind="word" /> heretic</label>
+        <label class="chip"><input type="checkbox" value="tools" data-kind="cap" /> strumenti</label>
+        <label class="chip"><input type="checkbox" value="vision" data-kind="cap" /> visione</label>
+        <label class="chip"><input type="checkbox" value="thinking" data-kind="cap" /> ragionamento</label>
+        <select id="lo-size"><option value="0">Qualsiasi dimensione</option><option value="2">fino a 2B</option><option value="4">fino a 4B</option><option value="8">fino a 8B (≈ 8 GB di VRAM)</option><option value="14">fino a 14B</option><option value="32">fino a 32B</option></select>
+      </div>
+      <p class="note sub">Abliterated e uncensored sono versioni modificate da terzi senza i rifiuti del modello originale: usale con giudizio.
+        I filtri «strumenti/visione/ragionamento» valgono per la libreria ufficiale e, quando dichiarato, per Hugging Face.</p>
+      <div id="lo-results" class="lo-results"></div>
+      <h3>Da un indirizzo</h3>
+      <div class="actions">
+        <input id="lo-url" placeholder="hf.co/utente/modello-GGUF:Q4_K_M · link di Hugging Face · ollama.com/… · https://…/file.gguf" />
+        <button id="lo-url-go">⬇ Scarica</button>
+      </div>
+      <p class="note sub">Da Hugging Face si può indicare anche il file (link al .gguf) o la quantizzazione dopo «:». Un .gguf da altri siti viene scaricato,
+        controllato (SHA-256) e importato in Ollama.</p>
+
+      <h3>Scheda video</h3>
+      <div id="gpu-list" class="note">…</div>
+      <p class="note" id="gpu-advice"></p>
+      <div class="row">
+        <label>Motore
+          <select id="gpu-backend">
+            <option value="auto">Automatico (decide Ollama)</option>
+            <option value="vulkan">Vulkan (consigliato per AMD RX 6000 e su Windows)</option>
+            <option value="rocm">ROCm (AMD RX 7000/9000, Linux)</option>
+            <option value="cpu">Solo CPU</option>
+          </select>
+        </label>
+        <label>Scheda da usare <select id="gpu-device"><option value="">Decide Ollama</option></select></label>
+      </div>
+      <div class="row">
+        <label class="inline"><input type="checkbox" id="gpu-fa" /> Flash attention</label>
+        <label>Cache del contesto
+          <select id="gpu-kv"><option value="f16">f16 (piena)</option><option value="q8_0">q8_0 (metà memoria, consigliata)</option><option value="q4_0">q4_0 (un quarto)</option></select>
+        </label>
+        <label id="gpu-hsa-row">HSA_OVERRIDE_GFX_VERSION <input id="gpu-hsa" placeholder="es. 10.3.0" style="max-width:110px;min-width:0" /></label>
+      </div>
+      <div class="actions"><button id="gpu-apply">Applica e riavvia Ollama</button> <span id="gpu-result" class="result"></span></div>
+      <p class="note sub">Sui PC con CPU Intel e scheda AMD, Ollama può scegliere la grafica integrata: indica la scheda dedicata.
+        «Emulazione CUDA» (ZLUDA) non è supportata da Ollama; con le Radeon la strada veloce e stabile è Vulkan, già incluso.
+        <span data-os="windows">Su Windows le impostazioni vanno nelle variabili dell'utente e Ollama viene riavviato.</span></p>
+    </section>
+
     <section data-tab="persona">
       <h2>Personalità e lingua</h2>
       <label>Lingua delle risposte
@@ -453,6 +545,12 @@
         <label class="inline sub"><input type="checkbox" id="sql-window" /> Mostra i risultati nella finestra SQL</label>
         <label class="sub">Righe mandate al modello per ogni query <select id="sql-rows"><option value="20">20</option><option value="50">50</option><option value="100">100</option><option value="200">200</option></select></label>
         <div class="actions sub"><button id="sql-open">Apri la finestra SQL</button> <span id="sql-state" class="result"></span></div></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="graph" /> <b>Mappa dei progetti</b> (Graphify)</label>
+        <p class="note">Alter Ego trasforma una cartella di codice e documenti in una mappa (grafo di conoscenza) e la interroga invece di leggere
+          i file uno per uno: risposte su progetti grandi con molti meno token. Il codice si analizza in locale, senza AI.
+          Usa le cartelle della <b>Gestione file</b> (o tutto il disco); le mappe stanno nella cartella dati di Alter Ego, non nei tuoi progetti.</p>
+        <div class="actions sub"><button id="graph-install">⬇ Installa Graphify</button> <span id="graph-state" class="result"></span></div>
+        <p class="note sub"><a href="#" id="graph-link">Graphify</a> (Graphify Labs, Apache-2.0) si installa con uv dal pacchetto ufficiale «graphifyy».</p></div>
     </section>
 
     <section data-tab="costs">

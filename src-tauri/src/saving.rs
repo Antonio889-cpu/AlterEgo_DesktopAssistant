@@ -56,6 +56,36 @@ const COMPLEX_WORDS: &[&str] = &[
     "summar", "translate", "write a", "list", "steps", "plan",
 ];
 
+/// Parole chiave → gruppi di strumenti (vedi actions::GROUPS). Nessuna corrispondenza = tutti.
+const GROUP_WORDS: &[(&str, &[&str])] = &[
+    ("sistema", &["apri", "aprire", "avvia", "lancia", "terminale", "comando", "esegui", "powershell", "bash", "cmd", "installa", "disinstalla",
+        "processo", "programma", "volume", "luminosità", "appunti", "copia", "incolla", "sistema", "rete", "ip ", "disco", "spazio", "ram", "cpu",
+        "open", "launch", "run ", "command", "terminal", "install", "process", "program", "brightness", "clipboard", "network", "disk"]),
+    ("file", &["file", "cartell", "documento", "percorso", "salva", "leggi il", "leggi la", "scrivi nel", "scrivi in un", "sposta", "rinomina",
+        "desktop", "download", ".txt", ".pdf", ".csv", ".json", "folder", "directory", "path", "save", "read the", "write to", "move", "rename"]),
+    ("web", &["cerca", "cercami", "internet", "web", "online", "notizie", "meteo", "sito", "pagina", "link", "http", "prezzo", "quanto costa",
+        "oggi", "stasera", "domani", "ultim", "attuale", "search", "look up", "news", "weather", "website", "url", "latest", "current", "price"]),
+    ("schermo", &["schermo", "screenshot", "clicca", "click", "mouse", "tastiera", "digita", "premi", "finestra", "pulsante", "bottone", "vedi",
+        "guarda", "screen", "keyboard", "type ", "press", "window", "button", "look at", "see "]),
+    ("musica", &["metti", "suona", "musica", "canzone", "brano", "playlist", "pausa", "riprendi", "prossim", "precedente", "spotify", "youtube",
+        "play", "music", "song", "track", "pause", "resume", "skip"]),
+    ("promemoria", &["promemoria", "ricordami", "timer", "sveglia", "remind", "alarm"]),
+    ("database", &["database", "sql", "tabella", "tabelle", "query", "select", "db ", "table"]),
+    ("grafo", &["codice", "progetto", "repository", "repo", "funzione", "classe", "modulo", "architettura", "grafo", "dipendenz",
+        "code", "project", "function", "class", "module", "graph", "dependenc"]),
+];
+
+/// Gruppi di strumenti che la domanda sembra chiedere ("app" sempre). Vuoto = nessuna parola chiave.
+pub fn pick_groups(text: &str) -> Vec<&'static str> {
+    let t = format!(" {} ", text.to_lowercase());
+    let mut out: Vec<&'static str> = GROUP_WORDS.iter().filter(|(_, words)| words.iter().any(|w| t.contains(w))).map(|(g, _)| *g).collect();
+    if out.is_empty() {
+        return out;
+    }
+    out.insert(0, "app");
+    out
+}
+
 /// Router a parole chiave (gratis, istantaneo).
 pub fn heuristic(text: &str, prev_used_tools: bool) -> Route {
     let t = format!(" {} ", text.to_lowercase());
@@ -132,6 +162,28 @@ pub fn trim_history(history: &mut [ChatMessage], keep: usize, max_chars: usize) 
     }
 }
 
+/// Risultati degli strumenti tra `from` e `to` (già letti dal modello) accorciati a inizio + fine,
+/// solo se insieme superano `threshold` caratteri. Restituisce true se ha accorciato qualcosa.
+pub fn compact_tool_results(history: &mut [ChatMessage], from: usize, to: usize, threshold: usize) -> bool {
+    let to = to.min(history.len());
+    if from >= to {
+        return false;
+    }
+    let total: usize = history[from..to].iter().filter(|m| m.role == "tool").map(|m| m.content.chars().count()).sum();
+    if total <= threshold {
+        return false;
+    }
+    for m in history[from..to].iter_mut().filter(|m| m.role == "tool") {
+        let n = m.content.chars().count();
+        if n > 1200 {
+            let head: String = m.content.chars().take(700).collect();
+            let tail: String = m.content.chars().skip(n - 300).collect();
+            m.content = format!("{head}\n[… {} caratteri tolti: risultato già usato nei passaggi precedenti …]\n{tail}", n - 1000);
+        }
+    }
+    true
+}
+
 /// I `n` fatti più pertinenti alla domanda (parole in comune), in ordine originale. 0 = tutti.
 pub fn pick_facts(facts: Vec<String>, question: &str, n: usize) -> Vec<String> {
     if n == 0 || facts.len() <= n {
@@ -202,6 +254,28 @@ mod tests {
         assert!(!r.needs_tools && r.simple);
         assert!(!heuristic("spiegami perché il cielo è blu", false).simple);
         assert!(heuristic("grazie", true).needs_tools); // il turno prima usava strumenti
+    }
+
+    #[test]
+    fn loop_compaction() {
+        let mut h = vec![
+            ChatMessage::new("user", "domanda"),
+            ChatMessage { role: "tool".into(), content: "x".repeat(9000), ..Default::default() },
+            ChatMessage { role: "tool".into(), content: "y".repeat(5000), ..Default::default() },
+            ChatMessage { role: "tool".into(), content: "z".repeat(9000), ..Default::default() },
+        ];
+        assert!(!compact_tool_results(&mut h, 1, 2, 12_000)); // sotto la soglia
+        assert!(compact_tool_results(&mut h, 1, 3, 12_000));
+        assert!(h[1].content.len() < 1200 && h[1].content.contains("caratteri tolti"));
+        assert_eq!(h[3].content.len(), 9000); // l'ultimo passaggio resta intero
+    }
+
+    #[test]
+    fn group_words() {
+        assert_eq!(pick_groups("cerca le notizie di oggi"), ["app", "web"]);
+        assert_eq!(pick_groups("apri il terminale e controlla lo spazio su disco"), ["app", "sistema"]);
+        assert_eq!(pick_groups("quanti clienti ci sono nella tabella del database?"), ["app", "database"]);
+        assert!(pick_groups("grazie mille").is_empty());
     }
 
     #[test]

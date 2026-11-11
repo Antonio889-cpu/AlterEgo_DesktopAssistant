@@ -3,45 +3,49 @@
 <head>
   <meta charset="utf-8" />
   <title>Alter Ego – SQL Server</title>
-  <link rel="stylesheet" href="settings.css" />
+  <link rel="stylesheet" href="crt.css" />
   <style>
-    body { display: flex; flex-direction: column; height: 100vh; }
-    main { flex: 1; display: flex; flex-direction: column; gap: 10px; max-width: none; padding: 12px 16px; min-height: 0; }
-    #query { width: 100%; min-height: 90px; resize: vertical; background: #061206; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 8px; font: 13px/1.4 Consolas, "DejaVu Sans Mono", monospace; }
-    .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    #status { margin-left: auto; color: var(--muted); }
-    #meta { color: var(--muted); font-size: 12px; }
-    #meta .by { color: var(--warn); }
-    .wrap { flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 6px; min-height: 120px; }
+    body { height: 100vh; }
+    .screen { height: calc(100vh - 16px); }
+    #query { min-height: 84px; resize: vertical; }
+    .grid-box { flex: 1; min-height: 140px; display: flex; }
+    .grid-box > .inner { padding: 0; flex: 1; overflow: auto; background: var(--field); }
     table { border-collapse: collapse; font: 12px/1.35 Consolas, "DejaVu Sans Mono", monospace; width: max-content; min-width: 100%; }
-    th, td { border-bottom: 1px solid #1f4a22; padding: 4px 8px; text-align: left; white-space: pre; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
-    th { position: sticky; top: 0; background: #0d2611; color: var(--accent); }
-    td.null { color: #6b8f63; font-style: italic; }
-    #error { color: var(--bad); white-space: pre-wrap; }
-    #history { max-height: 110px; overflow: auto; font: 12px Consolas, monospace; color: var(--muted); }
-    #history div { cursor: pointer; padding: 2px 0; border-bottom: 1px dotted #1f4a22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #history div:hover { color: var(--text); }
+    th, td { border-bottom: 1px solid #9ccf78; padding: 4px 9px; text-align: left; white-space: pre; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+    th { position: sticky; top: 0; background: var(--dlg-border); color: #c9ff8e; font: 13px "DotGothic16", monospace; }
+    tr:nth-child(even) td { background: rgba(108, 194, 47, .12); }
+    td.null { color: #5d7a4c; font-style: italic; }
+    .empty { padding: 14px; color: #3d5a2c; font: 14px "DotGothic16", monospace; }
+    #history { max-height: 96px; overflow: auto; font: 12px Consolas, monospace; }
+    #history div { cursor: pointer; padding: 2px 0; border-bottom: 1px dotted rgba(11, 29, 0, .3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #history div:hover { background: rgba(255, 255, 255, .3); }
+    .hist-box > .inner { padding: 6px 10px; }
   </style>
 </head>
 <body>
-  <header><h1>ALTER EGO · SQL Server</h1></header>
-  <main>
+  <div class="screen">
     <div class="bar">
-      <button id="connect">Connetti…</button>
-      <button id="disconnect">Disconnetti</button>
-      <span id="status">…</span>
+      <h1>ALTER EGO<small>SQL Server</small></h1>
+      <span id="status" class="status">…</span>
     </div>
-    <textarea id="query" spellcheck="false" placeholder="SELECT TOP 100 * FROM …   (Ctrl+Invio esegue)"></textarea>
-    <div class="bar">
-      <button id="run">▶ Esegui</button>
-      <button id="export">Copia come CSV</button>
-      <span id="meta"></span>
-    </div>
-    <div id="error"></div>
-    <div class="wrap"><table id="grid"><thead></thead><tbody></tbody></table></div>
-    <p class="note">Le query di Alter Ego compaiono qui insieme alle tue. Le tue non chiedono conferma; servono comunque i permessi «Database SQL Server» (e «Modifiche» per cambiare dati o struttura).</p>
-    <div id="history"></div>
-  </main>
+    <div class="box"><div class="inner">
+      <div class="bar" style="margin-bottom:8px">
+        <span class="tag" style="margin:0">Query</span>
+        <button id="connect">Connetti…</button>
+        <button id="disconnect">Disconnetti</button>
+      </div>
+      <textarea id="query" spellcheck="false" placeholder="SELECT TOP 100 * FROM …   (Ctrl+Invio esegue)"></textarea>
+      <div class="bar" style="margin-top:8px">
+        <button id="run" class="main">▶ Esegui</button>
+        <button id="export">Copia come CSV</button>
+        <span id="meta" class="meta"></span>
+      </div>
+      <div id="error" class="error"></div>
+    </div></div>
+    <div class="box grid-box"><div class="inner"><table id="grid"><thead></thead><tbody></tbody></table><div class="empty" id="empty">Nessun risultato ancora: le query di Alter Ego e le tue compaiono qui.</div></div></div>
+    <div class="box hist-box"><div class="inner"><div id="history"></div></div></div>
+    <p class="note">Le tue query non chiedono conferma, ma servono i permessi «Database SQL Server» (e «Modifiche» per cambiare dati o struttura).</p>
+  </div>
   <script src="i18n.js"></script>
   <script src="sqlview.js"></script>
 </body>

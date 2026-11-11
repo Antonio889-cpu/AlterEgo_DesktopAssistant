@@ -44,7 +44,7 @@ pub async fn ask(app: &AppHandle, title: &str, intro: &str, fields: Vec<Value>) 
     }
     let built = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("form.html".into()))
         .title(title)
-        .inner_size(460.0, 520.0)
+        .inner_size(540.0, 720.0)
         .min_inner_size(380.0, 300.0)
         .center()
         .always_on_top(true)

@@ -1,3 +1,13 @@
+## Alter Ego 1.7.0
+
+- Local models: LFM3 by Liquid AI in one click, Ollama installed for you, model browser with filters (abliterated, uncensored, tools, vision…), download from Hugging Face or a .gguf address.
+- AMD Radeon RX 6600 and newer: Vulkan, choice of the dedicated card on PCs with Intel integrated graphics, smaller context cache.
+- Fewer tokens in complex requests: tools in groups loaded on demand, old tool results compacted, automatic thinking, files read in pieces.
+- She knows which apps are open (names only, cache-friendly). Project maps with Graphify.
+- SQL Server windows restyled like Alter Ego.
+
+`AlterEgo_1.7.0_setup.exe` / `AlterEgo_1.7.0_portable.zip` Windows · `AlterEgo_1.7.0_amd64.AppImage` / `AlterEgo_1.7.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.6.0
 
 - More precise clicks: screenshots with coordinate rulers and the cursor marked, zoom, check after each click, exact controls on Windows.

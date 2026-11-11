@@ -48,6 +48,7 @@ Interface in English and Italian.
 - [Music](#music)
 - [Web search](#web-search)
 - [Token saving](#token-saving)
+- [Local models](#local-models)
 - [Alter Net](#alter-net)
 - [Costs](#costs)
 - [Voice clips](#voice-clips)
@@ -89,6 +90,10 @@ Interface in English and Italian.
 - **Spotify** (Premium): "play *title*" can play on your Spotify instead of YouTube.
 - **Token saving**: thinking off, tools only when needed, local router (keywords or Rizzo Flow), cheap model for simple questions.
 - **Costs panel**: every request with tokens, cache, duration and cost; daily/monthly totals and per-model summary, editable prices, CSV export.
+- **Local models with Ollama**: **LFM3** by Liquid AI in one click, model browser with filters (abliterated, uncensored, tools, vision…),
+  download from Hugging Face or any `.gguf` address, Ollama installed for you, **AMD Radeon** support (RX 6600 and newer, Vulkan) also on PCs with an Intel iGPU.
+- **Fewer tokens in complex reasoning**: tools in groups loaded on demand, old tool results compacted, automatic thinking, project maps with Graphify.
+- **Knows which apps are open** (names only), without breaking the provider cache.
 - **Terminal**: Alter Ego can run PowerShell or cmd commands (bash on Linux), with confirmation or autonomously; she keeps the working folder between commands.
 - **Full log** in Settings → Log: model requests, fallbacks, tools with result and duration, errors. **Silent start**: at login she starts hidden in the tray.
 - **Voice clips**: "Alter Ego clip that" → saves the clip with AMD Adrenalin, NVIDIA App or Medal, **without going through the AI**.
@@ -337,7 +342,46 @@ every search shows up in the Costs tab.
   **only the most relevant facts**, **smaller screenshots** and **shorter web pages**.
 - **Maximum saving** turns on everything at once; **Defaults** goes back.
 
+**Complex requests** (several tool steps) waste the most tokens, so Alter Ego also:
+- **sends tools in groups** (system, files, web, screen, music, reminders, database, project maps): only the groups the question asks for,
+  plus a small `load_tools` tool the model uses to load the others when it needs them (on by default);
+- **compacts long reasoning**: after the model has used a tool result, older results are shortened to their beginning and end,
+  once, when they add up to more than 12,000 characters, so the next steps stay in the provider cache;
+- keeps only the **latest screenshot**, reads **files in pieces** (`offset`/`limit`, 20,000 characters at most) and tells the model to call tools
+  without long comments in between and to ask only for the data it needs;
+- **automatic thinking**: off for simple questions, hidden for the others;
+- the list of **open applications** goes at the end of the question, never in the system prompt, so the prefix cache keeps working;
+- **project maps** ([Graphify](https://github.com/Graphify-Labs/graphify)): a folder of code becomes a knowledge graph that she queries instead of reading files one by one.
+
 Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini): the fixed part comes first, history moves in steps.
+
+## Local models
+
+*Settings → Local models* runs AI models **on your PC with [Ollama](https://ollama.com)**: no keys, no costs, nothing leaves the computer.
+
+- **Ollama installed for you** (with confirmation): on Windows the official installer, silently and without administrator rights;
+  on Linux the official package extracted into Alter Ego's folder and started with `ollama serve` (no sudo, needs `zstd`).
+  If Ollama is the active provider it starts together with Alter Ego.
+- **LFM3 in one click** ([Liquid AI](https://www.liquid.ai/blog/lfm3)): LFM3-1.7B, a 1.7-billion-parameter model for local agents
+  with tool calling, reasoning, up to 256K tokens of context and 16 languages including Italian, about 1 GB in Q4.
+  Variants: `lfm3` (Q4), `lfm3:1.7b-qad-q4_0`, `lfm3:1.7b-q8_0`, and **LFM3-VL 2B** from the official GGUFs on Hugging Face (sees screenshots, experimental).
+  Needs Ollama 0.40.12 or newer. Alter Ego applies Liquid AI's recommended settings (temperature 0.1, top_k 50, repeat penalty 1.1) and a 32K context.
+  License: LFM Open License v1.0 (the model is downloaded by Ollama, it isn't bundled with Alter Ego).
+- **Model browser**: official Ollama library, community models and GGUFs on Hugging Face, with search and filters
+  (abliterated, uncensored, heretic, tools, vision, reasoning, maximum size), quantization choice for Hugging Face, progress and cancel.
+- **From an address**: `hf.co/user/model-GGUF:Q4_K_M`, any Hugging Face link (also to a single `.gguf`), `ollama.com/…`,
+  or a `.gguf` from any site (downloaded, checked with SHA-256 and imported into Ollama).
+- **Installed models**: size, quantization, how much is on the GPU; *Use* (sets it as Alter Ego's model) and *Delete*.
+
+**AMD graphics cards (RX 6600 and newer)**. ROCm on Windows only supports the RX 7000 series and on Linux doesn't list the RX 6600/6700,
+so on those cards Ollama uses **Vulkan**, which is included and fast. The *Graphics card* section shows the cards found and the one Ollama
+actually uses (from its log), and lets you choose:
+- **backend**: automatic, Vulkan, ROCm (on Linux with `HSA_OVERRIDE_GFX_VERSION`, e.g. `10.3.0` for the RX 6000 series) or CPU only;
+- **card to use**: on PCs with an **Intel CPU and integrated graphics** Ollama may pick the iGPU; choose the AMD card
+  (`GGML_VK_VISIBLE_DEVICES`), as Ollama's own documentation recommends;
+- **flash attention** and a **q8_0 context cache** (half the memory, more context in 8 GB of VRAM).
+*Apply* restarts Ollama with these settings (on Windows they go into the user's environment variables). "CUDA emulation" (ZLUDA)
+isn't supported by Ollama: on Radeon cards Vulkan is the stable, fast path.
 
 ## Alter Net
 
@@ -406,6 +450,7 @@ an action before you see it, so only turn it on with actions and folders you're 
 | Music (YouTube) | no |
 | **Mouse and keyboard**: move, click, scroll, type, press keys, read the controls of a window (Windows) | ⚠ every action, or **autonomous**; mouse in the top-left corner = stop |
 | **SQL Server database** on this PC: connect (form), read; **changes** only if you allow them | changes ⚠ always; DROP/TRUNCATE and DELETE/UPDATE without WHERE always |
+| **Project maps** (Graphify) of the allowed folders: build the map, then query it | ⚠ to build a map |
 | **App commands** ("open music venue", "close the player"…), only Alter Ego itself, **on by default** | no (updating always asks) |
 
 Every action, even a denied one, goes to **Settings → Log**. Technical details (in Italian) in [docs/PERMESSI.md](docs/PERMESSI.md).
@@ -586,6 +631,9 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **Alter Ego, Chihiro Fujisaki and Danganronpa** are © Spike Chunsoft. This is an unofficial fan project,
   not affiliated with or endorsed by Spike Chunsoft. The character sprites belong to their owners and are not covered by the MIT license.
 - **Kokoro-82M** and hexgrad's `kokoro` library: Apache-2.0. Not bundled with the app: the Kokoro installation downloads them.
+- **LFM3** by [Liquid AI](https://www.liquid.ai/blog/lfm3): LFM Open License v1.0. Not bundled: Ollama downloads it when you choose it.
+- **[Ollama](https://github.com/ollama/ollama)**: MIT, not bundled (installed from ollama.com when you ask). **[Graphify](https://github.com/Graphify-Labs/graphify)** by Graphify Labs: Apache-2.0, installed with uv when you ask.
+- SQL Server driver [tiberius](https://github.com/prisma/tiberius) (MIT/Apache-2.0).
 - **VB-CABLE** by VB-Audio Software: donationware, not bundled; download it from the official website.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),

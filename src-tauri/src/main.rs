@@ -5,14 +5,17 @@ mod actions;
 mod alternet;
 mod appctl;
 mod applog;
+mod apps;
 mod assistant;
 mod audio;
 mod config;
 mod costs;
 mod form;
+mod graphify;
 mod hotkeys;
 mod i18n;
 mod keys;
+mod localai;
 mod memory;
 mod music;
 mod providers;
@@ -95,6 +98,8 @@ pub struct FrontConfig {
     /// "windows" o "linux": l'interfaccia mostra i testi giusti per il sistema.
     os: &'static str,
     sql: config::SqlConfig,
+    local: config::LocalConfig,
+    apps_context: bool,
     prices: Vec<config::Price>,
     music: config::MusicConfig,
     web: config::WebConfig,
@@ -134,6 +139,8 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         always_on_top: cfg.always_on_top,
         os: if cfg!(windows) { "windows" } else { "linux" },
         sql: cfg.sql.clone(),
+        local: cfg.local.clone(),
+        apps_context: cfg.apps_context,
         prices: cfg.prices.clone(),
         music: cfg.music.clone(),
         web: cfg.web.clone(),
@@ -426,6 +433,12 @@ fn set_autostart(app: AppHandle, on: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Alter Ego sa quali app sono aperte.
+#[tauri::command]
+fn set_apps_context(app: AppHandle, on: bool) {
+    update_config(&app, |c| c.apps_context = on);
+}
+
 /// Avvio silenzioso e "sempre in primo piano".
 #[tauri::command]
 fn set_window_prefs(app: AppHandle, start_hidden: bool, always_on_top: bool) {
@@ -499,6 +512,7 @@ fn main() {
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             rizzo::autostart(&handle);
+            localai::autostart(&handle);
             window::create_main(&handle, start_visible, on_top)?;
             if !start_visible {
                 applog::info("app", "avvio silenzioso: finestra nascosta, Alter Ego è nella tray");
@@ -653,6 +667,23 @@ fn main() {
             sql::sql_disconnect_ui,
             sql::sql_run_user,
             assistant::chat_cancel,
+            graphify::graph_status,
+            graphify::graph_install,
+            localai::local_status,
+            localai::local_install,
+            localai::local_start,
+            localai::local_stop,
+            localai::local_delete,
+            localai::local_use,
+            localai::local_pull,
+            localai::local_cancel,
+            localai::local_search,
+            localai::local_hf_files,
+            localai::local_lfm3,
+            localai::local_gpu,
+            localai::local_gpu_apply,
+            localai::local_settings,
+            set_apps_context,
             window::tv_done,
             assistant::load_user_sprites,
             assistant::import_sprite_sheet,
@@ -667,6 +698,7 @@ fn main() {
                 // il server Kokoro avviato da noi si chiude con l'app
                 app.state::<audio::kokoro::Kokoro>().stop();
                 rizzo::stop(app);
+                localai::stop(app);
             }
         });
 }

@@ -302,7 +302,8 @@ function showTab(name) {
   if (name === "ai") refreshUsage();
   if (name === "costs") refreshCosts();
   if (name === "applog") refreshAppLog();
-  if (name === "perms") refreshSqlState();
+  if (name === "local") refreshLocal(true);
+  if (name === "perms") { refreshSqlState(); refreshGraphState(); }
 }
 
 /** Token e cache dei provider da quando l'app è aperta (DeepSeek riporta la cache). */
@@ -349,7 +350,9 @@ function fillLook(cfg) {
   $("start-hidden").checked = cfg.start_hidden;
   $("start-hidden").disabled = !cfg.autostart;
   $("always-on-top").checked = cfg.always_on_top;
+  $("apps-context").checked = cfg.apps_context !== false;
 }
+$("apps-context").onchange = (e) => invoke("set_apps_context", { on: e.target.checked });
 const saveWindowPrefs = () => invoke("set_window_prefs", { startHidden: $("start-hidden").checked, alwaysOnTop: $("always-on-top").checked });
 $("start-hidden").onchange = saveWindowPrefs;
 $("always-on-top").onchange = saveWindowPrefs;
@@ -843,6 +846,22 @@ $("sql-window").onchange = saveSql;
 $("sql-rows").onchange = saveSql;
 $("sql-open").onclick = () => invoke("sql_view_open");
 listen("sql-status", () => refreshSqlState());
+async function refreshGraphState() {
+  try {
+    const s = await invoke("graph_status");
+    $("graph-state").textContent = s.installed ? t("installato ✓") : t("non installato");
+    $("graph-state").className = "result " + (s.installed ? "ok" : "");
+    $("graph-install").textContent = s.installed ? t("Aggiorna Graphify") : t("⬇ Installa Graphify");
+  } catch {}
+}
+$("graph-install").onclick = async (e) => {
+  e.target.disabled = true;
+  $("graph-state").textContent = t("installazione…");
+  try { $("graph-state").textContent = await invoke("graph_install"); } catch (err) { $("graph-state").textContent = String(err); $("graph-state").className = "result bad"; }
+  e.target.disabled = false;
+  refreshGraphState();
+};
+$("graph-link").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "graphify" }).catch(() => {}); };
 async function refreshSqlState() {
   try {
     const s = await invoke("sql_status");
@@ -885,8 +904,8 @@ $("thinking").onchange = (e) => { ai.thinking = e.target.value; saveAi(); };
 let saving = null;
 let savingTimer = null;
 function saveSaving() { clearTimeout(savingTimer); savingTimer = setTimeout(() => invoke("set_saving", { saving }), 250); }
-const SAVING_DEFAULT = { tools_on_demand: false, compact_tools: false, trim_history: true, facts_limit: 0, screenshot_width: 1280, page_chars: 8000 };
-const SAVING_MAX = { tools_on_demand: true, compact_tools: true, trim_history: true, facts_limit: 10, screenshot_width: 1024, page_chars: 5000 };
+const SAVING_DEFAULT = { tools_on_demand: false, compact_tools: false, trim_history: true, facts_limit: 0, screenshot_width: 1280, page_chars: 8000, tool_groups: true, loop_compact: true };
+const SAVING_MAX = { tools_on_demand: true, compact_tools: true, trim_history: true, facts_limit: 10, screenshot_width: 1024, page_chars: 5000, tool_groups: true, loop_compact: true };
 function fillSaving(cfg) {
   saving = structuredClone(cfg.saving);
   const eco = $("sv-eco-provider");
@@ -897,6 +916,8 @@ function fillSaving(cfg) {
   }
   $("sv-tools").checked = saving.tools_on_demand;
   $("sv-compact").checked = saving.compact_tools;
+  $("sv-groups").checked = saving.tool_groups !== false;
+  $("sv-loop").checked = saving.loop_compact !== false;
   $("sv-trim").checked = saving.trim_history;
   $("sv-facts").value = String(saving.facts_limit);
   $("sv-shot").value = String(saving.screenshot_width);
@@ -909,6 +930,8 @@ function fillSaving(cfg) {
 }
 $("sv-tools").onchange = (e) => { saving.tools_on_demand = e.target.checked; saveSaving(); };
 $("sv-compact").onchange = (e) => { saving.compact_tools = e.target.checked; saveSaving(); };
+$("sv-groups").onchange = (e) => { saving.tool_groups = e.target.checked; saveSaving(); };
+$("sv-loop").onchange = (e) => { saving.loop_compact = e.target.checked; saveSaving(); };
 $("sv-trim").onchange = (e) => { saving.trim_history = e.target.checked; saveSaving(); };
 $("sv-facts").onchange = (e) => { saving.facts_limit = +e.target.value; saveSaving(); };
 $("sv-shot").onchange = (e) => { saving.screenshot_width = +e.target.value; saveSaving(); };
@@ -978,7 +1001,7 @@ function applySavingPreset(p, thinking) {
   fillSaving({ saving }); saveSaving();
 }
 $("saving-max").onclick = () => applySavingPreset(SAVING_MAX, "off");
-$("saving-default").onclick = () => applySavingPreset(SAVING_DEFAULT, "hide");
+$("saving-default").onclick = () => applySavingPreset(SAVING_DEFAULT, "auto");
 
 // ---------- ricerca web ----------
 let web = null;
@@ -1173,3 +1196,206 @@ $("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle
     fillLook(e.payload);
   });
 })();
+
+// ---------- modelli locali (Ollama, LFM3, catalogo, GPU) ----------
+const LFM3_VARIANTS = [
+  ["lfm3", "LFM3 1.7B · Q4, ~1,1 GB (consigliato)"],
+  ["lfm3:1.7b-qad-q4_0", "LFM3 1.7B · Q4_0 QAD, ~1 GB (addestrato per la quantizzazione)"],
+  ["lfm3:1.7b-q8_0", "LFM3 1.7B · Q8_0, ~1,8 GB (più preciso)"],
+  ["hf.co/LiquidAI/LFM3-VL-2B-GGUF:Q4_K_M", "LFM3-VL 2B · vede gli screenshot, ~1,3 GB (sperimentale)"],
+];
+for (const [v, l] of LFM3_VARIANTS) $("lfm3-variant").append(Object.assign(document.createElement("option"), { value: v, textContent: t(l) }));
+const fmtSize = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : (b / 1e6).toFixed(0) + " MB");
+let localStatus = null;
+let gpuInfo = null;
+let activePull = null;
+
+function loResult(text, bad = false) {
+  const el = $("lo-state");
+  el.textContent = text;
+  el.className = "result " + (bad ? "bad" : "ok");
+}
+
+async function refreshLocal(withGpu = false) {
+  try { localStatus = await invoke("local_status"); } catch (e) { loResult(String(e), true); return; }
+  const s = localStatus;
+  if (!s.installed) loResult(t("Ollama non è installato. Premi «Installa / aggiorna Ollama» (o «Installa e usa LFM3»: fa tutto da solo)."), true);
+  else if (!s.running) loResult(t("Ollama installato ma spento ({bin}).", { bin: s.binary }), true);
+  else loResult(t("Ollama {v} acceso su {base}{lfm}", { v: s.version, base: s.base, lfm: s.lfm3_ok ? " · LFM3 supportato ✓" : t(" · per LFM3 serve una versione più recente") }), !s.lfm3_ok);
+  $("lo-start").disabled = !s.installed || s.running;
+  const tb = document.querySelector("#lo-models tbody");
+  tb.innerHTML = "";
+  if (!s.models.length) tb.innerHTML = '<tr><td colspan="6" class="note">' + t(s.running ? "nessun modello installato" : "Ollama è spento") + "</td></tr>";
+  const current = ai?.providers?.ollama?.model;
+  for (const m of s.models) {
+    const tr = document.createElement("tr");
+    const mem = m.gpu_percent == null ? "—" : (m.gpu_percent >= 99 ? t("GPU 100%") : m.gpu_percent <= 0 ? t("solo CPU") : t("GPU {p}% · CPU {c}%", { p: m.gpu_percent, c: 100 - m.gpu_percent }));
+    [m.name + (m.name === current || m.name === current + ":latest" ? " ✓" : ""), m.params, m.quant, fmtSize(m.size), mem].forEach((v) => tr.append(Object.assign(document.createElement("td"), { textContent: v })));
+    const td = document.createElement("td");
+    const use = Object.assign(document.createElement("button"), { textContent: t("Usa"), className: "small" });
+    use.onclick = async () => { loResult(await invoke("local_use", { name: m.name, primary: $("lfm3-primary").checked })); refreshAiFromConfig(); refreshLocal(); };
+    const del = Object.assign(document.createElement("button"), { textContent: t("Elimina"), className: "small danger" });
+    del.onclick = async () => {
+      if (!confirm(t("Eliminare il modello {name} da Ollama?", { name: m.name }))) return;
+      try { await invoke("local_delete", { name: m.name }); } catch (e) { loResult(String(e), true); }
+      refreshLocal();
+    };
+    td.append(use, " ", del);
+    tr.append(td);
+    tb.append(tr);
+  }
+  if (withGpu) refreshGpu();
+}
+
+/** Dopo «Usa»: il provider Ollama e il modello cambiano anche nella scheda AI. */
+async function refreshAiFromConfig() {
+  const cfg = await invoke("get_config");
+  ai = structuredClone(cfg.ai);
+  renderProviders();
+  $("temperature").value = ai.temperature;
+  $("temperature-val").textContent = ai.temperature.toFixed(2);
+  fillAdvanced();
+}
+
+function showProgress(p) {
+  const box = $("lo-progress");
+  box.hidden = false;
+  const pct = p.total ? Math.round((p.completed / p.total) * 100) : 0;
+  $("lo-bar").style.width = (p.total ? pct : 100) + "%";
+  const label = p.error ? "⚠ " + p.error : p.done ? "✓ " + (p.status === "success" ? t("{name} pronto", { name: p.name || "Ollama" }) : p.status) :
+    `${p.name ? p.name + " · " : ""}${p.status}${p.total ? ` · ${fmtSize(p.completed)} / ${fmtSize(p.total)} (${pct}%)` : ""}`;
+  $("lo-ptext").textContent = label;
+  $("lo-ptext").className = p.error ? "result bad" : "";
+  activePull = p.task === "pull" && !p.done ? p.name : null;
+  $("lo-cancel").hidden = !activePull;
+  if (p.done) { refreshLocal(); setTimeout(() => { if (!activePull) box.hidden = true; }, 8000); }
+}
+listen("local-progress", (e) => showProgress(e.payload));
+$("lo-cancel").onclick = () => activePull && invoke("local_cancel", { name: activePull });
+
+async function busy(btn, fn) {
+  btn.disabled = true;
+  try { await fn(); } catch (e) { loResult(String(e), true); showProgress({ error: String(e), done: true }); }
+  btn.disabled = false;
+  refreshLocal();
+}
+$("lo-install").onclick = (e) => busy(e.target, async () => loResult(t("Ollama {v} pronto.", { v: await invoke("local_install") })));
+$("lo-start").onclick = (e) => busy(e.target, async () => loResult(t("Ollama {v} acceso.", { v: await invoke("local_start") })));
+$("lo-refresh").onclick = () => refreshLocal(true);
+$("lo-autostart").onchange = (e) => invoke("local_settings", { autostart: e.target.checked });
+$("lfm3-go").onclick = (e) => busy(e.target, async () => {
+  loResult(t("Preparo LFM3… (installa Ollama se manca, poi scarica il modello)"));
+  loResult(await invoke("local_lfm3", { variant: $("lfm3-variant").value, primary: $("lfm3-primary").checked }));
+  refreshAiFromConfig();
+});
+$("lo-url-go").onclick = (e) => busy(e.target, async () => {
+  const name = await invoke("local_pull", { name: $("lo-url").value });
+  loResult(t("Scaricato: {name}. Premi «Usa» nella tabella per usarlo.", { name }));
+});
+
+// catalogo
+async function search() {
+  const box = $("lo-results");
+  box.innerHTML = '<div class="note" style="padding:8px">' + t("Cerco…") + "</div>";
+  const chips = [...document.querySelectorAll('#lo-chips input[data-kind="word"]:checked')].map((c) => c.value);
+  const caps = [...document.querySelectorAll('#lo-chips input[data-kind="cap"]:checked')].map((c) => c.value);
+  let list;
+  try {
+    list = await invoke("local_search", { source: $("lo-source").value, query: $("lo-query").value, chips, caps, maxB: +$("lo-size").value });
+  } catch (e) { box.innerHTML = ""; box.append(Object.assign(document.createElement("div"), { className: "note bad", textContent: String(e) })); return; }
+  box.innerHTML = "";
+  if (!list.length) { box.innerHTML = '<div class="note" style="padding:8px">' + t("Nessun modello trovato con questi filtri.") + "</div>"; return; }
+  for (const m of list) box.append(resultItem(m));
+}
+function resultItem(m) {
+  const d = document.createElement("div");
+  d.className = "lo-item";
+  d.append(Object.assign(document.createElement("div"), { className: "nm", textContent: m.name }));
+  const act = document.createElement("div");
+  act.className = "act";
+  if (m.source === "huggingface") {
+    const sel = document.createElement("select");
+    sel.append(Object.assign(document.createElement("option"), { value: "", textContent: t("quantizzazione predefinita (Q4_K_M)") }));
+    sel.onfocus = async () => {
+      if (sel.dataset.loaded) return;
+      sel.dataset.loaded = "1";
+      try {
+        for (const [f, size] of await invoke("local_hf_files", { repo: m.name })) sel.append(Object.assign(document.createElement("option"), { value: f, textContent: `${f} · ${fmtSize(size)}` }));
+      } catch {}
+    };
+    act.append(sel);
+    const b = Object.assign(document.createElement("button"), { textContent: t("⬇ Scarica"), className: "small" });
+    b.onclick = () => busy(b, async () => { await invoke("local_pull", { name: m.name + (sel.value ? ":" + sel.value : "") }); });
+    act.append(b);
+  } else {
+    const tags = m.sizes.length > 1 ? m.sizes : [];
+    let sel = null;
+    if (tags.length) {
+      sel = document.createElement("select");
+      for (const s of tags) sel.append(Object.assign(document.createElement("option"), { value: s, textContent: s }));
+      act.append(sel);
+    }
+    const b = Object.assign(document.createElement("button"), { textContent: t("⬇ Scarica"), className: "small" });
+    b.onclick = () => busy(b, async () => { await invoke("local_pull", { name: m.name + (sel ? ":" + sel.value : "") }); });
+    act.append(b);
+  }
+  d.append(act);
+  if (m.description) d.append(Object.assign(document.createElement("div"), { className: "ds", textContent: m.description }));
+  const tg = document.createElement("div");
+  tg.className = "tg";
+  for (const x of [...m.capabilities, ...m.sizes]) tg.append(Object.assign(document.createElement("span"), { textContent: x }));
+  if (m.downloads) tg.append(Object.assign(document.createElement("span"), { textContent: "⬇ " + m.downloads }));
+  if (m.updated) tg.append(Object.assign(document.createElement("span"), { textContent: m.updated }));
+  d.append(tg);
+  return d;
+}
+$("lo-search").onclick = search;
+$("lo-query").addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
+$("lo-source").onchange = search;
+document.querySelectorAll("#lo-chips input, #lo-size").forEach((c) => (c.onchange = search));
+
+// GPU
+async function refreshGpu() {
+  gpuInfo = await invoke("local_gpu");
+  const g = gpuInfo;
+  const list = $("gpu-list");
+  list.innerHTML = "";
+  if (!g.gpus.length) list.textContent = t("Nessuna scheda video trovata.");
+  for (const x of g.gpus) {
+    const row = document.createElement("div");
+    row.textContent = `• ${x.name}${x.vram_mb ? " · " + (x.vram_mb / 1024).toFixed(0) + " GB" : ""}${x.integrated ? " · " + t("integrata") : ""}`;
+    list.append(row);
+  }
+  const used = document.createElement("div");
+  used.style.marginTop = "6px";
+  used.textContent = g.devices.length
+    ? t("Ollama usa: {list}", { list: g.devices.map((d) => `${d.description || d.id} (${d.library}${d.total ? ", " + d.total : ""})`).join(", ") })
+    : t("Ollama non ha ancora segnalato le GPU (avvialo, poi «Aggiorna»): senza GPU usa la CPU.");
+  list.append(used);
+  $("gpu-advice").textContent = g.advice;
+  const s = g.settings;
+  $("gpu-backend").value = s.backend;
+  const dev = $("gpu-device");
+  dev.innerHTML = "";
+  dev.append(Object.assign(document.createElement("option"), { value: "", textContent: t("Decide Ollama") }));
+  for (const d of g.devices.filter((d) => d.library.toLowerCase() === "vulkan")) {
+    dev.append(Object.assign(document.createElement("option"), { value: d.id, textContent: `${d.id}: ${d.description}${d.kind ? " (" + d.kind + ")" : ""}` }));
+  }
+  if (s.vk_device && ![...dev.options].some((o) => o.value === s.vk_device)) dev.append(Object.assign(document.createElement("option"), { value: s.vk_device, textContent: s.vk_device }));
+  dev.value = s.vk_device;
+  $("gpu-fa").checked = s.flash_attention;
+  $("gpu-kv").value = s.kv_cache;
+  $("gpu-hsa").value = s.hsa_override;
+  $("gpu-hsa-row").style.display = document.body.classList.contains("os-linux") ? "" : "none";
+  $("lo-autostart").checked = s.autostart;
+  if (s.backend === "auto" && g.suggested_backend !== "auto") $("gpu-advice").textContent += " " + t("Suggerito: {b}.", { b: g.suggested_backend });
+}
+$("gpu-apply").onclick = async (e) => {
+  const r = $("gpu-result");
+  e.target.disabled = true;
+  const settings = { ...gpuInfo.settings, backend: $("gpu-backend").value, vk_device: $("gpu-device").value, flash_attention: $("gpu-fa").checked, kv_cache: $("gpu-kv").value, hsa_override: $("gpu-hsa").value.trim() };
+  try { r.textContent = await invoke("local_gpu_apply", { settings, restart: !!localStatus?.installed }); r.className = "result ok"; }
+  catch (err) { r.textContent = String(err); r.className = "result bad"; }
+  e.target.disabled = false;
+  refreshLocal(true);
+};

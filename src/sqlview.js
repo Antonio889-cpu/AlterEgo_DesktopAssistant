@@ -15,6 +15,8 @@ function render(r) {
     ? t("{n} righe{more} · {ms} ms", { n: r.rows.length, more: r.truncated ? "+" : "", ms: r.ms })
     : t("{n} righe modificate · {ms} ms", { n: r.affected, ms: r.ms });
   $("meta").append(who, " · " + info);
+  $("empty").hidden = r.columns.length > 0;
+  if (!r.columns.length && !r.error) { $("empty").hidden = false; $("empty").textContent = t("{n} righe modificate.", { n: r.affected }); }
   const head = $("grid").querySelector("thead");
   const body = $("grid").querySelector("tbody");
   head.innerHTML = ""; body.innerHTML = "";

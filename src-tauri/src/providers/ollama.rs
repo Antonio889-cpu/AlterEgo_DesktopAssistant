@@ -60,6 +60,12 @@ pub fn body(t: &Target, system: &str, messages: &[ChatMessage], tools: Option<&V
     if t.top_p < 1.0 {
         options["top_p"] = json!(t.top_p);
     }
+    if o.top_k > 0 {
+        options["top_k"] = json!(o.top_k);
+    }
+    if o.repeat_penalty > 0.0 {
+        options["repeat_penalty"] = json!(o.repeat_penalty);
+    }
     let mut b = json!({ "model": t.model, "messages": to_native(system, messages), "stream": true, "options": options });
     if let Some(tools) = tools {
         b["tools"] = tools.clone();
@@ -177,7 +183,7 @@ mod tests {
     #[test]
     fn native_body() {
         let t = Target {
-            ollama: Some(crate::config::OllamaOpts { num_ctx: 16384, keep_alive: "-1".into(), num_gpu: -1 }),
+            ollama: Some(crate::config::OllamaOpts { num_ctx: 16384, keep_alive: "-1".into(), num_gpu: -1, top_k: 50, repeat_penalty: 1.1 }),
             max_tokens: 500,
             model: "qwen3".into(),
             ..Target::basic("ollama", "http://localhost:11434/v1".into(), None)
@@ -190,6 +196,7 @@ mod tests {
         let b = body(&t, "sys", &msgs, None, true);
         assert_eq!(b["options"]["num_ctx"], 16384);
         assert_eq!(b["options"]["num_predict"], 500);
+        assert_eq!((b["options"]["top_k"].clone(), b["options"]["repeat_penalty"].clone()), (json!(50), json!(1.1)));
         assert!(b["options"].get("num_gpu").is_none());
         assert_eq!(b["keep_alive"], -1);
         assert_eq!(b["think"], false);

@@ -1,6 +1,6 @@
 [package]
 name = "alter-ego"
-version = "1.6.0"
+version = "1.7.0"
 description = "Alter Ego – assistente desktop personale"
 edition = "2021"
 

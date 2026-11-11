@@ -201,6 +201,8 @@ pub fn open_link(which: &str) -> Result<(), String> {
         "releases" => releases_url(),
         "spotify_dev" => "https://developer.spotify.com/dashboard".to_string(),
         "rizzo" => "https://github.com/Rizzo-AI-Academy/rizzo-flow".to_string(),
+        "graphify" => "https://github.com/Graphify-Labs/graphify".to_string(),
+        "lfm3" => "https://www.liquid.ai/blog/lfm3".to_string(),
         _ => return Err("link sconosciuto".into()),
     };
     #[cfg(windows)]

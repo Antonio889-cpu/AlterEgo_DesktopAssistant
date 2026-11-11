@@ -26,6 +26,7 @@ Tutte le azioni sono **spente di default**. Si attivano in *Impostazioni → Per
 | Appunti | `read_clipboard`, `write_clipboard` | ⚠ per leggere | Solo testo. |
 | Lettura schermo | `take_screenshot`, `zoom_screen` | ⚠ sempre | Serve un provider con "visione" spuntata. Alter Ego si nasconde durante lo scatto. |
 | Database SQL Server | `sql_connect`, `sql_query`, `sql_disconnect` | modifiche ⚠ | Vedi sotto. |
+| Mappa dei progetti | `graph_build`, `graph_ask` | ⚠ per `graph_build` | Stesse cartelle della Gestione file (o tutto il disco). Vedi sotto. |
 | Volume e luminosità | `set_volume`, `set_brightness` | no | Volume con i tasti multimediali; luminosità solo su schermi di portatili. |
 | Comandi | `run_command` | ⚠ sempre | Solo comandi della lista (nome → comando), scelti per nome. Mai testo libero. |
 
@@ -102,6 +103,26 @@ Strumenti `sql_connect`, `sql_query`, `sql_disconnect` (driver [tiberius](https:
   Il tipo si decide togliendo commenti e stringhe e cercando le parole chiave: con il permesso *Modifiche* spento si eseguono solo letture.
 - Query ferma più di 120 secondi: interrotta, connessione chiusa.
 - Nella **finestra SQL** l'utente vede le query di Alter Ego e può scrivere le sue (senza conferma, con gli stessi permessi).
+
+## Mappa dei progetti (Graphify)
+
+Strumenti `graph_build` e `graph_ask` ([Graphify](https://github.com/Graphify-Labs/graphify), Apache-2.0). Spento di default.
+
+- Si installa dalle impostazioni con `uv tool install graphifyy` (pacchetto ufficiale, con conferma).
+- `graph_build` (conferma) esegue `graphify update <cartella>`: il codice viene analizzato in locale con tree-sitter, senza AI.
+  Il grafo va in `<cartella dati di Alter Ego>/graphs/<nome>-<hash>` (variabile `GRAPHIFY_OUT`), non nella cartella dell'utente.
+- `graph_ask` esegue `graphify query|explain|path|god-nodes` sul grafo, con un tetto di token (`--budget`), e restituisce il risultato come **DATO**.
+- Le cartelle seguono le regole della Gestione file (lista o tutto il disco). Gli argomenti passano come argv, mai in una shell.
+
+## Strumenti a gruppi
+
+Con *Strumenti a gruppi* (Risparmio token) il modello riceve solo i gruppi di strumenti che la domanda sembra chiedere, più `load_tools`
+per caricare gli altri. `load_tools` non esegue niente: aggiunge definizioni di strumenti già consentiti nei Permessi.
+
+## Modelli locali
+
+Installare Ollama (scarica ed esegue l'installer o il pacchetto ufficiale da ollama.com) e riavviarlo con nuove impostazioni GPU
+chiedono **sempre** conferma. I download dei modelli e la ricerca nel catalogo partono solo dai pulsanti delle impostazioni, non dal modello AI.
 
 ## Comandi dell'app
 

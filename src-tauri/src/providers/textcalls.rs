@@ -144,6 +144,23 @@ fn json_at(s: &str, from: usize) -> Option<(Value, usize)> {
     Some((v, start + de.byte_offset()))
 }
 
+/// `<parameter=chiave>valore</parameter>` ripetuto → oggetto JSON (valori JSON se validi, altrimenti testo).
+fn xml_params(body: &str) -> Value {
+    let mut args = Map::new();
+    let mut p = 0;
+    while let Some(a) = find_ci(body, "<parameter=", p) {
+        let ne = body[a + 11..].find('>').map(|e| a + 11 + e).unwrap_or(body.len());
+        let key = body[a + 11..ne].trim().trim_matches('"').to_string();
+        let ve = find_ci(body, "</parameter>", ne).unwrap_or(body.len());
+        let raw = body.get(ne + 1..ve).unwrap_or("");
+        if !key.is_empty() {
+            args.insert(key, param_value(raw, None));
+        }
+        p = ve.max(ne + 1);
+    }
+    Value::Object(args)
+}
+
 /// Altri formati testuali: `<tool_call>{json}</tool_call>`, `<function=nome>{json}</function>`,
 /// `[TOOL_CALLS][{...}]`, `<|tool_calls_begin|>…<|tool_sep|>nome ```json {…}``` …`.
 fn parse_others(s: &str) -> (Vec<(String, Value)>, Vec<(usize, usize)>) {
@@ -161,13 +178,15 @@ fn parse_others(s: &str) -> (Vec<(String, Value)>, Vec<(usize, usize)>) {
         cuts.push((a, end));
         pos = end;
     }
-    // Llama 3.x
+    // Llama 3.x (`<function=nome>{json}</function>`) e XML di LFM3 / Qwen3-Coder
+    // (`<function=nome><parameter=chiave>valore</parameter></function>`)
     let mut pos = 0;
     while let Some(a) = find_ci(s, "<function=", pos) {
         let name_end = s[a + 10..].find('>').map(|e| a + 10 + e).unwrap_or(s.len());
         let name = s[a + 10..name_end].trim().trim_matches('"').to_string();
         let end = find_ci(s, "</function>", name_end).map(|e| e + 11).unwrap_or(s.len());
-        let args = json_at(&s[..end], name_end).map(|(v, _)| v).unwrap_or(json!({}));
+        let body = s.get(name_end + 1..end.saturating_sub(11).max(name_end + 1)).unwrap_or("");
+        let args = if find_ci(body, "<parameter=", 0).is_some() { xml_params(body) } else { json_at(&s[..end], name_end).map(|(v, _)| v).unwrap_or(json!({})) };
         if !name.is_empty() {
             calls.push((name, args));
         }
@@ -297,5 +316,12 @@ mod tests {
         assert_eq!((c.as_str(), calls.len()), ("Ecco", 0));
         // testo normale invariato
         assert_eq!(extract("[happy] ciao", &allowed()).0, "[happy] ciao");
+        // LFM3 (XML con parametri)
+        let t = "[happy]\nSubito.\n<tool_call>\n<function=play_music>\n<parameter=query>\nBad Apple\n</parameter>\n<parameter=enqueue>\ntrue\n</parameter>\n</function>\n</tool_call>";
+        let (c, calls) = extract(t, &allowed());
+        assert_eq!(c, "[happy]\nSubito.");
+        assert_eq!(calls.len(), 1);
+        let a: Value = serde_json::from_str(&calls[0].arguments).unwrap();
+        assert_eq!(a, json!({"query": "Bad Apple", "enqueue": true}));
     }
 }

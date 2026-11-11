@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 let spec = null;
 
 function build() {
-  $("title").textContent = spec.title;
+  $("title").textContent = " · " + spec.title;
   document.title = spec.title;
   $("intro").textContent = spec.intro || "";
   const form = $("form");
@@ -29,7 +29,7 @@ function build() {
     }
     input.name = f.name;
     input.dataset.kind = f.type;
-    if (f.type === "checkbox") { label.className = "inline"; label.append(input, " " + f.label); }
+    if (f.type === "checkbox") { label.className = "inline"; label.append(input, Object.assign(document.createElement("span"), { textContent: f.label })); }
     else { const span = document.createElement("span"); span.textContent = f.label; label.append(span, input); }
     form.append(label);
   }

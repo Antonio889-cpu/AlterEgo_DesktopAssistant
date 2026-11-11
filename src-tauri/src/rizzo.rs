@@ -61,7 +61,7 @@ fn exe(name: &str) -> String {
 }
 
 /// `uv`: nel PATH o dove lo mette il suo installer (~/.local/bin, ~/.cargo/bin).
-fn find_uv() -> Option<PathBuf> {
+pub(crate) fn find_uv() -> Option<PathBuf> {
     let mut c = vec![PathBuf::from(exe("uv"))];
     if let Some(home) = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from) {
         c.push(home.join(".local").join("bin").join(exe("uv")));
@@ -159,12 +159,12 @@ fn run_step(app: &AppHandle, log: &Path, label: &str, cmd: &mut Command) -> Resu
 }
 
 /// `run_step` su un thread a parte (i passi durano anche decine di minuti).
-async fn step(app: &AppHandle, log: &Path, label: &str, mut cmd: Command) -> Result<(), String> {
+pub(crate) async fn step(app: &AppHandle, log: &Path, label: &str, mut cmd: Command) -> Result<(), String> {
     let (app, log, label) = (app.clone(), log.to_path_buf(), label.to_string());
     tauri::async_runtime::spawn_blocking(move || run_step(&app, &log, &label, &mut cmd)).await.map_err(|e| e.to_string())?
 }
 
-async fn install_uv(app: &AppHandle, log: &Path) -> Result<PathBuf, String> {
+pub(crate) async fn install_uv(app: &AppHandle, log: &Path) -> Result<PathBuf, String> {
     let mut cmd;
     #[cfg(windows)]
     {
