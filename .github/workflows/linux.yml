@@ -1,0 +1,62 @@
+# Compila solo la versione Linux (AppImage e .deb) di una release già pubblicata e la aggiunge ai suoi file,
+# aggiornando SHA256SUMS.txt. Si avvia a mano: Actions → Linux build → Run workflow (tag della release, es. 1.8.0).
+name: Linux build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag della release esistente (es. 1.8.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    # 22.04: l'AppImage funziona anche sulle distribuzioni con glibc meno recente
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Librerie di sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+            libssl-dev libasound2-dev libdbus-1-dev patchelf file
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Dipendenze
+        run: npm ci
+
+      - name: Build
+        run: npx tauri build --bundles deb,appimage
+
+      - name: Carica nella release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mkdir -p out old
+          cp src-tauri/target/release/bundle/appimage/*.AppImage "out/AlterEgo_${version}_amd64.AppImage"
+          cp src-tauri/target/release/bundle/deb/*.deb "out/AlterEgo_${version}_amd64.deb"
+          gh release download "$TAG" -p SHA256SUMS.txt -D old || touch old/SHA256SUMS.txt
+          (cd out && sha256sum -- *) > new.txt
+          # le righe vecchie degli stessi file vengono sostituite
+          grep -v -F -f <(awk '{print $2}' new.txt) old/SHA256SUMS.txt > SHA256SUMS.txt || true
+          cat new.txt >> SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" out/* SHA256SUMS.txt --clobber

@@ -1,3 +1,14 @@
+## Alter Ego 1.8.0
+
+- Local models: Gemma 4 and Gemma 3 among the recommended ones, catalog in its own window, tools work again (16K/32K context), Hugging Face quantization links fixed, long names no longer overflow.
+- Hermes Agent: one-click install, long tasks delegated (with confirmation), optional "Hermes as the brain".
+- VoiceStudio as a voice, with setup and autostart. Rizzo Flow from an existing folder.
+- SQL Server LocalDB, camera-shutter animation on screenshots, push-to-talk that works inside games and shows her right away, waits for slow pages.
+- Memory: Compact button and automatic cleanup. Alter Ego more in character.
+- Garry's Mod (Shinri Trial): she reacts to the game's sounds (off by default).
+
+`AlterEgo_1.8.0_setup.exe` / `AlterEgo_1.8.0_portable.zip` Windows · `AlterEgo_1.8.0_amd64.AppImage` / `AlterEgo_1.8.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.7.0
 
 - Local models: LFM3 by Liquid AI in one click, Ollama installed for you, model browser with filters (abliterated, uncensored, tools, vision…), download from Hugging Face or a .gguf address.
