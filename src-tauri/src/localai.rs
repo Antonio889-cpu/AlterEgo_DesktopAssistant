@@ -949,7 +949,8 @@ pub async fn local_hf_files(app: AppHandle, repo: String) -> Result<Vec<(String,
 // ---------- catalogo (finestra a parte) ----------
 
 #[tauri::command]
-pub fn local_catalog_open(app: AppHandle) -> Result<(), String> {
+// async: su Windows una finestra creata da un comando sincrono resta bianca (webview bloccata)
+pub async fn local_catalog_open(app: AppHandle) -> Result<(), String> {
     use tauri::{WebviewUrl, WebviewWindowBuilder};
     if let Some(w) = app.get_webview_window("models") {
         let _ = w.unminimize();

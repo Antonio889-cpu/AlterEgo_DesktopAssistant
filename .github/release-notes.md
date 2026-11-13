@@ -1,3 +1,9 @@
+## Alter Ego 1.8.1
+
+- Fix: the model catalog window opened blank on Windows.
+
+`AlterEgo_1.8.1_setup.exe` / `AlterEgo_1.8.1_portable.zip` Windows · `AlterEgo_1.8.1_amd64.AppImage` / `AlterEgo_1.8.1_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.8.0
 
 - Local models: Gemma 4 and Gemma 3 among the recommended ones, catalog in its own window, tools work again (16K/32K context), Hugging Face quantization links fixed, long names no longer overflow.
