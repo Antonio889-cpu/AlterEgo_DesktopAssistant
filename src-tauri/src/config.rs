@@ -271,6 +271,8 @@ pub struct Permissions {
     pub sql_write: bool,
     /// Mappe dei progetti con Graphify (cartelle della Gestione file).
     pub graph: bool,
+    /// Strumento `hermes_task`: delega a Hermes Agent (solo se installato; conferma a ogni uso).
+    pub hermes: bool,
 }
 
 impl Default for Permissions {
@@ -301,6 +303,7 @@ impl Default for Permissions {
             sql: false,
             sql_write: false,
             graph: false,
+            hermes: true,
         }
     }
 }
@@ -482,6 +485,8 @@ pub struct AudioConfig {
     pub kokoro_speed: f64,
     /// Avvia il server Kokoro insieme ad Alter Ego (se installato).
     pub kokoro_autostart: bool,
+    /// Avvia VoiceStudio insieme ad Alter Ego quando è la voce in uso (URL sulla porta 3900).
+    pub voicestudio_autostart: bool,
     /// Altoparlanti/cuffie per voce e suoni ("" = predefinito di Windows).
     pub output_device: String,
     /// Microfono per il push-to-talk ("" = predefinito di Windows).
@@ -506,6 +511,7 @@ impl Default for AudioConfig {
             kokoro_voice_en: "af_heart".into(),
             kokoro_speed: 1.0,
             kokoro_autostart: true,
+            voicestudio_autostart: true,
             output_device: String::new(),
             input_device: String::new(),
             mic_link: MicLink::default(),
@@ -581,11 +587,13 @@ pub struct RizzoConfig {
     pub autostart: bool,
     /// Taglia del modello: "4b" (più preciso) o "1.7b" (più leggero).
     pub size: String,
+    /// Cartella di un Rizzo Flow già scaricato ("" = quella gestita da Alter Ego).
+    pub dir: String,
 }
 
 impl Default for RizzoConfig {
     fn default() -> Self {
-        Self { autostart: false, size: "4b".into() }
+        Self { autostart: false, size: "4b".into(), dir: String::new() }
     }
 }
 
@@ -746,7 +754,11 @@ pub struct Config {
     pub saving: SavingConfig,
     /// Spotify (utenti Premium): controllo della riproduzione via Web API.
     pub spotify: SpotifyConfig,
+    /// Reagisce ai suoni di Garry's Mod (Shinri Trial) ascoltando l'audio del PC (spento di default).
+    pub gmod: bool,
     pub rizzo: RizzoConfig,
+    /// Hermes Agent come "cervello": ogni messaggio va a Hermes (spento di default).
+    pub hermes_brain: bool,
     pub sql: SqlConfig,
     pub local: LocalConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
@@ -785,7 +797,9 @@ impl Default for Config {
             web: WebConfig::default(),
             saving: SavingConfig::default(),
             spotify: SpotifyConfig::default(),
+            gmod: false,
             rizzo: RizzoConfig::default(),
+            hermes_brain: false,
             sql: SqlConfig::default(),
             local: LocalConfig::default(),
             clip: ClipConfig::default(),

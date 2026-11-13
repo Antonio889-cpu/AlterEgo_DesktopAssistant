@@ -35,11 +35,20 @@ fn friendly(exe: &str) -> String {
 
 /// (app aperte ordinate, app in primo piano). Nomi degli eseguibili senza estensione.
 pub fn running() -> (Vec<String>, Option<String>) {
+    let stem = |p: String| std::path::Path::new(&p).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
     let (exes, fg) = imp::windows();
+    let (exes, fg): (Vec<String>, _) = (exes.into_iter().map(stem).collect(), fg.map(stem));
     let keep = |e: &String| !e.is_empty() && !SKIP.contains(&e.to_lowercase().as_str());
     let set: BTreeSet<String> = exes.into_iter().filter(keep).map(|e| friendly(&e)).collect();
     let fg = fg.filter(keep).map(|e| friendly(&e));
     (set.into_iter().take(20).collect(), fg)
+}
+
+/// Percorso completo del primo processo con finestra il cui eseguibile si chiama come uno di `names`.
+pub fn exe_path(names: &[&str]) -> Option<std::path::PathBuf> {
+    imp::windows().0.into_iter().map(std::path::PathBuf::from).find(|p| {
+        p.file_stem().is_some_and(|s| names.iter().any(|n| s.to_string_lossy().eq_ignore_ascii_case(n)))
+    })
 }
 
 /// Riga di contesto da aggiungere alla domanda (vuota se non si trova niente).
@@ -78,8 +87,7 @@ mod imp {
             if ok == 0 {
                 return String::new();
             }
-            let path = String::from_utf16_lossy(&buf[..len as usize]);
-            std::path::Path::new(&path).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
+            String::from_utf16_lossy(&buf[..len as usize])
         }
     }
 

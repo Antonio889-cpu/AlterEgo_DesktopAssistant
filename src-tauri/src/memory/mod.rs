@@ -242,6 +242,33 @@ impl Memory {
         Ok(due)
     }
 
+    /// Sostituisce tutti i fatti (dopo la compattazione).
+    pub fn replace_facts(&self, facts: &[String]) -> R<()> {
+        let mut c = self.conn.lock().unwrap();
+        let tx = c.transaction().map_err(e)?;
+        tx.execute("DELETE FROM facts", []).map_err(e)?;
+        for f in facts {
+            let f = f.trim().trim_start_matches(['-', '*', '•']).trim();
+            if f.len() >= 3 {
+                tx.execute("INSERT OR IGNORE INTO facts (ts, content) VALUES (?1, ?2)", params![now(), f]).map_err(e)?;
+            }
+        }
+        tx.commit().map_err(e)
+    }
+
+    /// Toglie ciò che il riassunto più recente copre già: messaggi riassunti fuori dagli ultimi `keep`
+    /// e riassunti vecchi. Poi compatta il file. Restituisce (messaggi, riassunti) eliminati.
+    pub fn prune(&self, keep: usize) -> R<(usize, usize)> {
+        let Some((upto, _)) = self.latest_summary()? else { return Ok((0, 0)) };
+        let c = self.conn.lock().unwrap();
+        let msgs = c
+            .execute("DELETE FROM messages WHERE id <= ?1 AND id NOT IN (SELECT id FROM messages ORDER BY id DESC LIMIT ?2)", params![upto, keep as i64])
+            .map_err(e)?;
+        let sums = c.execute("DELETE FROM summaries WHERE id <> (SELECT MAX(id) FROM summaries)", []).map_err(e)?;
+        c.execute_batch("VACUUM;").map_err(e)?;
+        Ok((msgs, sums))
+    }
+
     /// "Dimentica tutto": svuota ogni tabella e compatta il file.
     pub fn forget_all(&self) -> R<()> {
         self.conn
@@ -293,6 +320,25 @@ mod tests {
         assert_eq!(m.pending_reminders().unwrap().len(), 1);
         assert!(m.cancel_reminder(a).is_err()); // già fatto
         assert_eq!(m.take_due_reminders(150).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn replace_and_prune() {
+        let m = Memory::in_memory();
+        for i in 0..10 {
+            m.add_message("user", &format!("m{i}")).unwrap();
+        }
+        assert_eq!(m.prune(3).unwrap(), (0, 0)); // niente riassunto: non si tocca nulla
+        m.add_summary(5, "vecchio").unwrap();
+        m.add_summary(8, "nuovo").unwrap();
+        // riassunti fino all'id 8, ma gli ultimi 3 messaggi (8, 9, 10) restano
+        assert_eq!(m.prune(3).unwrap(), (7, 1));
+        assert_eq!(m.recent(10).unwrap().iter().map(|x| x.content.as_str()).collect::<Vec<_>>(), ["m7", "m8", "m9"]);
+        assert_eq!(m.latest_summary().unwrap().unwrap().1, "nuovo");
+        m.add_fact("a").unwrap();
+        m.add_fact("vecchio fatto").unwrap();
+        m.replace_facts(&["- Si chiama Anna".into(), "Si chiama Anna".into(), "x".into()]).unwrap();
+        assert_eq!(m.facts().unwrap().iter().map(|f| f.content.as_str()).collect::<Vec<_>>(), ["Si chiama Anna"]);
     }
 
     #[test]

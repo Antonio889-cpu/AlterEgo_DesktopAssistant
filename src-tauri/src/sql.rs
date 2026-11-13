@@ -18,7 +18,10 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 pub const VIEW: &str = "sqlview";
 const KEY_SLOT: &str = "sql";
 
-type Conn = Client<Compat<TcpStream>>;
+/// TCP o named pipe (LocalDB ascolta solo sulla pipe).
+trait Io: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send {}
+impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send> Io for T {}
+type Conn = Client<Compat<Box<dyn Io>>>;
 
 #[derive(Default)]
 pub struct Sql {
@@ -153,7 +156,7 @@ pub async fn connect(app: &AppHandle, hint: &Value) -> Result<String, String> {
     }
     let f = crate::form::field;
     let mut fields = vec![
-        f("server", crate::i18n::tr("Server (es. localhost, localhost\\SQLEXPRESS, 127.0.0.1,1433)", "Server (e.g. localhost, localhost\\SQLEXPRESS, 127.0.0.1,1433)"), "text", json!(pick("server", &cfg.server))),
+        f("server", crate::i18n::tr("Server (es. localhost, localhost\\SQLEXPRESS, (localdb)\\MSSQLLocalDB, 127.0.0.1,1433)", "Server (e.g. localhost, localhost\\SQLEXPRESS, (localdb)\\MSSQLLocalDB, 127.0.0.1,1433)"), "text", json!(pick("server", &cfg.server))),
         f("database", crate::i18n::tr("Database (vuoto = predefinito)", "Database (empty = default)"), "text", json!(pick("database", &cfg.database))),
         json!({ "name": "auth", "label": crate::i18n::tr("Accesso", "Authentication"), "type": "select", "value": cfg.auth, "options": auths }),
         f("user", crate::i18n::tr("Utente", "User"), "text", json!(pick("user", &cfg.user))),
@@ -211,7 +214,8 @@ async fn open(app: &AppHandle, c: &SqlConfig, password: &str) -> Result<String, 
 
 /// Apre la connessione (solo server locali).
 async fn client(c: &SqlConfig, password: &str) -> Result<Conn, String> {
-    let (host, port, instance) = parse_server(&c.server)?;
+    let localdb = localdb_instance(&c.server);
+    let (host, port, instance) = if localdb.is_some() { ("localhost".into(), None, None) } else { parse_server(&c.server)? };
     let mut config = Config::new();
     config.host(&host);
     if let Some(p) = port {
@@ -227,6 +231,10 @@ async fn client(c: &SqlConfig, password: &str) -> Result<Conn, String> {
     if c.trust_cert {
         config.trust_cert();
     }
+    if localdb.is_some() {
+        // LocalDB non supporta TLS; la pipe non esce dal PC
+        config.encryption(tiberius::EncryptionLevel::NotSupported);
+    }
     #[cfg(windows)]
     let auth = if c.auth == "windows" { AuthMethod::Integrated } else { AuthMethod::sql_server(&c.user, password) };
     #[cfg(not(windows))]
@@ -234,6 +242,12 @@ async fn client(c: &SqlConfig, password: &str) -> Result<Conn, String> {
     config.authentication(auth);
 
     let connect = async {
+        #[cfg(windows)]
+        if let Some(name) = &localdb {
+            let pipe = localdb_pipe(name).await?;
+            let io: Box<dyn Io> = Box::new(open_pipe(&pipe).await?);
+            return Client::connect(config, io.compat_write()).await.map_err(|e| e.to_string());
+        }
         let tcp = if instance.is_some() && port.is_none() {
             use tiberius::SqlBrowser;
             TcpStream::connect_named(&config).await.map_err(|e| e.to_string())?
@@ -241,12 +255,60 @@ async fn client(c: &SqlConfig, password: &str) -> Result<Conn, String> {
             TcpStream::connect(config.get_addr()).await.map_err(|e| e.to_string())?
         };
         tcp.set_nodelay(true).ok();
-        Client::connect(config, tcp.compat_write()).await.map_err(|e| e.to_string())
+        let io: Box<dyn Io> = Box::new(tcp);
+        Client::connect(config, io.compat_write()).await.map_err(|e| e.to_string())
     };
     tokio::time::timeout(Duration::from_secs(20), connect)
         .await
         .map_err(|_| crate::i18n::tr("SQL Server non risponde (20 s): è avviato? TCP/IP è attivo?", "SQL Server does not answer (20 s): is it running? Is TCP/IP enabled?").to_string())?
         .map_err(|e| crate::tr!("connessione a SQL Server non riuscita: {}", "could not connect to SQL Server: {}", explain(&e)))
+}
+
+/// "(localdb)\MSSQLLocalDB" → Some("MSSQLLocalDB") (istanza predefinita se manca il nome).
+pub fn localdb_instance(server: &str) -> Option<String> {
+    let s = server.trim();
+    let rest = s.get(..9).filter(|p| p.eq_ignore_ascii_case("(localdb)")).map(|_| &s[9..])?;
+    let name = rest.trim_start_matches('\\').trim();
+    Some(if name.is_empty() { "MSSQLLocalDB".into() } else { name.into() })
+}
+
+/// Avvia l'istanza LocalDB (se è ferma) e ne legge la named pipe da `SqlLocalDB info`.
+#[cfg(windows)]
+async fn localdb_pipe(name: &str) -> Result<String, String> {
+    let name = name.to_string();
+    tokio::task::spawn_blocking(move || {
+        use std::os::windows::process::CommandExt;
+        let mut exes = vec![std::path::PathBuf::from("SqlLocalDB.exe")];
+        let root = std::path::Path::new(&std::env::var("ProgramFiles").unwrap_or_default()).join("Microsoft SQL Server");
+        let mut found: Vec<_> = std::fs::read_dir(root).into_iter().flatten().flatten().map(|d| d.path().join(r"Tools\Binn\SqlLocalDB.exe")).filter(|p| p.is_file()).collect();
+        found.sort();
+        exes.extend(found.into_iter().rev());
+        let run = |exe: &std::path::Path, args: &[&str]| std::process::Command::new(exe).args(args).creation_flags(0x0800_0000).output();
+        for exe in &exes {
+            let Ok(_) = run(exe, &["start", &name]) else { continue };
+            let out = run(exe, &["info", &name]).map_err(|e| e.to_string())?;
+            let text = String::from_utf8_lossy(&out.stdout);
+            if let Some(p) = text.split_whitespace().find_map(|w| w.strip_prefix("np:")) {
+                return Ok(p.to_string());
+            }
+            return Err(crate::tr!("istanza LocalDB «{name}» non trovata o non avviabile ({})", "LocalDB instance “{name}” not found or could not start ({})", text.trim()));
+        }
+        Err(crate::i18n::tr("SqlLocalDB.exe non trovato: LocalDB è installato?", "SqlLocalDB.exe not found: is LocalDB installed?").into())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(windows)]
+async fn open_pipe(path: &str) -> Result<tokio::net::windows::named_pipe::NamedPipeClient, String> {
+    for _ in 0..50 {
+        match tokio::net::windows::named_pipe::ClientOptions::new().open(path) {
+            Ok(p) => return Ok(p),
+            Err(e) if e.raw_os_error() == Some(231) => tokio::time::sleep(Duration::from_millis(100)).await, // ERROR_PIPE_BUSY
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Err("LocalDB: pipe occupata".into())
 }
 
 /// Suggerimenti per gli errori più comuni (in locale).
@@ -499,6 +561,9 @@ mod tests {
         assert_eq!(parse_server("localhost").unwrap(), ("localhost".into(), None, None));
         assert_eq!(parse_server(".\\SQLEXPRESS").unwrap(), ("localhost".into(), None, Some("SQLEXPRESS".into())));
         assert_eq!(parse_server("127.0.0.1,1433").unwrap(), ("127.0.0.1".into(), Some(1433), None));
+        assert_eq!(localdb_instance(r"(localdb)\MSSQLLocalDB").as_deref(), Some("MSSQLLocalDB"));
+        assert_eq!(localdb_instance("(LocalDB)").as_deref(), Some("MSSQLLocalDB"));
+        assert_eq!(localdb_instance("localhost"), None);
         assert_eq!(parse_server("localhost:1434").unwrap().1, Some(1434));
         assert!(parse_server("db.example.com").is_err());
         assert!(parse_server("10.0.0.5").is_err());
@@ -517,6 +582,17 @@ mod tests {
         assert_eq!(classify("drop table t"), "danger");
         assert_eq!(classify("EXEC xp_cmdshell 'dir'"), "danger");
         assert_eq!(classify("WITH x AS (SELECT 1 a) SELECT * FROM x"), "read");
+    }
+
+    /// LocalDB di questo PC (autenticazione di Windows).
+    #[tokio::test]
+    #[ignore]
+    async fn localdb() {
+        let c = SqlConfig { server: r"(localdb)\MSSQLLocalDB".into(), auth: "windows".into(), ..Default::default() };
+        let mut cl = client(&c, "").await.unwrap();
+        let r = exec(&mut cl, "SELECT 1 AS uno, @@VERSION AS v").await;
+        assert!(r.error.is_none(), "{:?}", r.error);
+        println!("{:?}", r.rows);
     }
 
     /// Con un SQL Server vero: AE_SQL_TEST="server|utente|password|database" (es. docker mssql/server).
@@ -543,7 +619,7 @@ mod tests {
         // la connessione resta usabile dopo un errore
         assert!(exec(&mut cl, "SELECT 1 AS uno").await.error.is_none());
         let bad = client(&SqlConfig { server: p[0].into(), user: p[1].into(), auth: "sql".into(), trust_cert: true, ..Default::default() }, "sbagliata").await;
-        assert!(bad.unwrap_err().contains("utente o password sbagliati"));
+        assert!(bad.err().unwrap().contains("utente o password sbagliati"));
     }
 
     #[test]

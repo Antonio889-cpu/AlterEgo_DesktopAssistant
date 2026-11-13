@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Alter Ego – Catalogo modelli</title>
+  <link rel="stylesheet" href="crt.css" />
+  <style>
+    body { height: 100vh; }
+    .screen { height: calc(100vh - 16px); }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .row > input, .row > select { width: auto; flex: 1; min-width: 160px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+    .chip { display: inline-flex; flex-direction: row; gap: 5px; align-items: center; margin: 0; padding: 2px 9px; font-size: 13px;
+      border: 2px solid var(--dlg-border); background: var(--field); cursor: pointer; text-shadow: none; }
+    .chip:has(input:checked) { background: #fff6a8; }
+    .results-box { flex: 1; min-height: 160px; display: flex; }
+    .results-box > .inner { padding: 0; flex: 1; overflow: auto; background: var(--field); }
+    .item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 9px 12px; border-bottom: 2px dotted rgba(11, 29, 0, .25); }
+    .item:nth-child(even) { background: rgba(108, 194, 47, .12); }
+    .nm { font: 15px "DotGothic16", monospace; overflow-wrap: anywhere; min-width: 0; }
+    .ds { font-size: 13px; color: #29461a; grid-column: 1; overflow-wrap: anywhere; }
+    .tg { grid-column: 1; display: flex; gap: 5px; flex-wrap: wrap; font: 12px Consolas, monospace; }
+    .tg span { border: 1px solid #5d8a3c; padding: 0 5px; color: #29461a; }
+    .act { grid-column: 2; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+    .act select { width: 230px; font-size: 12px; padding: 3px 5px; }
+    .act button { font-size: 13px; padding: 3px 10px; }
+    .empty { padding: 14px; color: #3d5a2c; }
+    .progress { display: flex; gap: 10px; align-items: center; }
+    .progress[hidden] { display: none; }
+    .bar-out { flex: 0 0 240px; height: 14px; border: 2px solid var(--dlg-border); background: var(--field); }
+    .bar-out i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, var(--dlg-border) 0 6px, #3b8f12 6px 9px); transition: width .3s; }
+    #ptext { font: 13px Consolas, monospace; overflow-wrap: anywhere; }
+    #ptext.bad, #state.bad { color: var(--bad); }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="bar">
+      <h1>ALTER EGO<small>Catalogo modelli locali</small></h1>
+      <span id="state" class="status"></span>
+    </div>
+
+    <div class="box"><div class="inner">
+      <span class="tag">⭐ Consigliati</span>
+      <div class="row">
+        <select id="variant"></select>
+        <label class="inline" style="margin:0"><input type="checkbox" id="primary" checked /> usalo come modello principale</label>
+        <button id="rec-go" class="main">⬇ Installa e usa</button>
+      </div>
+      <p class="say" style="font-size:13px;margin-top:8px">LFM3: piccolo, ottimo con gli strumenti. Gemma 4: strumenti, visione, ragionamento. Gemma 3: chat e visione, senza strumenti su Ollama.</p>
+    </div></div>
+
+    <div class="box"><div class="inner">
+      <span class="tag">Cerca e scarica</span>
+      <div class="row">
+        <select id="source" style="flex:0 0 auto">
+          <option value="library">Libreria ufficiale di Ollama</option>
+          <option value="community">Modelli della community (ollama.com)</option>
+          <option value="huggingface">Hugging Face (GGUF)</option>
+        </select>
+        <input id="query" placeholder="es. qwen, gemma, llama, mistral…" />
+        <button id="search" class="main">Cerca</button>
+      </div>
+      <div class="chips" id="chips">
+        <label class="chip"><input type="checkbox" value="tools" data-kind="cap" /> strumenti</label>
+        <label class="chip"><input type="checkbox" value="vision" data-kind="cap" /> visione</label>
+        <label class="chip"><input type="checkbox" value="thinking" data-kind="cap" /> ragionamento</label>
+        <label class="chip"><input type="checkbox" value="abliterated" data-kind="word" /> abliterated</label>
+        <label class="chip"><input type="checkbox" value="uncensored" data-kind="word" /> uncensored</label>
+        <label class="chip"><input type="checkbox" value="heretic" data-kind="word" /> heretic</label>
+        <select id="size" style="width:auto"><option value="0">Qualsiasi dimensione</option><option value="2">fino a 2B</option><option value="4">fino a 4B</option><option value="8">fino a 8B (≈ 8 GB di VRAM)</option><option value="14">fino a 14B</option><option value="32">fino a 32B</option></select>
+      </div>
+    </div></div>
+
+    <div class="box results-box"><div class="inner" id="results"><div class="empty">Cerca un modello, oppure scegline uno consigliato qui sopra.</div></div></div>
+
+    <div class="box"><div class="inner">
+      <div class="row">
+        <span class="tag" style="margin:0">Da un indirizzo</span>
+        <input id="url" placeholder="hf.co/utente/modello-GGUF:Q4_K_M · link di Hugging Face · ollama.com/… · https://…/file.gguf" />
+        <button id="url-go">⬇ Scarica</button>
+      </div>
+      <div class="progress" id="progress" hidden><div class="bar-out"><i id="pbar"></i></div><span id="ptext"></span> <button id="cancel">Annulla</button></div>
+    </div></div>
+    <p class="note">Abliterated e uncensored sono versioni modificate da terzi senza i rifiuti del modello originale: usale con giudizio. I modelli scaricati compaiono nelle Impostazioni → Modelli locali.</p>
+  </div>
+  <script src="i18n.js"></script>
+  <script src="models.js"></script>
+</body>
+</html>

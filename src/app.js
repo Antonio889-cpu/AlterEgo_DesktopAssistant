@@ -157,6 +157,41 @@ listen("reminder", async (e) => {
   State.settle();
 });
 
+// ---------- Garry's Mod / Shinri Trial: reazioni ai suoni del gioco (vedi gmod.rs) ----------
+const GMOD_LINES = {
+  body: [["worried", "Un corpo è stato scoperto… Fai attenzione, per favore. Da adesso ogni dettaglio conta."],
+         ["sad", "Un altro corpo… Non doveva succedere. Aiutami a scoprire la verità."]],
+  check_body: [["thinking", "Stai esaminando il corpo… Guarda le ferite, la posizione e cosa c'è intorno."]],
+  investigation: [["thinking", "È iniziata l'indagine. Raccogli più prove che puoi, e se hai le mani sporche… lavale subito."]],
+  game_start: [["worried", "La partita è cominciata… Spero che nessuno ceda alla disperazione."]],
+  trial: [["thinking", "Il processo di classe sta per iniziare. Usa le prove che hai raccolto… io credo in te!"]],
+  voting: [["worried", "È il momento di votare… Pensaci bene. Una scelta sbagliata condanna tutti."]],
+  verdict_true: [["sad", "Avete trovato il colpevole… È la verità, anche se fa male."]],
+  verdict_false: [["surprised", "Il verdetto era sbagliato…! No… il colpevole l'ha fatta franca."]],
+  end_peaceful: [["happy", "È finita senza vittime… Sono così sollevata! Ce l'avete fatta tutti insieme."]],
+  end_failure: [["sad", "È finita male… Mi dispiace tanto. La prossima volta andrà meglio, vero?"]],
+  blackout: [["worried", "Blackout…! Resta vicino a qualcuno di cui ti fidi."]],
+  disguise: [["worried", "Travestimenti… adesso nessuno è chi sembra. Non fidarti dell'aspetto."]],
+  teleport: [["surprised", "Teletrasporto?! Guardati intorno, potresti essere ovunque…"]],
+  killer: [["sad", "Anche tu… alla fine hai ceduto alla disperazione…"],
+           ["sad", "Perché…? Speravo che la speranza vincesse… e invece anche tu hai ceduto alla disperazione."],
+           ["sad", "Non posso crederci… Hai davvero scelto la disperazione? Io… non so cosa dire."]],
+  hurt: [["surprised", "Ti hanno colpito! Stai bene? Allontanati, presto!"]],
+  death: [["sad", "No… non può essere… Ti prego, dimmi che è solo un gioco…"]],
+  low_sleep: [["worried", "Hai bisogno di dormire… Riposa un po', per favore."]],
+};
+listen("gmod", async (e) => {
+  const opts = GMOD_LINES[e.payload.event];
+  if (!opts) return;
+  const [emotion, text] = opts[Math.floor(Math.random() * opts.length)];
+  const line = t(text);
+  State.setEmotion(emotion);
+  State.setMode("speaking");
+  Audio2.speak(line);
+  await Dialog.say(line);
+  State.settle();
+});
+
 // ---------- accensione / spegnimento "vecchia TV" (vedi window.rs) ----------
 let tvTimer = null;
 function tvOn() {
@@ -179,6 +214,14 @@ function tvOff() {
   }, 470);
 }
 listen("tv", (e) => (e.payload === "on" ? tvOn() : tvOff()));
+// otturatore: si chiude prima dello screenshot e si riapre dopo
+listen("shutter", (e) => {
+  const s = document.getElementById("shutter");
+  s.className = "";
+  void s.offsetWidth;
+  s.className = e.payload;
+  if (e.payload === "open") setTimeout(() => (s.className = ""), 320);
+});
 
 // ---------- modalità compatta durante la musica ----------
 // Mentre suona un brano la finestra si rimpicciolisce; torna normale quando Alter Ego parla,

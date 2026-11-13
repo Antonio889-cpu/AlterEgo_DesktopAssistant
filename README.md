@@ -82,7 +82,7 @@ Interface in English and Italian.
 - **Talk to the app**: "open music venue", "close the audio player", "open the website", "check for updates"… everything about the app can be done by asking her.
 - **Mouse and keyboard**: if you allow it, Alter Ego moves the cursor, clicks, types and presses keys (with confirmation and an emergency stop).
   Precise clicks: screenshots with numbered rulers and the cursor marked, zoom on small targets, a check screenshot after each click and, on Windows, the exact position of buttons and fields (UI Automation).
-- **SQL Server** on your PC: when needed she asks for the connection details in a small form (the password never goes to the AI model), reads data, and with your permission changes it; results also show up in a SQL window where you can write your own queries.
+- **SQL Server** on your PC: when needed she asks for the connection details in a small form (the password never goes to the AI model), reads data, and with your permission changes it; results also show up in a SQL window where you can write your own queries. **LocalDB** works too: server `(localdb)\MSSQLLocalDB`.
 - **Complex requests**: she chains tools by herself (terminal, files, web, screen, database) for up to 12 steps (adjustable), checks each result and changes approach when something fails.
 - **Noise suppression** for the Mic-Link microphone (RNNoise, adjustable).
 - **Updates**: website and GitHub links in the app and a button to update to the latest release.
@@ -243,7 +243,9 @@ that start exactly like a previous request. That's why:
     and downloads the model. Then Alter Ego starts the server by itself (only on `127.0.0.1`) and closes it when you quit.
     Already have [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI)? Enter its URL and turn off autostart.
   - **Windows voices**, offline (more voices: Windows Settings → Time & language → Speech → Add voices);
-  - any **OpenAI-compatible** `/audio/speech` service (e.g. local Piper or a cloud service).
+  - any **OpenAI-compatible** `/audio/speech` service (e.g. local Piper or a cloud service);
+  - **[VoiceStudio](https://github.com/debpalash/VoiceStudio)** (AGPL-3.0, local voices and voice cloning): *Use VoiceStudio* installs it
+    with the official script if missing (with confirmation), starts it, points the voice at `http://127.0.0.1:3900/v1` and can start it together with Alter Ego.
 
   Sentences are synthesized one at a time: the first one plays right away, the others are prepared while she talks. Her face moves while the voice plays.
 - **Devices**: choose the output for voice and sounds and the push-to-talk microphone (or keep the Windows defaults).
@@ -367,8 +369,13 @@ Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini)
   Variants: `lfm3` (Q4), `lfm3:1.7b-qad-q4_0`, `lfm3:1.7b-q8_0`, and **LFM3-VL 2B** from the official GGUFs on Hugging Face (sees screenshots, experimental).
   Needs Ollama 0.40.12 or newer. Alter Ego applies Liquid AI's recommended settings (temperature 0.1, top_k 50, repeat penalty 1.1) and a 32K context.
   License: LFM Open License v1.0 (the model is downloaded by Ollama, it isn't bundled with Alter Ego).
-- **Model browser**: official Ollama library, community models and GGUFs on Hugging Face, with search and filters
+- **Recommended models**: LFM3, **Gemma 4** (tools, vision, reasoning) and **Gemma 3** (chat and vision; no tools on Ollama).
+- **Model catalog** in its own window, in Alter Ego's style: official Ollama library, community models and GGUFs on Hugging Face, with search and filters
   (abliterated, uncensored, heretic, tools, vision, reasoning, maximum size), quantization choice for Hugging Face, progress and cancel.
+- **Tools with local models**: Alter Ego talks to Ollama's native API and picks a 16K or 32K context by itself, so the system prompt
+  and the tool list are no longer cut off by Ollama's 4K default.
+
+![Model catalog](docs/screenshots/en/models-catalog.png)
 - **From an address**: `hf.co/user/model-GGUF:Q4_K_M`, any Hugging Face link (also to a single `.gguf`), `ollama.com/…`,
   or a `.gguf` from any site (downloaded, checked with SHA-256 and imported into Ollama).
 - **Installed models**: size, quantization, how much is on the GPU; *Use* (sets it as Alter Ego's model) and *Delete*.
@@ -382,6 +389,14 @@ actually uses (from its log), and lets you choose:
 - **flash attention** and a **q8_0 context cache** (half the memory, more context in 8 GB of VRAM).
 *Apply* restarts Ollama with these settings (on Windows they go into the user's environment variables). "CUDA emulation" (ZLUDA)
 isn't supported by Ollama: on Radeon cards Vulkan is the stable, fast path.
+
+## Hermes Agent
+
+[Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research, MIT) can work next to Alter Ego, in *Settings → Permissions*:
+- **Install Hermes** runs the official script (with confirmation); **Set up** opens `hermes setup` to pick its AI model.
+- **Delegate long tasks** (on by default, only if Hermes is installed): Alter Ego gets a `hermes_task` tool for research, code projects and automations,
+  asks you before each use and sums up the result. With Rizzo Flow as the router, Rizzo flags the requests worth delegating.
+- **Hermes as the brain** (off by default): every message goes to Hermes, Alter Ego adds voice and expressions.
 
 ## Alter Net
 
@@ -466,7 +481,11 @@ Every action, even a denied one, goes to **Settings → Log**. Technical details
 - **Memory** (SQLite, only on your PC):
   - every message sends the latest messages, a summary and the facts she knows about you;
   - from time to time she summarizes old conversations and learns lasting facts about you;
-  - in *Settings → Memory* you can see, add or delete facts, export everything as JSON or press *Forget everything*.
+  - in *Settings → Memory* you can see, add or delete facts, export everything as JSON or press *Forget everything*;
+  - **Compact** merges duplicate facts, drops useless ones and deletes old messages already covered by a summary (the latest ones stay);
+    it also runs by itself when she knows more than 40 facts.
+- **Character**: the sheet follows Alter Ego from Danganronpa more closely (Chihiro, hope and despair, how she talks);
+  an unmodified copy updates itself with new versions.
 
 ## Sprites
 

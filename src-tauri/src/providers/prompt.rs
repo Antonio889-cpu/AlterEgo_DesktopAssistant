@@ -13,11 +13,19 @@ pub fn persona_path(data_dir: &Path) -> std::path::PathBuf {
     data_dir.join("persona").join("alter_ego.md")
 }
 
-/// Legge la persona dell'utente; se manca la crea dal default.
+/// Impronte (FNV-1a, senza \r, senza spazi ai bordi) delle schede predefinite delle versioni precedenti:
+/// una copia mai modificata si aggiorna da sola.
+const OLD_DEFAULTS: &[u64] = &[0x500b_a238_4f7e_88dd];
+
+fn fnv(s: &str) -> u64 {
+    s.replace('\r', "").trim().bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| (h ^ b as u64).wrapping_mul(0x100_0000_01b3))
+}
+
+/// Legge la persona dell'utente; se manca (o è una scheda predefinita vecchia) la crea dal default.
 pub fn load_persona(data_dir: &Path) -> String {
     let p = persona_path(data_dir);
     match fs::read_to_string(&p) {
-        Ok(s) if !s.trim().is_empty() => s,
+        Ok(s) if !s.trim().is_empty() && !OLD_DEFAULTS.contains(&fnv(&s)) => s,
         _ => {
             if let Some(dir) = p.parent() {
                 let _ = fs::create_dir_all(dir);
@@ -59,6 +67,8 @@ fn tool_guide(cfg: &Config) -> String {
 - Richieste complesse: procedi da sola, passo dopo passo. Scegli lo strumento giusto per ogni passo, guarda il risultato e decidi il passo successivo; \
 combina strumenti diversi (terminale, file, web, schermo, database) quando serve. Puoi chiamare insieme più strumenti indipendenti.\n\
 - Se un passo fallisce leggi l'errore e prova un'altra strada invece di ripetere la stessa chiamata. Hai al massimo {} passaggi.\n\
+- Pagine e app lente: se lo schermo è bianco, mostra un caricamento o non è ancora cambiato, non arrenderti: \
+aspetta (take_screenshot con wait 3-5) e guarda di nuovo, fino a 3 volte; per un errore di rete o un timeout riprova una volta prima di cambiare strada.\n\
 - Alla fine rispondi con un riepilogo breve: cosa hai fatto, cosa hai trovato, cosa non è riuscito.\n\
 - Risparmia token: tra una chiamata e l'altra non scrivere commenti o piani lunghi, chiama direttamente lo strumento; \
 chiedi solo i dati che servono (filtri, TOP, righe precise, offset) invece di interi file o tabelle.\n",
@@ -195,6 +205,17 @@ pub fn window_start(total: usize, max: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_persona_is_upgraded() {
+        assert!(!OLD_DEFAULTS.contains(&fnv(DEFAULT_PERSONA)), "aggiungi l'impronta della vecchia scheda, non della nuova");
+        let dir = std::env::temp_dir().join(format!("ae-persona-{}", std::process::id()));
+        let p = persona_path(&dir);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(&p, "mia scheda").unwrap();
+        assert_eq!(load_persona(&dir), "mia scheda");
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn prompt_contains_parts() {

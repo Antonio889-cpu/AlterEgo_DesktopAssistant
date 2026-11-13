@@ -11,7 +11,9 @@ mod audio;
 mod config;
 mod costs;
 mod form;
+mod gmod;
 mod graphify;
+mod hermes;
 mod hotkeys;
 mod i18n;
 mod keys;
@@ -27,6 +29,7 @@ mod sql;
 mod stt;
 mod tray;
 mod update;
+mod voicestudio;
 mod web;
 mod window;
 
@@ -105,6 +108,8 @@ pub struct FrontConfig {
     web: config::WebConfig,
     saving: config::SavingConfig,
     spotify: config::SpotifyConfig,
+    gmod: bool,
+    hermes_brain: bool,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -146,6 +151,8 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         web: cfg.web.clone(),
         saving: cfg.saving.clone(),
         spotify: cfg.spotify.clone(),
+        gmod: cfg.gmod,
+        hermes_brain: cfg.hermes_brain,
     }
 }
 
@@ -511,6 +518,7 @@ fn main() {
             *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap() = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
+            voicestudio::autostart(&handle);
             rizzo::autostart(&handle);
             localai::autostart(&handle);
             window::create_main(&handle, start_visible, on_top)?;
@@ -531,6 +539,7 @@ fn main() {
             window::spawn_saver(handle.clone());
             actions::spawn_reminder_loop(handle.clone());
             music::spawn_analyzer(handle.clone());
+            gmod::spawn(handle.clone());
             window::spawn_handle_poller(handle);
             Ok(())
         })
@@ -618,6 +627,15 @@ fn main() {
             spotify::spotify_disconnect,
             spotify::spotify_settings,
             spotify::spotify_status,
+            gmod::gmod_settings,
+            rizzo::rizzo_set_dir,
+            localai::local_catalog_open,
+            hermes::hermes_status,
+            hermes::hermes_install,
+            hermes::hermes_setup,
+            hermes::hermes_settings,
+            voicestudio::voicestudio_status,
+            voicestudio::voicestudio_setup,
             set_saving,
             saving::rizzo_test,
             assistant::chat,
@@ -627,6 +645,7 @@ fn main() {
             assistant::memory_add_fact,
             assistant::memory_delete_fact,
             assistant::memory_forget_all,
+            assistant::memory_compact,
             assistant::memory_export,
             assistant::open_data_dir,
             assistant::stt_test,

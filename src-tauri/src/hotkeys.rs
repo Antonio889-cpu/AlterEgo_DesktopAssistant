@@ -46,6 +46,7 @@ pub fn register(app: &AppHandle, hk: &Hotkeys) -> Vec<String> {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     crate::actions::mousehook::set_button(app, 0);
+    crate::actions::mousehook::set_key(app, 0);
     let mut map = HashMap::new();
     let mut errors = Vec::new();
     for (combo, action, label) in [
@@ -65,6 +66,13 @@ pub fn register(app: &AppHandle, hk: &Hotkeys) -> Vec<String> {
                     errors.push(format!("{label} ({combo}): tasti del mouse supportati solo su Windows"));
                 }
                 continue;
+            }
+            // anche dall'hook di tastiera: funziona nei giochi che bloccano le hotkey registrate
+            // (doppioni innocui: `assistant::ptt` conta una sola pressione)
+            if cfg!(windows) {
+                if let Some(k) = crate::actions::mousehook::parse_combo(combo) {
+                    crate::actions::mousehook::set_key(app, k);
+                }
             }
         }
         match combo.parse::<Shortcut>() {

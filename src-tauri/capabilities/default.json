@@ -8,7 +8,8 @@
     "player",
     "venue",
     "form",
-    "sqlview"
+    "sqlview",
+    "models"
   ],
   "permissions": [
     "core:default",

@@ -372,7 +372,9 @@ pub async fn chat(
                 max_tokens: cfg.max_tokens,
                 top_p: cfg.top_p,
                 timeout_secs: cfg.timeout_secs,
-                ollama: (id == "ollama" && cfg.ollama.native()).then(|| cfg.ollama.clone()),
+                // sempre API nativa: quella compatibile OpenAI usa il contesto predefinito di Ollama (4K) e
+                // taglia prompt e strumenti, così i modelli locali "dimenticano" i tool
+                ollama: (id == "ollama").then(|| cfg.ollama.clone()),
             };
             if target.model.is_empty() {
                 // Ollama senza modello scelto: usa il primo installato.

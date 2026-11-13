@@ -82,7 +82,7 @@ Interfaccia in italiano e in inglese.
 - **Parla con l'app**: "apri music venue", "chiudi il lettore audio", "apri il sito", "controlla gli aggiornamenti"… tutto ciò che riguarda l'app si fa chiedendolo a lei.
 - **Mouse e tastiera**: se lo permetti, Alter Ego muove il cursore, clicca, scrive e preme tasti (con conferma e stop d'emergenza).
   Clic precisi: screenshot con righelli numerati e cursore segnato, zoom sui punti piccoli, screenshot di controllo dopo ogni clic e, su Windows, la posizione esatta di pulsanti e campi (UI Automation).
-- **SQL Server** sul tuo PC: quando serve chiede i dati di connessione in un piccolo modulo (la password non va mai al modello AI), legge i dati e, se lo permetti, li modifica; i risultati si vedono anche in una finestra SQL dove puoi scrivere le tue query.
+- **SQL Server** sul tuo PC: quando serve chiede i dati di connessione in un piccolo modulo (la password non va mai al modello AI), legge i dati e, se lo permetti, li modifica; i risultati si vedono anche in una finestra SQL dove puoi scrivere le tue query. Funziona anche **LocalDB**: server `(localdb)\MSSQLLocalDB`.
 - **Richieste complesse**: concatena da sola gli strumenti (terminale, file, web, schermo, database) fino a 12 passaggi (regolabili), controlla ogni risultato e cambia strada se qualcosa non va.
 - **Riduzione del rumore** del microfono di Mic-Link (RNNoise, regolabile).
 - **Aggiornamenti**: link al sito e a GitHub nell'app e un tasto per aggiornare all'ultima release.
@@ -244,7 +244,9 @@ che iniziano esattamente come una richiesta precedente. Per questo:
     e scarica il modello. Poi Alter Ego avvia il server da solo (solo su `127.0.0.1`) e lo chiude quando esci.
     Hai già [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI)? Metti il suo URL e spegni l'avvio automatico.
   - **Voci di Windows**, offline (per l'italiano: Impostazioni di Windows → Ora e lingua → Voce → Aggiungi voci, es. Elsa o Cosimo);
-  - un **servizio compatibile OpenAI** `/audio/speech` (es. Piper locale o un servizio cloud).
+  - un **servizio compatibile OpenAI** `/audio/speech` (es. Piper locale o un servizio cloud);
+  - **[VoiceStudio](https://github.com/debpalash/VoiceStudio)** (AGPL-3.0, voci locali e clonazione): *Usa VoiceStudio* lo installa
+    con lo script ufficiale se manca (con conferma), lo avvia, imposta la voce su `http://127.0.0.1:3900/v1` e può avviarlo insieme ad Alter Ego.
 
   Le frasi vengono sintetizzate una alla volta: la prima si sente subito, le altre si preparano mentre parla. Il volto si anima finché la voce suona.
 - **Dispositivi**: scegli l'uscita per voce e suoni e il microfono del push-to-talk (o lascia quelli predefiniti di Windows).
@@ -368,8 +370,13 @@ I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSee
   Varianti: `lfm3` (Q4), `lfm3:1.7b-qad-q4_0`, `lfm3:1.7b-q8_0` e **LFM3-VL 2B** dai GGUF ufficiali su Hugging Face (vede gli screenshot, sperimentale).
   Serve Ollama 0.40.12 o più recente. Alter Ego applica i parametri consigliati da Liquid AI (temperatura 0.1, top_k 50, repeat penalty 1.1) e un contesto di 32K.
   Licenza: LFM Open License v1.0 (il modello lo scarica Ollama, non è incluso in Alter Ego).
-- **Catalogo**: libreria ufficiale di Ollama, modelli della community e GGUF su Hugging Face, con ricerca e filtri
+- **Modelli consigliati**: LFM3, **Gemma 4** (strumenti, visione, ragionamento) e **Gemma 3** (chat e visione; su Ollama niente strumenti).
+- **Catalogo** in una finestra a parte, nello stile di Alter Ego: libreria ufficiale di Ollama, modelli della community e GGUF su Hugging Face, con ricerca e filtri
   (abliterated, uncensored, heretic, strumenti, visione, ragionamento, dimensione massima), scelta della quantizzazione per Hugging Face, avanzamento e annulla.
+- **Strumenti con i modelli locali**: Alter Ego usa l'API nativa di Ollama e sceglie da sola un contesto di 16K o 32K, così prompt
+  e lista degli strumenti non vengono più tagliati dal contesto predefinito di Ollama (4K).
+
+![Catalogo dei modelli](docs/screenshots/models-catalog.png)
 - **Da un indirizzo**: `hf.co/utente/modello-GGUF:Q4_K_M`, qualsiasi link di Hugging Face (anche a un singolo `.gguf`), `ollama.com/…`,
   oppure un `.gguf` da qualsiasi sito (scaricato, controllato con SHA-256 e importato in Ollama).
 - **Modelli installati**: dimensione, quantizzazione, quanto sta sulla GPU; *Usa* (diventa il modello di Alter Ego) ed *Elimina*.
@@ -383,6 +390,14 @@ davvero (dal suo log), e permette di scegliere:
 - **flash attention** e **cache del contesto q8_0** (metà memoria, più contesto in 8 GB di VRAM).
 *Applica* riavvia Ollama con queste impostazioni (su Windows vanno nelle variabili d'ambiente dell'utente). L'«emulazione CUDA» (ZLUDA)
 non è supportata da Ollama: con le Radeon la strada stabile e veloce è Vulkan.
+
+## Hermes Agent
+
+[Hermes Agent](https://hermes-agent.nousresearch.com) (Nous Research, MIT) può lavorare accanto ad Alter Ego, in *Impostazioni → Permessi*:
+- **Installa Hermes** usa lo script ufficiale (con conferma); **Configura** apre `hermes setup` per scegliere il suo modello AI.
+- **Delega i compiti lunghi** (attivo di default, solo se Hermes è installato): Alter Ego ha lo strumento `hermes_task` per ricerche, progetti di codice
+  e automazioni, chiede conferma ogni volta e ti riassume il risultato. Con Rizzo Flow come router, è Rizzo a segnalare le richieste da delegare.
+- **Hermes come cervello** (spento di default): ogni messaggio va a Hermes, Alter Ego mette voce ed espressioni.
 
 ## Alter Net
 
@@ -467,7 +482,11 @@ Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli te
 - **Memoria** (SQLite, solo sul tuo PC):
   - a ogni messaggio partono gli ultimi messaggi, un riassunto e i fatti che sa su di te;
   - ogni tanto riassume le conversazioni vecchie e impara fatti duraturi su di te;
-  - in *Impostazioni → Memoria* vedi, aggiungi o cancelli i fatti, esporti tutto in JSON o premi *Dimentica tutto*.
+  - in *Impostazioni → Memoria* vedi, aggiungi o cancelli i fatti, esporti tutto in JSON o premi *Dimentica tutto*;
+  - **Compatta** unisce i fatti doppi, toglie quelli inutili ed elimina i messaggi vecchi già coperti da un riassunto (gli ultimi restano);
+    parte anche da sola quando i fatti superano i 40.
+- **Personaggio**: la scheda segue più da vicino l'Alter Ego di Danganronpa (Chihiro, speranza e disperazione, modo di parlare);
+  una copia mai modificata si aggiorna da sola con le nuove versioni.
 
 ## Sprite
 

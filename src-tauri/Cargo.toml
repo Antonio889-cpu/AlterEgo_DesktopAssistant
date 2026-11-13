@@ -1,6 +1,6 @@
 [package]
 name = "alter-ego"
-version = "1.7.0"
+version = "1.8.0"
 description = "Alter Ego – assistente desktop personale"
 edition = "2021"
 
@@ -26,7 +26,7 @@ base64 = "0.22"
 tauri-plugin-notification = "2"
 tauri-plugin-autostart = "2"
 # musica: decodifica m4a/AAC (YouTube via yt-dlp) e mp3, spettro per il visualizzatore
-symphonia = { version = "0.5", default-features = false, features = ["aac", "isomp4", "mp3", "wav", "pcm"] }
+symphonia = { version = "0.5", default-features = false, features = ["aac", "isomp4", "mp3", "wav", "pcm", "ogg", "vorbis"] }
 rustfft = "6"
 # riduzione del rumore del microfono (Mic-Link): RNNoise in Rust puro
 nnnoiseless = { version = "0.5", default-features = false }

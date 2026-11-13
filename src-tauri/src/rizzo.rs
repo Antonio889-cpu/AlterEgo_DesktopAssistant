@@ -26,17 +26,52 @@ const MARK: &str = "alterego-installed.txt";
 static CHILD: Mutex<Option<Child>> = Mutex::new(None);
 static INSTALLING: AtomicBool = AtomicBool::new(false);
 
-pub fn dir(app: &AppHandle) -> PathBuf {
-    app.path().app_local_data_dir().unwrap_or_else(|_| std::env::temp_dir()).join("rizzo-flow")
+fn custom_dir(app: &AppHandle) -> Option<PathBuf> {
+    let d = app.state::<crate::AppState>().cfg.lock().unwrap().rizzo.dir.trim().to_string();
+    (!d.is_empty()).then(|| PathBuf::from(d))
 }
 
-/// Taglie del modello scaricate (dal file segno dell'installazione).
+pub fn dir(app: &AppHandle) -> PathBuf {
+    custom_dir(app).unwrap_or_else(|| app.path().app_local_data_dir().unwrap_or_else(|_| std::env::temp_dir()).join("rizzo-flow"))
+}
+
+/// Taglie del modello scaricate (dal file segno dell'installazione). In una cartella scelta
+/// dall'utente il segno non c'è: si usa la taglia delle impostazioni.
 fn installed_sizes(app: &AppHandle) -> Vec<String> {
-    std::fs::read_to_string(dir(app).join(MARK)).unwrap_or_default().split_whitespace().map(str::to_string).collect()
+    let v: Vec<String> = std::fs::read_to_string(dir(app).join(MARK)).unwrap_or_default().split_whitespace().map(str::to_string).collect();
+    if v.is_empty() && custom_dir(app).is_some() {
+        return vec![app.state::<crate::AppState>().cfg.lock().unwrap().rizzo.size.clone()];
+    }
+    v
+}
+
+/// È una cartella di Rizzo Flow? (pyproject.toml che dichiara il pacchetto `rizzo`)
+fn is_rizzo_dir(d: &Path) -> bool {
+    std::fs::read_to_string(d.join("pyproject.toml")).is_ok_and(|t| t.to_lowercase().contains("rizzo"))
 }
 
 pub fn installed(app: &AppHandle) -> bool {
     !installed_sizes(app).is_empty() && dir(app).join("pyproject.toml").is_file()
+}
+
+/// Usa un Rizzo Flow già scaricato altrove ("" = torna alla cartella gestita da Alter Ego).
+#[tauri::command]
+pub fn rizzo_set_dir(app: AppHandle, path: String) -> Result<String, String> {
+    let p = path.trim().trim_matches('"').to_string();
+    if !p.is_empty() && !is_rizzo_dir(Path::new(&p)) {
+        return Err(crate::i18n::tr("in questa cartella non c'è Rizzo Flow (manca pyproject.toml)", "Rizzo Flow is not in this folder (pyproject.toml missing)").into());
+    }
+    stop(&app);
+    crate::update_config(&app, |c| {
+        c.rizzo.dir = p.clone();
+        if !p.is_empty() {
+            c.saving.router = "rizzo".into();
+            if local_port(&c.saving.router_url).is_none() {
+                c.saving.router_url = "http://127.0.0.1:8017".into();
+            }
+        }
+    });
+    Ok(dir(&app).display().to_string())
 }
 
 fn hidden(cmd: &mut Command) -> &mut Command {

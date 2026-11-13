@@ -30,6 +30,8 @@ pub struct Route {
     pub needs_tools: bool,
     /// Domanda semplice: va bene il modello economico.
     pub simple: bool,
+    /// Compito lungo e autonomo: adatto a Hermes Agent (solo con Rizzo Flow).
+    pub delegate: bool,
 }
 
 const ACTION_WORDS: &[&str] = &[
@@ -92,7 +94,7 @@ pub fn heuristic(text: &str, prev_used_tools: bool) -> Route {
     let needs_tools = prev_used_tools || ACTION_WORDS.iter().any(|w| t.contains(w));
     let words = text.split_whitespace().count();
     let simple = !needs_tools && words <= 25 && !COMPLEX_WORDS.iter().any(|w| t.contains(w)) && !text.contains('\n');
-    Route { needs_tools, simple }
+    Route { needs_tools, simple, delegate: false }
 }
 
 /// Router con Rizzo Flow (API compatibile Jev, `POST /v1/systemone`): decisioni tipizzate in ~50 ms,
@@ -105,6 +107,10 @@ pub async fn rizzo(http: &reqwest::Client, url: &str, text: &str, prev_reply: &s
             "needs_action": {
                 "type": "noul",
                 "instructions": "Is the user asking the desktop assistant to DO something with a tool: open a program or website, search the web or get current/real-time information, play or control music, read/write files, take a screenshot, set a reminder, use the mouse or keyboard, run a command, or change the assistant app (windows, player, settings, updates)? Small talk, opinions, explanations and questions answerable from general knowledge are NO."
+            },
+            "long_task": {
+                "type": "noul",
+                "instructions": "Is this a long autonomous job that needs many steps and a lot of work on its own, such as deep multi-source research, building or refactoring a code project, or a multi-step automation? Single actions, quick questions and normal chat are NO."
             },
             "complexity": {
                 "type": "score",
@@ -127,7 +133,8 @@ pub fn parse_rizzo(v: &Value, prev_used_tools: bool) -> Option<Route> {
     let score = v.pointer("/answers/complexity/score").and_then(Value::as_f64).unwrap_or(1.0);
     // si sbaglia volentieri dalla parte degli strumenti: un'azione persa è peggio di qualche token
     let needs_tools = prev_used_tools || p_action >= 0.3;
-    Some(Route { needs_tools, simple: !needs_tools && score < 0.6 })
+    let delegate = v.pointer("/answers/long_task/noul").and_then(Value::as_f64).is_some_and(|p| p >= 0.6);
+    Some(Route { needs_tools: needs_tools || delegate, simple: !needs_tools && !delegate && score < 0.6, delegate })
 }
 
 /// Descrizioni degli strumenti ridotte alla prima frase, senza descrizioni dei parametri.
@@ -281,9 +288,9 @@ mod tests {
     #[test]
     fn rizzo_answer() {
         let v = json!({"answers": {"needs_action": {"type": "noul", "noul": 0.92}, "complexity": {"type": "score", "score": 0.1}}});
-        assert_eq!(parse_rizzo(&v, false), Some(Route { needs_tools: true, simple: false }));
+        assert_eq!(parse_rizzo(&v, false), Some(Route { needs_tools: true, simple: false, delegate: false }));
         let v = json!({"answers": {"needs_action": {"type": "noul", "noul": 0.04}, "complexity": {"type": "score", "score": 0.2}}});
-        assert_eq!(parse_rizzo(&v, false), Some(Route { needs_tools: false, simple: true }));
+        assert_eq!(parse_rizzo(&v, false), Some(Route { needs_tools: false, simple: true, delegate: false }));
         assert_eq!(parse_rizzo(&json!({}), false), None);
     }
 

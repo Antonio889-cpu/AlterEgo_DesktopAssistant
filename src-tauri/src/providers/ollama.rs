@@ -45,12 +45,18 @@ pub fn to_native(system: &str, messages: &[ChatMessage]) -> Vec<Value> {
     out
 }
 
+/// Contesto quando l'utente non lo sceglie: abbastanza per prompt, strumenti e risposta.
+/// Solo due misure (16K/32K) perché cambiarlo costringe Ollama a ricaricare il modello.
+fn auto_ctx(system: &str, messages: &[ChatMessage], tools: Option<&Value>) -> u32 {
+    let chars = system.len() + messages.iter().map(|m| m.content.len()).sum::<usize>() + tools.map_or(0, |t| t.to_string().len());
+    // ~3 caratteri per token, più 4K per la risposta
+    if chars / 3 + 4096 <= 16384 { 16384 } else { 32768 }
+}
+
 pub fn body(t: &Target, system: &str, messages: &[ChatMessage], tools: Option<&Value>, think: bool) -> Value {
     let o = t.ollama.clone().unwrap_or_default();
     let mut options = json!({ "temperature": t.temperature });
-    if o.num_ctx > 0 {
-        options["num_ctx"] = json!(o.num_ctx);
-    }
+    options["num_ctx"] = json!(if o.num_ctx > 0 { o.num_ctx } else { auto_ctx(system, messages, tools) });
     if o.num_gpu >= 0 {
         options["num_gpu"] = json!(o.num_gpu);
     }
@@ -198,6 +204,9 @@ mod tests {
         assert_eq!(b["options"]["num_predict"], 500);
         assert_eq!((b["options"]["top_k"].clone(), b["options"]["repeat_penalty"].clone()), (json!(50), json!(1.1)));
         assert!(b["options"].get("num_gpu").is_none());
+        let auto = Target { model: "qwen3".into(), ..Target::basic("ollama", "http://localhost:11434/v1".into(), None) };
+        assert_eq!(body(&auto, "sys", &msgs, None, false)["options"]["num_ctx"], 16384);
+        assert_eq!(body(&auto, &"x".repeat(60_000), &msgs, None, false)["options"]["num_ctx"], 32768);
         assert_eq!(b["keep_alive"], -1);
         assert_eq!(b["think"], false);
         assert_eq!(b["messages"][2]["tool_calls"][0]["function"]["arguments"]["command"], "ls");

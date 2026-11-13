@@ -516,6 +516,17 @@ body.click-through #screen, body.click-through #dialog { cursor: default; }
   70%  { transform: scale(.03, .012); filter: brightness(7) saturate(0); opacity: 1; }
   100% { transform: scale(0, 0); filter: brightness(9); opacity: 0; }
 }
+/* otturatore durante gli screenshot (vedi actions::without_window) */
+@property --iris { syntax: "<percentage>"; inherits: false; initial-value: 80%; }
+#shutter { display: none; position: absolute; inset: 0; pointer-events: none; z-index: 60;
+  background: repeating-conic-gradient(from 12deg, #040704 0deg 54deg, #18241a 54deg 60deg);
+  -webkit-mask: radial-gradient(circle, transparent var(--iris), #000 calc(var(--iris) + .6%));
+  mask: radial-gradient(circle, transparent var(--iris), #000 calc(var(--iris) + .6%)); }
+#shutter.close { display: block; animation: iris-close .17s ease-in forwards; }
+#shutter.open { display: block; animation: iris-open .3s ease-out forwards; }
+#shutter.open::after { content: ""; position: absolute; inset: 0; background: #fff; animation: tv-flash .3s ease-out both; mix-blend-mode: screen; }
+@keyframes iris-close { from { --iris: 80%; } to { --iris: 0%; } }
+@keyframes iris-open { from { --iris: 0%; } to { --iris: 80%; } }
 @keyframes tv-flash-off { 0% { opacity: 0; } 35%, 100% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   #root.tv-on-anim, #root.tv-off-anim { animation-duration: .01s; }

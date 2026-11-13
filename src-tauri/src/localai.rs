@@ -488,7 +488,7 @@ pub async fn local_delete(app: AppHandle, name: String) -> Result<(), String> {
 #[tauri::command]
 pub fn local_use(app: AppHandle, name: String, primary: bool) -> String {
     let lfm3 = name.to_lowercase().contains("lfm3");
-    let vision = ["vl", "vision", "llava", "omni", "gemma3", "qwen2.5vl", "minicpm-v"].iter().any(|k| name.to_lowercase().contains(k));
+    let vision = ["vl", "vision", "llava", "omni", "gemma3", "gemma4", "qwen2.5vl", "minicpm-v"].iter().any(|k| name.to_lowercase().contains(k));
     update_config(&app, |c| {
         let pc = c.ai.providers.entry("ollama".into()).or_default();
         pc.enabled = true;
@@ -522,6 +522,18 @@ pub fn local_use(app: AppHandle, name: String, primary: bool) -> String {
 
 // ---------- download (pull) ----------
 
+/// "Qwen3-8B-Q4_K_M.gguf", "Q4_K_M/x-00001-of-00002.gguf", "q8_0" → "Q4_K_M" / "Q8_0".
+fn quant_of(s: &str) -> Option<String> {
+    s.to_uppercase()
+        .split(['-', '.', '/'])
+        .filter(|p| {
+            let d = |r: &str| r.chars().next().is_some_and(|c| c.is_ascii_digit());
+            p.strip_prefix("IQ").or(p.strip_prefix('Q')).is_some_and(d) || ["F16", "BF16", "F32"].contains(p)
+        })
+        .last()
+        .map(str::to_string)
+}
+
 /// Nome per `ollama pull` da quello che scrive l'utente: nomi di Ollama, hf.co/…, link di Hugging Face
 /// (anche a un file .gguf), link di ollama.com. `Err` per gli URL diretti a un .gguf fuori da Hugging Face
 /// (quelli si scaricano a parte, vedi `pull_gguf_url`).
@@ -540,9 +552,10 @@ pub fn normalize(input: &str) -> Result<String, String> {
                 return Err(crate::i18n::tr("indirizzo di Hugging Face incompleto (serve utente/modello)", "incomplete Hugging Face address (user/model needed)").into());
             }
             let repo = format!("{}/{}", parts[0], parts[1].split(':').next().unwrap_or(""));
-            let quant = parts[1].split_once(':').map(|(_, q)| q.to_string());
-            let file = parts.iter().rev().find(|p| p.to_lowercase().ends_with(".gguf")).map(|f| f.to_string());
-            let tag = file.or(quant).map(|q| format!(":{q}")).unwrap_or_default();
+            // Ollama vuole la quantizzazione (":Q4_K_M"), non il nome del file .gguf
+            let tail = rest.split(['?', '#']).next().unwrap_or(rest);
+            let quant = tail.split_once(':').map(|(_, q)| q).or(tail.to_lowercase().ends_with(".gguf").then_some(tail)).and_then(quant_of);
+            let tag = quant.map(|q| format!(":{q}")).unwrap_or_default();
             return Ok(format!("hf.co/{repo}{tag}"));
         }
     }
@@ -915,7 +928,7 @@ pub async fn local_hf_files(app: AppHandle, repo: String) -> Result<Vec<(String,
     }
     let http = app.state::<AppState>().ai.http.clone();
     let v: Value = http
-        .get(format!("https://huggingface.co/api/models/{repo}/tree/main"))
+        .get(format!("https://huggingface.co/api/models/{repo}/tree/main?recursive=true"))
         .timeout(Duration::from_secs(20))
         .send()
         .await
@@ -933,26 +946,54 @@ pub async fn local_hf_files(app: AppHandle, repo: String) -> Result<Vec<(String,
         .collect())
 }
 
+// ---------- catalogo (finestra a parte) ----------
+
+#[tauri::command]
+pub fn local_catalog_open(app: AppHandle) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+    if let Some(w) = app.get_webview_window("models") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        return w.set_focus().map_err(|e| e.to_string());
+    }
+    WebviewWindowBuilder::new(&app, "models", WebviewUrl::App("models.html".into()))
+        .title(crate::i18n::tr("Alter Ego – Catalogo modelli", "Alter Ego – Model catalog"))
+        .inner_size(860.0, 760.0)
+        .min_inner_size(560.0, 480.0)
+        .center()
+        .build()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 // ---------- LFM3 ----------
 
-/// Varianti di LFM3 proposte (nome per Ollama, descrizione, GB circa). Fonte: ollama.com/library/lfm3
-/// e huggingface.co/LiquidAI (collezione LFM3).
-pub const LFM3: &[(&str, &str, f64)] = &[
-    ("lfm3", "LFM3 1.7B, Q4 (predefinito)", 1.1),
-    ("lfm3:1.7b-qad-q4_0", "LFM3 1.7B, Q4_0 QAD (addestrato per la quantizzazione)", 1.05),
-    ("lfm3:1.7b-q8_0", "LFM3 1.7B, Q8_0 (più preciso)", 1.85),
-    ("hf.co/LiquidAI/LFM3-VL-2B-GGUF:Q4_K_M", "LFM3-VL 2B, Q4_K_M (vede gli screenshot, sperimentale)", 1.3),
+/// Modelli consigliati (nomi per Ollama; descrizioni in settings.js). Fonti: ollama.com/library/lfm3, /gemma4, /gemma3
+/// e huggingface.co/LiquidAI (collezione LFM3). Gemma 3 su Ollama non dichiara gli strumenti: solo chat e visione.
+pub const RECOMMENDED: &[&str] = &[
+    "lfm3",
+    "lfm3:1.7b-qad-q4_0",
+    "lfm3:1.7b-q8_0",
+    "hf.co/LiquidAI/LFM3-VL-2B-GGUF:Q4_K_M",
+    "gemma4:e2b",
+    "gemma4:e4b",
+    "gemma4:12b",
+    "gemma4:26b-a4b",
+    "gemma3:1b",
+    "gemma3:4b",
+    "gemma3:12b",
+    "gemma3:27b",
 ];
 
 /// Installa e usa LFM3: Ollama (se manca, con conferma), versione minima, download, configurazione.
 #[tauri::command]
 pub async fn local_lfm3(app: AppHandle, variant: String, primary: bool) -> Result<String, String> {
-    let variant = if LFM3.iter().any(|(n, _, _)| *n == variant) { variant } else { "lfm3".into() };
+    let variant = if RECOMMENDED.contains(&variant.as_str()) { variant } else { "lfm3".into() };
     if binary(&app).is_none() && version(&app).await.is_none() {
         local_install(app.clone()).await?;
     }
     let v = ensure_running(&app).await?;
-    if !variant.starts_with("hf.co/") && !version_at_least(&v, LFM3_MIN) {
+    if variant.starts_with("lfm3") && !version_at_least(&v, LFM3_MIN) {
         return Err(crate::tr!(
             "LFM3 richiede Ollama {LFM3_MIN} o più recente (hai la {v}): usa «Installa / aggiorna Ollama»",
             "LFM3 needs Ollama {LFM3_MIN} or newer (you have {v}): use “Install / update Ollama”"
@@ -1307,10 +1348,13 @@ mod tests {
         assert_eq!(normalize("https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF").unwrap(), "hf.co/LiquidAI/LFM3-1.7B-GGUF");
         assert_eq!(
             normalize("https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/blob/main/LFM3-1.7B-Q8_0.gguf").unwrap(),
-            "hf.co/LiquidAI/LFM3-1.7B-GGUF:LFM3-1.7B-Q8_0.gguf"
+            "hf.co/LiquidAI/LFM3-1.7B-GGUF:Q8_0"
         );
         assert_eq!(normalize("hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:IQ3_M").unwrap(), "hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:IQ3_M");
         assert_eq!(normalize("https://ollama.com/library/lfm3:1.7b-q8_0").unwrap(), "lfm3:1.7b-q8_0");
+        assert_eq!(normalize("hf.co/unsloth/gemma-3-4b-it-GGUF:Q4_K_M/gemma-3-4b-it-Q4_K_M-00001-of-00002.gguf").unwrap(), "hf.co/unsloth/gemma-3-4b-it-GGUF:Q4_K_M");
+        assert_eq!(normalize("hf.co/u/r-GGUF:r-UD-Q4_K_XL.gguf").unwrap(), "hf.co/u/r-GGUF:Q4_K_XL");
+        assert_eq!(normalize("https://huggingface.co/u/r-GGUF/resolve/main/r.bf16.gguf?download=true").unwrap(), "hf.co/u/r-GGUF:BF16");
         assert_eq!(normalize("https://ollama.com/orcarouter/LFM3-1.7B-abliterated").unwrap(), "orcarouter/LFM3-1.7B-abliterated");
         assert_eq!(normalize("https://example.com/m.gguf").unwrap_err(), "gguf-url");
         assert!(normalize("rm -rf /").is_err());

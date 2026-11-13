@@ -223,6 +223,14 @@ $("export-memory").onclick = async () => {
   try { memResult(t("Esportata in {path}", { path: await invoke("memory_export") }), "ok"); }
   catch (e) { memResult(String(e), "bad"); }
 };
+$("compact-memory").onclick = async (e) => {
+  if (!confirm(t("Compattare la memoria? Il modello AI unisce i doppioni e toglie i fatti inutili; i messaggi vecchi già riassunti vengono eliminati (gli ultimi restano)."))) return;
+  e.target.disabled = true;
+  memResult(t("Compatto…"), "");
+  try { memResult(await invoke("memory_compact"), "ok"); } catch (err) { memResult(String(err), "bad"); }
+  e.target.disabled = false;
+  refreshMemory();
+};
 $("forget-all").onclick = async () => {
   if (!confirm(t("Cancellare TUTTA la memoria di Alter Ego (conversazioni, riassunti, fatti)? Non si può annullare."))) return;
   try { await invoke("memory_forget_all"); memResult("Memoria cancellata.", "ok"); refreshMemory(); }
@@ -475,6 +483,8 @@ function fillAudio(cfg) {
   $("kokoro-url").value = audio.kokoro_url;
   $("kokoro-speed").value = audio.kokoro_speed;
   $("kokoro-autostart").checked = audio.kokoro_autostart;
+  $("vs-autostart").checked = audio.voicestudio_autostart !== false;
+  refreshVoiceStudio();
   const ml = audio.mic_link;
   $("link-enabled").checked = ml.enabled;
   $("link-mic-vol").value = ml.mic_volume;
@@ -508,6 +518,25 @@ $("kokoro-speed").oninput = (e) => { audio.kokoro_speed = +e.target.value; saveA
 $("kokoro-voice").onchange = (e) => { audio.kokoro_voice = e.target.value; saveAudio(); };
 $("kokoro-voice-en").onchange = (e) => { audio.kokoro_voice_en = e.target.value; saveAudio(); };
 $("kokoro-autostart").onchange = (e) => { audio.kokoro_autostart = e.target.checked; saveAudio(); };
+// ---------- VoiceStudio ----------
+async function refreshVoiceStudio() {
+  try {
+    const s = await invoke("voicestudio_status");
+    $("vs-state").textContent = !s.installed ? t("non installato") : s.running ? t("acceso ✓") : t("installato, spento");
+    $("vs-state").className = "result " + (s.running ? "ok" : "");
+  } catch {}
+}
+$("vs-setup").onclick = async (e) => {
+  e.target.disabled = true;
+  $("vs-state").textContent = t("Preparo VoiceStudio…"); $("vs-state").className = "result";
+  try {
+    $("vs-state").textContent = await invoke("voicestudio_setup"); $("vs-state").className = "result ok";
+    const cfg = await invoke("get_config");
+    Object.assign(audio, cfg.audio); fillAudio(cfg);
+  } catch (err) { $("vs-state").textContent = String(err); $("vs-state").className = "result bad"; }
+  e.target.disabled = false;
+};
+$("vs-autostart").onchange = (e) => { audio.voicestudio_autostart = e.target.checked; saveAudio(); };
 $("kokoro-install").onclick = async () => {
   const el = $("kokoro-state");
   try {
@@ -985,6 +1014,15 @@ $("rz-start").onclick = async () => {
 };
 $("rz-stop").onclick = async () => { await invoke("rizzo_stop").catch(() => {}); rizzoStatus(); };
 $("rz-dir").onclick = () => invoke("rizzo_open_dir").catch(() => {});
+$("rz-path-go").onclick = async () => {
+  const p = $("rz-progress");
+  try {
+    const d = await invoke("rizzo_set_dir", { path: $("rz-path").value });
+    p.textContent = t("Uso Rizzo Flow in {d}", { d }); p.className = "result ok";
+    saving.router = "rizzo"; fillSaving({ saving });
+  } catch (e) { p.textContent = String(e); p.className = "result bad"; }
+  rizzoStatus();
+};
 listen("rizzo-status", (e) => {
   const { phase, text } = e.payload || {};
   const p = $("rz-progress");
@@ -1051,6 +1089,7 @@ async function spotifyStatus() {
 function fillSpotify(cfg) {
   $("sp-client").value = cfg.spotify.client_id || "";
   $("sp-enabled").checked = !!cfg.spotify.enabled;
+  $("gmod-enabled").checked = !!cfg.gmod;
   spotifyStatus();
 }
 $("sp-dev").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "spotify_dev" }); };
@@ -1064,6 +1103,7 @@ $("sp-connect").onclick = async (e) => {
 };
 $("sp-disconnect").onclick = async () => { await invoke("spotify_disconnect"); spotifyStatus(); };
 $("sp-enabled").onchange = (e) => invoke("spotify_settings", { enabled: e.target.checked });
+$("gmod-enabled").onchange = (e) => invoke("gmod_settings", { enabled: e.target.checked });
 
 // ---------- alter net ----------
 async function alterNetInfo() {
@@ -1198,13 +1238,6 @@ $("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle
 })();
 
 // ---------- modelli locali (Ollama, LFM3, catalogo, GPU) ----------
-const LFM3_VARIANTS = [
-  ["lfm3", "LFM3 1.7B · Q4, ~1,1 GB (consigliato)"],
-  ["lfm3:1.7b-qad-q4_0", "LFM3 1.7B · Q4_0 QAD, ~1 GB (addestrato per la quantizzazione)"],
-  ["lfm3:1.7b-q8_0", "LFM3 1.7B · Q8_0, ~1,8 GB (più preciso)"],
-  ["hf.co/LiquidAI/LFM3-VL-2B-GGUF:Q4_K_M", "LFM3-VL 2B · vede gli screenshot, ~1,3 GB (sperimentale)"],
-];
-for (const [v, l] of LFM3_VARIANTS) $("lfm3-variant").append(Object.assign(document.createElement("option"), { value: v, textContent: t(l) }));
 const fmtSize = (b) => (b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : (b / 1e6).toFixed(0) + " MB");
 let localStatus = null;
 let gpuInfo = null;
@@ -1283,76 +1316,9 @@ $("lo-install").onclick = (e) => busy(e.target, async () => loResult(t("Ollama {
 $("lo-start").onclick = (e) => busy(e.target, async () => loResult(t("Ollama {v} acceso.", { v: await invoke("local_start") })));
 $("lo-refresh").onclick = () => refreshLocal(true);
 $("lo-autostart").onchange = (e) => invoke("local_settings", { autostart: e.target.checked });
-$("lfm3-go").onclick = (e) => busy(e.target, async () => {
-  loResult(t("Preparo LFM3… (installa Ollama se manca, poi scarica il modello)"));
-  loResult(await invoke("local_lfm3", { variant: $("lfm3-variant").value, primary: $("lfm3-primary").checked }));
-  refreshAiFromConfig();
-});
-$("lo-url-go").onclick = (e) => busy(e.target, async () => {
-  const name = await invoke("local_pull", { name: $("lo-url").value });
-  loResult(t("Scaricato: {name}. Premi «Usa» nella tabella per usarlo.", { name }));
-});
-
-// catalogo
-async function search() {
-  const box = $("lo-results");
-  box.innerHTML = '<div class="note" style="padding:8px">' + t("Cerco…") + "</div>";
-  const chips = [...document.querySelectorAll('#lo-chips input[data-kind="word"]:checked')].map((c) => c.value);
-  const caps = [...document.querySelectorAll('#lo-chips input[data-kind="cap"]:checked')].map((c) => c.value);
-  let list;
-  try {
-    list = await invoke("local_search", { source: $("lo-source").value, query: $("lo-query").value, chips, caps, maxB: +$("lo-size").value });
-  } catch (e) { box.innerHTML = ""; box.append(Object.assign(document.createElement("div"), { className: "note bad", textContent: String(e) })); return; }
-  box.innerHTML = "";
-  if (!list.length) { box.innerHTML = '<div class="note" style="padding:8px">' + t("Nessun modello trovato con questi filtri.") + "</div>"; return; }
-  for (const m of list) box.append(resultItem(m));
-}
-function resultItem(m) {
-  const d = document.createElement("div");
-  d.className = "lo-item";
-  d.append(Object.assign(document.createElement("div"), { className: "nm", textContent: m.name }));
-  const act = document.createElement("div");
-  act.className = "act";
-  if (m.source === "huggingface") {
-    const sel = document.createElement("select");
-    sel.append(Object.assign(document.createElement("option"), { value: "", textContent: t("quantizzazione predefinita (Q4_K_M)") }));
-    sel.onfocus = async () => {
-      if (sel.dataset.loaded) return;
-      sel.dataset.loaded = "1";
-      try {
-        for (const [f, size] of await invoke("local_hf_files", { repo: m.name })) sel.append(Object.assign(document.createElement("option"), { value: f, textContent: `${f} · ${fmtSize(size)}` }));
-      } catch {}
-    };
-    act.append(sel);
-    const b = Object.assign(document.createElement("button"), { textContent: t("⬇ Scarica"), className: "small" });
-    b.onclick = () => busy(b, async () => { await invoke("local_pull", { name: m.name + (sel.value ? ":" + sel.value : "") }); });
-    act.append(b);
-  } else {
-    const tags = m.sizes.length > 1 ? m.sizes : [];
-    let sel = null;
-    if (tags.length) {
-      sel = document.createElement("select");
-      for (const s of tags) sel.append(Object.assign(document.createElement("option"), { value: s, textContent: s }));
-      act.append(sel);
-    }
-    const b = Object.assign(document.createElement("button"), { textContent: t("⬇ Scarica"), className: "small" });
-    b.onclick = () => busy(b, async () => { await invoke("local_pull", { name: m.name + (sel ? ":" + sel.value : "") }); });
-    act.append(b);
-  }
-  d.append(act);
-  if (m.description) d.append(Object.assign(document.createElement("div"), { className: "ds", textContent: m.description }));
-  const tg = document.createElement("div");
-  tg.className = "tg";
-  for (const x of [...m.capabilities, ...m.sizes]) tg.append(Object.assign(document.createElement("span"), { textContent: x }));
-  if (m.downloads) tg.append(Object.assign(document.createElement("span"), { textContent: "⬇ " + m.downloads }));
-  if (m.updated) tg.append(Object.assign(document.createElement("span"), { textContent: m.updated }));
-  d.append(tg);
-  return d;
-}
-$("lo-search").onclick = search;
-$("lo-query").addEventListener("keydown", (e) => { if (e.key === "Enter") search(); });
-$("lo-source").onchange = search;
-document.querySelectorAll("#lo-chips input, #lo-size").forEach((c) => (c.onchange = search));
+$("lo-catalog").onclick = () => invoke("local_catalog_open").catch((e) => loResult(String(e), true));
+// «Installa e usa» dal catalogo: provider e modello cambiati anche qui
+listen("local-used", () => { refreshAiFromConfig(); refreshLocal(); });
 
 // GPU
 async function refreshGpu() {
@@ -1399,3 +1365,28 @@ $("gpu-apply").onclick = async (e) => {
   e.target.disabled = false;
   refreshLocal(true);
 };
+
+// ---------- Hermes Agent ----------
+async function refreshHermes() {
+  try {
+    const s = await invoke("hermes_status");
+    $("hermes-state").textContent = s.installed ? t("installato ✓") : t("non installato");
+    $("hermes-state").className = "result " + (s.installed ? "ok" : "");
+    $("hermes-setup").disabled = !s.installed;
+  } catch {}
+}
+(async () => {
+  const cfg = await invoke("get_config");
+  $("hermes-brain").checked = !!cfg.hermes_brain;
+  refreshHermes();
+})();
+$("hermes-brain").onchange = (e) => invoke("hermes_settings", { brain: e.target.checked });
+$("hermes-install").onclick = async (e) => {
+  e.target.disabled = true;
+  $("hermes-state").textContent = t("Installo Hermes…"); $("hermes-state").className = "result";
+  try { $("hermes-state").textContent = await invoke("hermes_install"); $("hermes-state").className = "result ok"; }
+  catch (err) { $("hermes-state").textContent = String(err); $("hermes-state").className = "result bad"; }
+  e.target.disabled = false;
+  refreshHermes();
+};
+$("hermes-setup").onclick = () => invoke("hermes_setup").catch((err) => { $("hermes-state").textContent = String(err); $("hermes-state").className = "result bad"; });

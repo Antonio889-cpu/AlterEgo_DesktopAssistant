@@ -137,7 +137,7 @@ pub async fn chat(
             None => crate::saving::heuristic(&text, prev_tools),
         }
     } else if cfg.saving.router == "off" {
-        crate::saving::Route { needs_tools: true, simple: false }
+        crate::saving::Route { needs_tools: true, simple: false, delegate: false }
     } else {
         crate::saving::heuristic(&text, prev_tools)
     };
@@ -152,7 +152,24 @@ pub async fn chat(
     conv.cancel.store(false, Ordering::SeqCst);
     let t0 = std::time::Instant::now();
     crate::applog::info("chat", &format!("domanda ({} caratteri, strumenti: {}, semplice: {})", text.chars().count(), route.needs_tools, route.simple));
-    let result = run_with_tools(&app, &cfg, system, history, on_event, route, &text).await;
+    let result = if cfg.hermes_brain && crate::hermes::find().is_some() {
+        // Hermes come cervello: risponde lui, Alter Ego mette voce e faccia
+        let prompt = format!(
+            "{}\n\nRispondi in personaggio come Alter Ego. Prima riga: solo l'emozione tra parentesi quadre, una tra [{}]; poi 2-4 frasi brevi, senza markdown.\n\nMessaggio dell'utente:\n{text}",
+            persona.lines().filter(|l| !l.trim_start().starts_with('>')).collect::<Vec<_>>().join("\n"),
+            providers::prompt::EMOTIONS.join("|")
+        );
+        crate::hermes::ask(&prompt, std::time::Duration::from_secs(15 * 60))
+            .await
+            .map(|t| providers::ChatResult { text: t, provider: "hermes".into(), model: "hermes".into(), tool_calls: vec![] })
+    } else {
+        let system = if route.delegate && cfg.permissions.hermes && crate::hermes::find().is_some() {
+            format!("{system}\n\n(Questa richiesta sembra un compito lungo e autonomo: valuta di delegarla con hermes_task.)")
+        } else {
+            system
+        };
+        run_with_tools(&app, &cfg, system, history, on_event, route, &text).await
+    };
     match &result {
         Ok(r) => crate::applog::info("chat", &format!("risposta da {} / {} in {} ms", r.provider, r.model, t0.elapsed().as_millis())),
         Err(e) => crate::applog::error("chat", &format!("nessuna risposta dopo {} ms: {e}", t0.elapsed().as_millis())),
@@ -451,6 +468,20 @@ pub fn memory_forget_all(conv: State<Conversation>) -> Result<(), String> {
     memory_or_err(&conv)?.forget_all()
 }
 
+/// Compatta la memoria (vedi `memory::summarize::compact`).
+#[tauri::command]
+pub async fn memory_compact(app: AppHandle) -> Result<String, String> {
+    let conv = app.state::<Conversation>();
+    let m = memory_or_err(&conv)?;
+    let ai_cfg = app.state::<AppState>().cfg.lock().unwrap().ai.clone();
+    let (before, after, msgs) = memory::summarize::compact(&conv.ai_bg, ai_cfg, m).await?;
+    crate::applog::info("memoria", &format!("compattata: fatti {before} → {after}, messaggi eliminati {msgs}"));
+    Ok(crate::tr!(
+        "Fatto: {before} fatti → {after}, {msgs} messaggi vecchi già riassunti eliminati.",
+        "Done: {before} facts → {after}, {msgs} old already-summarized messages removed."
+    ))
+}
+
 /// Esporta la memoria in JSON nella cartella Documenti. Restituisce il percorso.
 #[tauri::command]
 pub fn memory_export(app: AppHandle, conv: State<Conversation>) -> Result<String, String> {
@@ -482,6 +513,14 @@ fn emit_stt(app: &AppHandle, ev: stt::SttEvent) {
 
 /// Chiamata dalla hotkey: premuto = registra, rilasciato = trascrivi.
 pub fn ptt(app: &AppHandle, pressed: bool) {
+    // hook e hotkey registrata possono arrivare entrambi: conta solo il primo di ogni pressione
+    static DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if DOWN.swap(pressed, Ordering::SeqCst) == pressed {
+        return;
+    }
+    if pressed {
+        crate::window::show_main(app); // si fa vedere subito, prima che parta il microfono
+    }
     let conv = app.state::<Conversation>();
     let provider = app.state::<AppState>().cfg.lock().unwrap().stt.provider.clone();
     if pressed {

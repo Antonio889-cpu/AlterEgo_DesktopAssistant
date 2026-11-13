@@ -159,6 +159,10 @@
           <button id="rz-stop">■ Ferma</button>
           <button id="rz-dir">Cartella</button>
         </div>
+        <div class="actions">
+          <input id="rz-path" placeholder="Hai già Rizzo Flow? Incolla la sua cartella (es. D:\AI\rizzo-flow)" style="flex:1" />
+          <button id="rz-path-go">Usa questa cartella</button>
+        </div>
         <label class="inline"><input type="checkbox" id="rz-auto" /> Avvia il server di Rizzo Flow insieme ad Alter Ego (si chiude quando esci)</label>
         <div class="actions"><span id="rz-progress" class="result"></span></div>
         <p class="note sub">L'installazione scarica uv (se manca), il codice da GitHub e il modello, poi imposta il router su Rizzo Flow. Funziona anche senza GPU, più lento.</p>
@@ -185,49 +189,16 @@
       <div class="lo-progress" id="lo-progress" hidden><div class="bar"><i id="lo-bar"></i></div><span id="lo-ptext"></span> <button id="lo-cancel" class="small">Annulla</button></div>
 
       <div class="lfm3">
-        <h3>💧 LFM3 di Liquid AI</h3>
-        <p class="note">Modello da 1,7 miliardi di parametri per agenti locali: <b>strumenti</b>, ragionamento, contesto fino a 256K token,
-          16 lingue tra cui l'italiano. Circa 1 GB in Q4: va anche senza GPU. Licenza LFM Open License v1.0.
-          Liquid AI non lo consiglia per il ragionamento complesso a molti passaggi (è piccolo).</p>
-        <div class="actions">
-          <select id="lfm3-variant"></select>
-          <label class="inline" style="margin:0"><input type="checkbox" id="lfm3-primary" checked /> usalo come modello principale</label>
-          <button id="lfm3-go" class="primary">⬇ Installa e usa LFM3</button>
-        </div>
+        <h3>⭐ Catalogo dei modelli</h3>
+        <p class="note">Modelli consigliati (<b>LFM3</b>, <b>Gemma 4</b>, <b>Gemma 3</b>), ricerca nella libreria di Ollama e su Hugging Face, download da un indirizzo:
+          tutto in una finestra a parte.</p>
+        <div class="actions"><button id="lo-catalog" class="primary">🗂 Apri il catalogo</button></div>
       </div>
 
       <h3>Modelli installati</h3>
       <table id="lo-models" class="grid"><thead><tr><th>Modello</th><th>Parametri</th><th>Quant.</th><th>Dimensione</th><th>In memoria</th><th></th></tr></thead><tbody></tbody></table>
 
-      <h3>Cerca e scarica</h3>
-      <div class="actions">
-        <select id="lo-source">
-          <option value="library">Libreria ufficiale di Ollama</option>
-          <option value="community">Modelli della community (ollama.com)</option>
-          <option value="huggingface">Hugging Face (GGUF)</option>
-        </select>
-        <input id="lo-query" placeholder="es. qwen, gemma, llama, mistral…" style="max-width:260px" />
-        <button id="lo-search">Cerca</button>
-      </div>
-      <div class="chips" id="lo-chips">
-        <label class="chip"><input type="checkbox" value="abliterated" data-kind="word" /> abliterated</label>
-        <label class="chip"><input type="checkbox" value="uncensored" data-kind="word" /> uncensored</label>
-        <label class="chip"><input type="checkbox" value="heretic" data-kind="word" /> heretic</label>
-        <label class="chip"><input type="checkbox" value="tools" data-kind="cap" /> strumenti</label>
-        <label class="chip"><input type="checkbox" value="vision" data-kind="cap" /> visione</label>
-        <label class="chip"><input type="checkbox" value="thinking" data-kind="cap" /> ragionamento</label>
-        <select id="lo-size"><option value="0">Qualsiasi dimensione</option><option value="2">fino a 2B</option><option value="4">fino a 4B</option><option value="8">fino a 8B (≈ 8 GB di VRAM)</option><option value="14">fino a 14B</option><option value="32">fino a 32B</option></select>
-      </div>
-      <p class="note sub">Abliterated e uncensored sono versioni modificate da terzi senza i rifiuti del modello originale: usale con giudizio.
-        I filtri «strumenti/visione/ragionamento» valgono per la libreria ufficiale e, quando dichiarato, per Hugging Face.</p>
-      <div id="lo-results" class="lo-results"></div>
-      <h3>Da un indirizzo</h3>
-      <div class="actions">
-        <input id="lo-url" placeholder="hf.co/utente/modello-GGUF:Q4_K_M · link di Hugging Face · ollama.com/… · https://…/file.gguf" />
-        <button id="lo-url-go">⬇ Scarica</button>
-      </div>
-      <p class="note sub">Da Hugging Face si può indicare anche il file (link al .gguf) o la quantizzazione dopo «:». Un .gguf da altri siti viene scaricato,
-        controllato (SHA-256) e importato in Ollama.</p>
+      <label class="inline"><input type="checkbox" id="lfm3-primary" checked /> «Usa» lo imposta come modello principale</label>
 
       <h3>Scheda video</h3>
       <div id="gpu-list" class="note">…</div>
@@ -303,6 +274,7 @@
       <div class="actions">
         <button id="refresh-memory">Aggiorna</button>
         <button id="export-memory">Esporta (JSON)</button>
+        <button id="compact-memory" title="Unisce i doppioni, toglie i fatti inutili e i messaggi vecchi già riassunti">🗜 Compatta</button>
         <button id="forget-all" class="danger">Dimentica tutto</button>
         <span id="memory-result" class="result"></span>
       </div>
@@ -313,6 +285,12 @@
       <label>Uscita (voce e suoni) <select id="out-device"></select></label>
       <label>Microfono (push-to-talk) <select id="in-device"></select></label>
       <div class="actions"><button id="dev-refresh">Aggiorna elenco</button> <span id="dev-status" class="result"></span></div>
+    </section>
+
+    <section data-tab="voice">
+      <h2>Garry's Mod (Shinri Trial)</h2>
+      <p class="note">Mentre Garry's Mod è aperto, Alter Ego ascolta l'audio del PC e riconosce i suoni del gioco per reagire. Non tocca il gioco e non manda niente a nessuno: i suoni di riferimento vengono dall'addon Sounds @ ST del Workshop.</p>
+      <label class="inline"><input type="checkbox" id="gmod-enabled" /> Reagisci ai suoni di Shinri Trial (corpo scoperto, indagine, processo…)</label>
     </section>
 
     <section data-tab="voice">
@@ -380,6 +358,10 @@
       </div>
       <p class="note" id="tts-voice-note"><span data-os="windows">Per una voce italiana: Impostazioni di Windows → Ora e lingua → Voce → Aggiungi voci (es. Elsa, Cosimo).</span><span data-os="linux">Le voci di sistema usano espeak-ng: installalo (es. <code>sudo apt install espeak-ng</code>). Per una voce più naturale usa Kokoro.</span></p>
       <div id="tts-openai">
+        <div class="actions"><button id="vs-setup">🎙 Usa VoiceStudio</button> <span id="vs-state" class="result"></span></div>
+        <label class="inline"><input type="checkbox" id="vs-autostart" /> Avvia VoiceStudio insieme ad Alter Ego quando è la voce in uso</label>
+        <p class="note sub"><b>VoiceStudio</b> (debpalash, AGPL-3.0): voci locali e clonazione. Lo installa se manca (script ufficiale), lo avvia e imposta qui sotto
+          il suo indirizzo. La voce si sceglie (o si clona) dentro VoiceStudio; il suo nome va nel campo «Voce».</p>
         <label>URL <input id="tts-url" placeholder="http://localhost:8880/v1" /></label>
         <label>Modello <input id="tts-model" placeholder="tts-1" /></label>
         <label>Voce <input id="tts-remote-voice" placeholder="es. alloy, if_sara" /></label>
@@ -551,6 +533,12 @@
           Usa le cartelle della <b>Gestione file</b> (o tutto il disco); le mappe stanno nella cartella dati di Alter Ego, non nei tuoi progetti.</p>
         <div class="actions sub"><button id="graph-install">⬇ Installa Graphify</button> <span id="graph-state" class="result"></span></div>
         <p class="note sub"><a href="#" id="graph-link">Graphify</a> (Graphify Labs, Apache-2.0) si installa con uv dal pacchetto ufficiale «graphifyy».</p></div>
+      <div class="perm"><label class="inline"><input type="checkbox" data-perm="hermes" /> <b>Hermes Agent</b> (Nous Research): delega i compiti lunghi</label>
+        <p class="note">Hermes è un agente autonomo con strumenti, memoria e skill propri. Alter Ego gli passa i compiti lunghi (ricerche, progetti di codice,
+          automazioni) e ti riassume il risultato; chiede conferma ogni volta. Con Rizzo Flow come router, è Rizzo a segnalare quando conviene.</p>
+        <label class="inline sub"><input type="checkbox" id="hermes-brain" /> <b>Hermes come cervello</b>: ogni messaggio va a Hermes, Alter Ego mette voce ed espressioni</label>
+        <div class="actions sub"><button id="hermes-install">⬇ Installa Hermes</button> <button id="hermes-setup">⚙ Configura</button> <span id="hermes-state" class="result"></span></div>
+        <p class="note sub">L'installazione usa lo script ufficiale di hermes-agent.nousresearch.com; poi «Configura» apre la scelta del modello AI di Hermes.</p></div>
     </section>
 
     <section data-tab="costs">
