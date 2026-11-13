@@ -147,7 +147,7 @@ pub fn classify(q: &str) -> &'static str {
 
 /// Chiede i dati con il modulo e si collega. `hint`: valori proposti dal modello (server, database, utente).
 pub async fn connect(app: &AppHandle, hint: &Value) -> Result<String, String> {
-    let cfg = app.state::<AppState>().cfg.lock().unwrap().sql.clone();
+    let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).sql.clone();
     let pick = |k: &str, d: &str| hint.get(k).and_then(Value::as_str).filter(|s| !s.trim().is_empty()).unwrap_or(d).to_string();
     let saved = crate::keys::get_slot(KEY_SLOT, "1").is_some() && cfg.remember;
     let mut auths = vec![json!({ "value": "sql", "label": crate::i18n::tr("Utente e password di SQL Server", "SQL Server user and password") })];
@@ -436,8 +436,8 @@ pub async fn run(app: &AppHandle, query: &str, by: &str) -> SqlResult {
         res.error = res.error.map(|e| e.trim_start_matches(TIMEOUT_MARK).to_string());
     }
     drop(guard);
-    *app.state::<Sql>().last.lock().unwrap() = Some(res.clone());
-    let show = app.state::<AppState>().cfg.lock().unwrap().sql.show_window;
+    *app.state::<Sql>().last.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(res.clone());
+    let show = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).sql.show_window;
     if show || app.get_webview_window(VIEW).is_some() {
         let _ = open_view(app);
         let _ = app.emit("sql-result", &res);
@@ -506,14 +506,14 @@ pub async fn sql_view_open(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn sql_status(app: AppHandle) -> Value {
     let label = connected(&app).await;
-    let perms = app.state::<AppState>().cfg.lock().unwrap().permissions.clone();
+    let perms = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).permissions.clone();
     json!({ "connected": label.is_some(), "label": label.unwrap_or_default(), "read": perms.sql, "write": perms.sql_write })
 }
 
 /// Connessione dalla finestra SQL (stesso modulo).
 #[tauri::command]
 pub fn sql_last(app: AppHandle) -> Option<SqlResult> {
-    app.state::<Sql>().last.lock().unwrap().clone()
+    app.state::<Sql>().last.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
 }
 
 /// Mostra i risultati nella finestra SQL (impostazione).
@@ -528,7 +528,7 @@ pub fn sql_settings(app: AppHandle, show_window: bool, max_rows: usize) {
 
 #[tauri::command]
 pub async fn sql_connect_ui(app: AppHandle) -> Result<String, String> {
-    if !app.state::<AppState>().cfg.lock().unwrap().permissions.sql {
+    if !app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).permissions.sql {
         return Err(crate::i18n::tr("attiva prima «Database SQL Server» in Impostazioni → Permessi", "first enable “SQL Server database” in Settings → Permissions").into());
     }
     connect(&app, &json!({})).await
@@ -542,7 +542,7 @@ pub async fn sql_disconnect_ui(app: AppHandle) -> String {
 /// Query scritta dall'utente nella finestra SQL: niente conferma (la scrive lui), ma servono i permessi.
 #[tauri::command]
 pub async fn sql_run_user(app: AppHandle, query: String) -> Result<SqlResult, String> {
-    let perms = app.state::<AppState>().cfg.lock().unwrap().permissions.clone();
+    let perms = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).permissions.clone();
     if !perms.sql {
         return Err(crate::i18n::tr("attiva prima «Database SQL Server» in Impostazioni → Permessi", "first enable “SQL Server database” in Settings → Permissions").into());
     }

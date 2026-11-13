@@ -124,12 +124,12 @@ fn rate_for_position(app: &AppHandle) -> u32 {
 
 pub fn state(app: &AppHandle) -> State {
     let m = app.state::<Music>();
-    let cfg = app.state::<AppState>().cfg.lock().unwrap().music.clone();
-    let i = m.inner.lock().unwrap();
+    let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.clone();
+    let i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let track = i.index.and_then(|x| i.queue.get(x)).cloned();
     let played = app.state::<AudioEngine>().music_played(false) as f64 / rate_for_position(app) as f64;
     let duration = track.as_ref().map(|t| t.duration).unwrap_or(0.0);
-    let favorite = track.as_ref().is_some_and(|t| m.library.lock().unwrap().is_favorite(&t.id));
+    let favorite = track.as_ref().is_some_and(|t| m.library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_favorite(&t.id));
     let mut position = if i.playing { i.base + played } else { i.base };
     if duration > 0.0 {
         position = position.min(duration);
@@ -160,7 +160,7 @@ pub fn emit_state(app: &AppHandle) {
 }
 
 fn set_status(app: &AppHandle, s: &str) {
-    app.state::<Music>().inner.lock().unwrap().status = s.to_string();
+    app.state::<Music>().inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner).status = s.to_string();
     emit_state(app);
 }
 
@@ -181,11 +181,11 @@ pub fn is_expanded() -> bool {
 }
 
 fn player_width(app: &AppHandle) -> f64 {
-    app.state::<AppState>().cfg.lock().unwrap().music.player_width.clamp(PLAYER_MIN_W, PLAYER_MAX_W)
+    app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.player_width.clamp(PLAYER_MIN_W, PLAYER_MAX_W)
 }
 
 fn venue_docked(app: &AppHandle) -> bool {
-    app.state::<AppState>().cfg.lock().unwrap().music.venue_docked
+    app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.venue_docked
 }
 
 /// Dimensione logica della finestra del lettore nella modalità data.
@@ -217,7 +217,7 @@ fn open_player_in(app: &AppHandle, expanded: bool) {
     EXPANDED.store(expanded, Ordering::SeqCst);
     let pos = {
         let st = app.state::<AppState>();
-        let c = st.cfg.lock().unwrap();
+        let c = st.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if expanded { c.music.venue_pos } else { c.music.player_pos }
     };
     let (lw, lh) = mode_size(app, expanded);
@@ -457,7 +457,7 @@ pub fn resize_player(app: &AppHandle, width: f64) {
     if let Some(w) = app.get_webview_window(PLAYER).filter(|_| !is_expanded()) {
         let _ = w.set_size(tauri::LogicalSize::new(width, width * PLAYER_H / PLAYER_W));
     }
-    app.state::<AppState>().cfg.lock().unwrap().music.player_width = width;
+    app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.player_width = width;
     app.state::<AppState>().dirty.store(true, Ordering::Relaxed);
 }
 
@@ -481,7 +481,7 @@ fn open_venue_window(app: &AppHandle) {
         let _ = w.set_focus();
         return;
     }
-    let pos = app.state::<AppState>().cfg.lock().unwrap().music.venue_pos;
+    let pos = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.venue_pos;
     let b = tauri::WebviewWindowBuilder::new(app, VENUE, tauri::WebviewUrl::App("venue.html".into()))
         .title("Music Venue")
         .decorations(false)
@@ -544,7 +544,7 @@ pub fn window_destroyed(app: &AppHandle, label: &str) {
 pub fn record_venue_position(win: &tauri::Window) {
     if let Ok(p) = win.outer_position() {
         let app = win.app_handle();
-        app.state::<AppState>().cfg.lock().unwrap().music.venue_pos = Some((p.x, p.y));
+        app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.venue_pos = Some((p.x, p.y));
         app.state::<AppState>().dirty.store(true, Ordering::Relaxed);
     }
 }
@@ -563,14 +563,14 @@ fn entry_of(t: &Track) -> library::Entry {
 
 fn save_library(app: &AppHandle) {
     let m = app.state::<Music>();
-    let lib = m.library.lock().unwrap().clone();
+    let lib = m.library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     library::save(&m.data_dir, &lib);
     let _ = app.emit("venue-library", lib);
 }
 
 /// Brano suonato fuori dal lettore (Spotify): va nei recenti della Venue.
 pub fn record_external(app: &AppHandle, e: library::Entry) {
-    app.state::<Music>().library.lock().unwrap().played(e);
+    app.state::<Music>().library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).played(e);
     save_library(app);
 }
 
@@ -581,7 +581,7 @@ pub fn favorite_current(app: &AppHandle, want: Option<bool>) -> Result<bool, Str
     };
     let m = app.state::<Music>();
     let now = {
-        let mut lib = m.library.lock().unwrap();
+        let mut lib = m.library.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let is = lib.is_favorite(&t.id);
         if want.is_none_or(|w| w != is) { lib.toggle_favorite(entry_of(&t)) } else { is }
     };
@@ -636,7 +636,7 @@ pub fn record_player_position(win: &tauri::Window) {
         let app = win.app_handle();
         {
             let st = app.state::<AppState>();
-            let mut c = st.cfg.lock().unwrap();
+            let mut c = st.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if is_expanded() { c.music.venue_pos = Some((p.x, p.y)) } else { c.music.player_pos = Some((p.x, p.y)) }
         }
         app.state::<AppState>().dirty.store(true, Ordering::Relaxed);
@@ -649,14 +649,14 @@ pub fn record_player_position(win: &tauri::Window) {
 fn start_track(app: &AppHandle, index: usize, start: f64) {
     let m = app.state::<Music>();
     let gen = m.gen.fetch_add(1, Ordering::SeqCst) + 1;
-    if let Some(tx) = m.ctl.lock().unwrap().take() {
+    if let Some(tx) = m.ctl.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() {
         let _ = tx.send(decode::Ctl::Stop);
     }
     let file = {
-        let mut i = m.inner.lock().unwrap();
+        let mut i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let Some(t) = i.queue.get(index) else { return };
         let f = t.file.clone();
-        m.library.lock().unwrap().played(entry_of(t));
+        m.library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).played(entry_of(t));
         i.index = Some(index);
         i.base = start;
         i.playing = true;
@@ -667,10 +667,10 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
     save_library(app);
     let engine = app.state::<AudioEngine>();
     engine.set_music_paused(false);
-    let vol = app.state::<AppState>().cfg.lock().unwrap().music.volume;
+    let vol = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.volume;
     engine.set_music_gain(gain(vol));
     let (tx, rx) = mpsc::channel();
-    *m.ctl.lock().unwrap() = Some(tx);
+    *m.ctl.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(tx);
     open_player(app);
     emit_state(app);
     let app = app.clone();
@@ -682,7 +682,7 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
             let on_seek = move |t: f64| {
                 let m = app2.state::<Music>();
                 if m.gen.load(Ordering::SeqCst) == gen {
-                    m.inner.lock().unwrap().base = t;
+                    m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner).base = t;
                     app2.state::<AudioEngine>().music_played(true);
                 }
             };
@@ -705,10 +705,10 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
 
 /// Prossimo brano secondo shuffle/repeat. `auto`: fine naturale del brano.
 fn advance(app: &AppHandle, auto: bool) {
-    let cfg = app.state::<AppState>().cfg.lock().unwrap().music.clone();
+    let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.clone();
     let (len, cur) = {
         let m = app.state::<Music>();
-        let i = m.inner.lock().unwrap();
+        let i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         (i.queue.len(), i.index.unwrap_or(0))
     };
     if len == 0 {
@@ -739,11 +739,11 @@ fn advance(app: &AppHandle, auto: bool) {
 fn stop(app: &AppHandle) {
     let m = app.state::<Music>();
     m.gen.fetch_add(1, Ordering::SeqCst);
-    if let Some(tx) = m.ctl.lock().unwrap().take() {
+    if let Some(tx) = m.ctl.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() {
         let _ = tx.send(decode::Ctl::Stop);
     }
     {
-        let mut i = m.inner.lock().unwrap();
+        let mut i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         i.playing = false;
         i.paused = false;
         i.base = 0.0;
@@ -790,7 +790,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
         Ok(r) => r,
         Err(e) => {
             set_status(app, &crate::tr!("Non trovato: {e}", "Not found: {e}"));
-            if !m.inner.lock().unwrap().playing && !is_expanded() {
+            if !m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner).playing && !is_expanded() {
                 close_player(app);
             }
             return Err(e);
@@ -813,7 +813,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
         lyrics_synced: false,
     };
     let (index, now) = {
-        let mut i = m.inner.lock().unwrap();
+        let mut i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let busy = i.playing;
         if enqueue && busy {
             i.queue.push(track);
@@ -832,7 +832,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
         emit_state(app);
     }
     // testo sincronizzato in background
-    if app.state::<AppState>().cfg.lock().unwrap().music.lyrics {
+    if app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.lyrics {
         let app = app.clone();
         let id = info.id.clone();
         let raw = info.title.clone();
@@ -853,7 +853,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
                 }
             }
             let m = app.state::<Music>();
-            let mut i = m.inner.lock().unwrap();
+            let mut i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             for t in i.queue.iter_mut().filter(|t| t.id == id) {
                 match &found {
                     Some(l) => {
@@ -885,7 +885,7 @@ fn fmt_time(s: f64) -> String {
 pub fn toggle_pause(app: &AppHandle) {
     let m = app.state::<Music>();
     let paused = {
-        let mut i = m.inner.lock().unwrap();
+        let mut i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if !i.playing {
             return;
         }
@@ -988,7 +988,7 @@ pub fn spawn_analyzer(app: AppHandle) {
                 std::thread::sleep(Duration::from_millis(40));
                 let (playing, paused) = {
                     let m = app.state::<Music>();
-                    let i = m.inner.lock().unwrap();
+                    let i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                     (i.playing, i.paused)
                 };
                 if !playing || app.get_webview_window(PLAYER).is_none() {
@@ -1056,7 +1056,7 @@ pub async fn music_prev(app: AppHandle) {
 
 #[tauri::command]
 pub fn music_seek(app: AppHandle, secs: f64) {
-    if let Some(tx) = app.state::<Music>().ctl.lock().unwrap().as_ref() {
+    if let Some(tx) = app.state::<Music>().ctl.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref() {
         let _ = tx.send(decode::Ctl::Seek(secs.max(0.0)));
     }
 }
@@ -1178,7 +1178,7 @@ pub async fn venue_closed(app: AppHandle) {
 
 #[tauri::command]
 pub fn venue_library(app: AppHandle) -> library::Library {
-    app.state::<Music>().library.lock().unwrap().clone()
+    app.state::<Music>().library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
 }
 
 /// Preferito: `id` vuoto = brano attuale.
@@ -1189,7 +1189,7 @@ pub fn venue_favorite(app: AppHandle, id: String) -> Result<bool, String> {
     }
     let m = app.state::<Music>();
     let now = {
-        let mut lib = m.library.lock().unwrap();
+        let mut lib = m.library.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let e = lib.find(&id).cloned().ok_or("brano non trovato")?;
         lib.toggle_favorite(e)
     };
@@ -1200,7 +1200,7 @@ pub fn venue_favorite(app: AppHandle, id: String) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn venue_remove(app: AppHandle, id: String) {
-    app.state::<Music>().library.lock().unwrap().remove_recent(&id);
+    app.state::<Music>().library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).remove_recent(&id);
     save_library(&app);
 }
 
@@ -1216,7 +1216,7 @@ pub async fn venue_play(app: AppHandle, id: String, query: Option<String>, enque
             q
         }
         None => {
-            let lib = app.state::<Music>().library.lock().unwrap().clone();
+            let lib = app.state::<Music>().library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
             let e = lib.find(&id).ok_or("brano non trovato")?;
             e.url.clone().unwrap_or_else(|| format!("https://www.youtube.com/watch?v={}", e.id))
         }

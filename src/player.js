@@ -128,7 +128,8 @@ function render() {
     $("lyrics").title = st.track?.lyrics_source ? `${t("Testo")}: ${st.track.lyrics_source}${st.track.lyrics_synced ? "" : " — " + t("tempi stimati")}` : "";
   }
 }
-(function loop() { render(); requestAnimationFrame(loop); })();
+// 10 aggiornamenti al secondo bastano per barra e testo (30 mentre trascini), 2 in pausa: meno CPU e GPU
+(function loop() { render(); setTimeout(loop, seeking ? 33 : st?.playing && !st?.paused ? 100 : 500); })();
 
 // ---------- comandi ----------
 $("b-play").onclick = () => invoke("music_toggle");

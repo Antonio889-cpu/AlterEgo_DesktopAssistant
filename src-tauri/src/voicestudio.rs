@@ -35,7 +35,7 @@ pub fn start() -> Result<(), String> {
 
 /// Avvio insieme ad Alter Ego: solo se la voce in uso è VoiceStudio.
 pub fn autostart(app: &AppHandle) {
-    let a = app.state::<crate::AppState>().cfg.lock().unwrap().audio.clone();
+    let a = app.state::<crate::AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.clone();
     if a.tts == "openai" && a.tts_url.contains(":3900") && a.voicestudio_autostart && find().is_some() {
         std::thread::spawn(|| {
             if let Err(e) = start() {

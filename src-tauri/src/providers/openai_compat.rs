@@ -179,7 +179,7 @@ pub async fn stream_chat(
     }
     // ragionamento spento: parametri del provider (se li rifiuta si riprova senza e lo si ricorda)
     let think_key = format!("{}/{}", t.id, t.model);
-    let mut think_params = if t.thinking_off && !ai.no_think_params.lock().unwrap().contains(&think_key) { thinking_off_params(&t.id, &t.model) } else { None };
+    let mut think_params = if t.thinking_off && !ai.no_think_params.lock().unwrap_or_else(std::sync::PoisonError::into_inner).contains(&think_key) { thinking_off_params(&t.id, &t.model) } else { None };
     if let (Some(p), Some(o)) = (&think_params, body.as_object_mut()) {
         for (k, v) in p.as_object().into_iter().flatten() {
             o.insert(k.clone(), v.clone());
@@ -187,7 +187,7 @@ pub async fn stream_chat(
     }
     // uso dei token in fondo allo stream (per il pannello Costi; DeepSeek riporta anche la cache).
     // Ollama è gratis; un provider che rifiuta il parametro viene ricordato e non lo riceve più.
-    let want_usage = t.id != "ollama" && !ai.no_usage.lock().unwrap().contains(&t.id);
+    let want_usage = t.id != "ollama" && !ai.no_usage.lock().unwrap_or_else(std::sync::PoisonError::into_inner).contains(&t.id);
     if want_usage {
         body["stream_options"] = json!({ "include_usage": true });
         if t.id == "openrouter" {
@@ -216,7 +216,7 @@ pub async fn stream_chat(
             && matches!(status.as_u16(), 400 | 404 | 422)
             && ["reason", "think", "unrecognized", "unknown", "not supported", "extra", "invalid"].iter().any(|w| lower.contains(w));
         if think_rejected {
-            ai.no_think_params.lock().unwrap().insert(think_key.clone());
+            ai.no_think_params.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(think_key.clone());
             if let (Some(o), Some(p)) = (body.as_object_mut(), think_params.take()) {
                 for k in p.as_object().map(|m| m.keys().cloned().collect::<Vec<_>>()).unwrap_or_default() {
                     o.remove(&k);
@@ -225,7 +225,7 @@ pub async fn stream_chat(
             continue;
         }
         if want_usage && !retried && status.as_u16() == 400 && text.to_lowercase().contains("stream_options") {
-            ai.no_usage.lock().unwrap().insert(t.id.clone());
+            ai.no_usage.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(t.id.clone());
             if let Some(o) = body.as_object_mut() {
                 o.remove("stream_options");
                 o.remove("usage");

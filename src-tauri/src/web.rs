@@ -70,7 +70,7 @@ pub fn parse_fetch(v: &Value) -> Page {
 async fn call(app: &AppHandle, what: &str, body: Value) -> Result<Value, String> {
     let state = app.state::<AppState>();
     let (base, ids) = {
-        let cfg = state.cfg.lock().unwrap();
+        let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let pc = cfg.ai.providers.get("deepseek").cloned().unwrap_or_default();
         let base = if pc.base_url.trim().is_empty() { "https://api.deepseek.com".to_string() } else { pc.base_url.clone() };
         (api_root(&base), pc.key_ids())
@@ -123,13 +123,13 @@ async fn call(app: &AppHandle, what: &str, body: Value) -> Result<Value, String>
 pub const SEARCH_PROVIDERS: &[&str] = &["deepseek", "gemini", "tavily", "brave", "duckduckgo"];
 
 fn web_cfg(app: &AppHandle) -> crate::config::WebConfig {
-    app.state::<AppState>().cfg.lock().unwrap().web.clone()
+    app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).web.clone()
 }
 
 /// Il provider ha ciò che serve (chiave) per essere provato.
 fn available(app: &AppHandle, p: &str) -> bool {
     let st = app.state::<AppState>();
-    let has = |id: &str| st.cfg.lock().unwrap().ai.providers.get(id).is_some_and(|pc| !pc.keys.is_empty());
+    let has = |id: &str| st.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.providers.get(id).is_some_and(|pc| !pc.keys.is_empty());
     match p {
         "deepseek" => has("deepseek"),
         "gemini" => has("gemini"),
@@ -189,7 +189,7 @@ fn log_call(app: &AppHandle, provider: &str, model: &str, t0: Instant, input: u6
 /// Google Search tramite Gemini: risposta già riassunta + fonti.
 async fn gemini_search(app: &AppHandle, q: &str, model: &str) -> Result<Vec<Hit>, String> {
     let st = app.state::<AppState>();
-    let ids = st.cfg.lock().unwrap().ai.providers.get("gemini").map(|p| p.key_ids()).unwrap_or_default();
+    let ids = st.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.providers.get("gemini").map(|p| p.key_ids()).unwrap_or_default();
     let keys = st.ai.key_order("gemini", &ids);
     if keys.is_empty() {
         return Err(crate::i18n::tr("Gemini: manca la chiave (AI e chiavi)", "Gemini: key missing (AI & keys)").into());

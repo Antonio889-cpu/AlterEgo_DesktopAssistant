@@ -52,7 +52,7 @@ fn enc(s: &str) -> String {
 }
 
 fn client_id(app: &AppHandle) -> Result<String, String> {
-    let id = app.state::<AppState>().cfg.lock().unwrap().spotify.client_id.trim().to_string();
+    let id = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).spotify.client_id.trim().to_string();
     if id.is_empty() {
         Err(crate::i18n::tr("manca il Client ID di Spotify (Impostazioni → Voce e audio → Spotify)", "Spotify Client ID missing (Settings → Voice & audio → Spotify)").into())
     } else {
@@ -136,7 +136,7 @@ fn store_tokens(v: &Value) -> Result<String, String> {
     if let Some(r) = v.get("refresh_token").and_then(Value::as_str) {
         keys::set_slot("spotify", "refresh", r)?;
     }
-    *ACCESS.lock().unwrap() = Some((access.clone(), Instant::now() + Duration::from_secs(secs.saturating_sub(60))));
+    *ACCESS.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some((access.clone(), Instant::now() + Duration::from_secs(secs.saturating_sub(60))));
     Ok(access)
 }
 
@@ -176,7 +176,7 @@ pub async fn connect(app: &AppHandle) -> Result<String, String> {
 
 pub fn disconnect(app: &AppHandle) {
     let _ = keys::delete_slot("spotify", "refresh");
-    *ACCESS.lock().unwrap() = None;
+    *ACCESS.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     update_config(app, |c| {
         c.spotify.connected = false;
         c.spotify.account.clear();
@@ -184,7 +184,7 @@ pub fn disconnect(app: &AppHandle) {
 }
 
 async fn access_token(app: &AppHandle) -> Result<String, String> {
-    if let Some((t, until)) = ACCESS.lock().unwrap().clone() {
+    if let Some((t, until)) = ACCESS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone() {
         if Instant::now() < until {
             return Ok(t);
         }
@@ -219,7 +219,7 @@ async fn api(app: &AppHandle, method: reqwest::Method, path: &str, body: Option<
         }
         (404, "NO_ACTIVE_DEVICE") | (404, _) if reason == "NO_ACTIVE_DEVICE" || msg.to_lowercase().contains("device") => "NO_ACTIVE_DEVICE".into(),
         (401, _) => {
-            *ACCESS.lock().unwrap() = None;
+            *ACCESS.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = None;
             crate::i18n::tr("Spotify: accesso scaduto, ricollega l'account", "Spotify: access expired, reconnect the account").into()
         }
         (code, _) => format!("Spotify (HTTP {code}): {msg}"),
@@ -347,7 +347,7 @@ pub async fn control(app: &AppHandle, action: &str, value: Option<f64>) -> Resul
 
 /// Spotify è attivo e collegato.
 pub fn active(app: &AppHandle) -> bool {
-    let c = app.state::<AppState>().cfg.lock().unwrap().spotify.clone();
+    let c = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).spotify.clone();
     c.enabled && c.connected
 }
 
@@ -377,7 +377,7 @@ pub fn spotify_settings(app: AppHandle, enabled: bool) {
 
 #[tauri::command]
 pub fn spotify_status(app: AppHandle) -> Status {
-    let c = app.state::<AppState>().cfg.lock().unwrap().spotify.clone();
+    let c = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).spotify.clone();
     Status { connected: c.connected && keys::get_slot("spotify", "refresh").is_some(), account: c.account, redirect: REDIRECT }
 }
 

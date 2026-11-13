@@ -17,7 +17,7 @@ fn home() -> PathBuf {
 }
 
 pub fn cwd() -> PathBuf {
-    CWD.lock().unwrap().clone().filter(|p| p.is_dir()).unwrap_or_else(home)
+    CWD.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone().filter(|p| p.is_dir()).unwrap_or_else(home)
 }
 
 /// Nome e versione del sistema, per far scrivere al modello i comandi giusti.
@@ -129,10 +129,10 @@ $__c = if ($LASTEXITCODE) {{ $LASTEXITCODE }} elseif ($?) {{ 0 }} else {{ 1 }}; 
         let new_dir = stdout[pos + MARK.len()..].trim().to_string();
         stdout.truncate(pos);
         if !new_dir.is_empty() && PathBuf::from(&new_dir).is_dir() {
-            *CWD.lock().unwrap() = Some(PathBuf::from(new_dir));
+            *CWD.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(PathBuf::from(new_dir));
         }
     } else if cwd_arg.is_some() {
-        *CWD.lock().unwrap() = Some(dir.clone());
+        *CWD.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(dir.clone());
     }
     let stderr = String::from_utf8_lossy(&out.stderr);
     let mut text = stdout.trim_end().to_string();

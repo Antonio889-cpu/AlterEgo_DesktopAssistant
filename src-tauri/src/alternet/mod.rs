@@ -169,7 +169,7 @@ fn on_message(w: WebviewWindow, msg: String) {
     let from_start = here.as_ref().is_some_and(|u| u.scheme() == "data");
     if let Some(chunk) = msg.strip_prefix("assets:") {
         // solo dal gioco sul server attuale
-        let server = ALLOWED.lock().unwrap().server.clone();
+        let server = ALLOWED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).server.clone();
         if here.as_ref().is_some_and(|u| !server.is_empty() && u.as_str().starts_with(&server)) {
             sync::on_chunk(w.app_handle(), server, chunk);
         }
@@ -188,7 +188,7 @@ fn on_message(w: WebviewWindow, msg: String) {
             let _ = w.close();
         }
         "offline" if from_start => {
-            let dir = ALLOWED.lock().unwrap().offline.clone();
+            let dir = ALLOWED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).offline.clone();
             if let Some(u) = dir.as_deref().and_then(offline_url) {
                 let _ = w.navigate(u);
             }
@@ -202,7 +202,7 @@ fn on_message(w: WebviewWindow, msg: String) {
                 match (ok, game_url(&new)) {
                     (true, Some(u)) => {
                         save_server(&new);
-                        ALLOWED.lock().unwrap().server = new;
+                        ALLOWED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).server = new;
                         let _ = w.navigate(u);
                     }
                     _ => {
@@ -225,7 +225,7 @@ async fn choose(app: &AppHandle, change: bool) -> (Url, Target) {
     let server = server_url();
     let offline = offline_dir(app);
     {
-        let mut a = ALLOWED.lock().unwrap();
+        let mut a = ALLOWED.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         a.server = server.clone();
         a.offline = offline.clone();
     }
@@ -268,7 +268,7 @@ pub async fn open(app: &AppHandle, change: bool) -> Result<String, String> {
         .fullscreen(true)
         .data_directory(data_dir().join("WebView2"))
         .initialization_script(BRIDGE)
-        .on_navigation(|to| allowed_nav(to, &ALLOWED.lock().unwrap()))
+        .on_navigation(|to| allowed_nav(to, &ALLOWED.lock().unwrap_or_else(std::sync::PoisonError::into_inner)))
         .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
         .on_document_title_changed(|w, title| {
             if let Some(rest) = title.strip_prefix(TITLE_TAG) {

@@ -97,6 +97,8 @@ struct Shared {
     music_played: AtomicU64,
     /// Ultimi campioni di musica suonati (mono), per lo spettro.
     analysis: Mutex<VecDeque<f32>>,
+    /// Altoparlanti in pausa perché non c'è niente da suonare (vedi `run`).
+    idle: AtomicBool,
 }
 
 #[derive(Default, Clone, Copy)]
@@ -120,6 +122,12 @@ pub struct Status {
     pub link_error: Option<String>,
 }
 
+/// Messaggi al thread audio: nuovi dispositivi, oppure "c'è qualcosa da suonare" (riprende l'uscita in pausa).
+enum Msg {
+    Setup(Setup),
+    Wake,
+}
+
 #[derive(Clone, PartialEq, Debug)]
 struct Setup {
     output: String,
@@ -133,7 +141,7 @@ pub enum Kind {
 }
 
 pub struct AudioEngine {
-    tx: Mutex<mpsc::Sender<Setup>>,
+    tx: Mutex<mpsc::Sender<Msg>>,
     shared: Arc<Shared>,
     last: Mutex<Option<Setup>>,
     /// Ogni nuova frase/stop incrementa: le sintesi vecchie non vengono riprodotte.
@@ -144,7 +152,7 @@ impl AudioEngine {
     pub fn new() -> Self {
         let shared = Arc::new(Shared::default());
         shared.music_gain.store(0.8f32.to_bits(), Ordering::Relaxed);
-        let (tx, rx) = mpsc::channel::<Setup>();
+        let (tx, rx) = mpsc::channel::<Msg>();
         let sh = shared.clone();
         std::thread::Builder::new()
             .name("audio".into())
@@ -156,18 +164,25 @@ impl AudioEngine {
     /// Applica dispositivi e Mic-Link dalla config (ricrea gli stream solo se cambiano).
     pub fn configure(&self, a: &AudioConfig) {
         let ml = &a.mic_link;
-        *self.shared.gains.lock().unwrap() =
+        *self.shared.gains.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
             LinkGains { mic: ml.mic_volume as f32, voice: ml.voice_volume as f32, blips: ml.include_blips, music: ml.include_music };
-        *self.shared.ns.lock().unwrap() =
+        *self.shared.ns.lock().unwrap_or_else(std::sync::PoisonError::into_inner) =
             denoise::Params { enabled: ml.noise_suppression, strength: ml.ns_strength as f32, gate: ml.ns_gate as f32 };
         let setup = Setup {
             output: a.output_device.clone(),
             link: ml.enabled.then(|| (ml.mic_device.clone(), ml.cable_device.clone())),
         };
-        let mut last = self.last.lock().unwrap();
+        let mut last = self.last.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if last.as_ref() != Some(&setup) {
             *last = Some(setup.clone());
-            let _ = self.tx.lock().unwrap().send(setup);
+            let _ = self.tx.lock().unwrap_or_else(std::sync::PoisonError::into_inner).send(Msg::Setup(setup));
+        }
+    }
+
+    /// Se gli altoparlanti sono in pausa, li riavvia (dopo aver accodato qualcosa).
+    fn wake(&self) {
+        if self.shared.idle.swap(false, Ordering::SeqCst) {
+            let _ = self.tx.lock().unwrap_or_else(std::sync::PoisonError::into_inner).send(Msg::Wake);
         }
     }
 
@@ -176,9 +191,9 @@ impl AudioEngine {
         if samples.is_empty() || rate == 0 {
             return 0.0;
         }
-        let gains = *self.shared.gains.lock().unwrap();
+        let gains = *self.shared.gains.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         for (sink, gain, is_link) in [(&self.shared.speaker, 1.0, false), (&self.shared.link, gains.voice, true)] {
-            let mut s = sink.lock().unwrap();
+            let mut s = sink.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if !s.active || (is_link && kind == Kind::Fx && !gains.blips) {
                 continue;
             }
@@ -191,54 +206,57 @@ impl AudioEngine {
                 Kind::Fx => mix_into(&mut s.fx, &data),
             }
         }
+        self.wake();
         samples.len() as f32 / rate as f32
     }
 
     /// Secondi di voce ancora da riprodurre sugli altoparlanti.
     pub fn voice_remaining(&self) -> f32 {
-        let s = self.shared.speaker.lock().unwrap();
+        let s = self.shared.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if s.rate == 0 { 0.0 } else { s.voice.len() as f32 / s.rate as f32 }
     }
 
     /// Ferma la voce (e i suoni) in corso.
     pub fn stop(&self) {
         self.voice_gen.fetch_add(1, Ordering::SeqCst);
-        self.shared.speaker.lock().unwrap().clear();
-        self.shared.link.lock().unwrap().clear();
+        self.shared.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
+        self.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
     }
 
     pub fn status(&self) -> Status {
-        self.shared.status.lock().unwrap().clone()
+        self.shared.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
     }
 
     // ---------- musica (stereo) ----------
 
     /// Rate degli altoparlanti (0 = nessuna uscita) e del cavo Mic-Link se riceve la musica.
     pub fn music_rates(&self) -> (u32, Option<u32>) {
-        let sp = self.shared.speaker.lock().unwrap();
+        let sp = self.shared.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let speaker = if sp.active { sp.rate } else { 0 };
         drop(sp);
-        let link = self.shared.link.lock().unwrap();
-        let g = *self.shared.gains.lock().unwrap();
+        let link = self.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let g = *self.shared.gains.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         (speaker, (link.active && g.music).then_some(link.rate))
     }
 
     /// Accoda musica già ricampionata. Senza uscita audio conta i frame come "suonati"
     /// (così posizione e spettro funzionano lo stesso) e restituisce false.
     pub fn push_music(&self, speaker: &[(f32, f32)], link: Option<&[(f32, f32)]>) -> bool {
-        let mut sp = self.shared.speaker.lock().unwrap();
+        let mut sp = self.shared.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let active = sp.active;
         if active {
             sp.music.extend(speaker.iter().copied());
         }
         drop(sp);
         if let Some(l) = link {
-            let mut lk = self.shared.link.lock().unwrap();
+            let mut lk = self.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             if lk.active {
                 lk.music.extend(l.iter().copied());
             }
         }
-        if !active {
+        if active {
+            self.wake();
+        } else {
             self.shared.music_played.fetch_add(speaker.len() as u64, Ordering::Relaxed);
             push_analysis(&self.shared, speaker.iter().map(|(l, r)| (l + r) * 0.5));
         }
@@ -247,14 +265,14 @@ impl AudioEngine {
 
     /// Secondi di musica in coda sugli altoparlanti.
     pub fn music_buffered(&self) -> f32 {
-        let s = self.shared.speaker.lock().unwrap();
+        let s = self.shared.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if s.rate == 0 { 0.0 } else { s.music.len() as f32 / s.rate as f32 }
     }
 
     pub fn music_clear(&self) {
-        self.shared.speaker.lock().unwrap().music.clear();
-        self.shared.link.lock().unwrap().music.clear();
-        self.shared.analysis.lock().unwrap().clear();
+        self.shared.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.clear();
+        self.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.clear();
+        self.shared.analysis.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
     }
 
     pub fn music_is_paused(&self) -> bool {
@@ -263,6 +281,9 @@ impl AudioEngine {
 
     pub fn set_music_paused(&self, paused: bool) {
         self.shared.music_paused.store(paused, Ordering::Relaxed);
+        if !paused {
+            self.wake();
+        }
     }
 
     pub fn set_music_gain(&self, gain: f32) {
@@ -276,13 +297,13 @@ impl AudioEngine {
 
     /// Ultimi `n` campioni di musica suonati (mono).
     pub fn music_analysis(&self, n: usize) -> Vec<f32> {
-        let a = self.shared.analysis.lock().unwrap();
+        let a = self.shared.analysis.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         a.iter().skip(a.len().saturating_sub(n)).copied().collect()
     }
 }
 
 fn push_analysis(sh: &Shared, samples: impl Iterator<Item = f32>) {
-    let mut a = sh.analysis.lock().unwrap();
+    let mut a = sh.analysis.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     a.extend(samples);
     let len = a.len();
     if len > ANALYSIS_LEN {
@@ -354,26 +375,81 @@ pub fn find_input(name: &str) -> Option<cpal::Device> {
 
 // ---------- thread degli stream ----------
 
-fn run(rx: mpsc::Receiver<Setup>, sh: Arc<Shared>) {
+/// Niente da suonare per questo tempo: gli altoparlanti vanno in pausa (niente callback a vuoto,
+/// la scheda audio può dormire). Si riprendono al primo suono (`AudioEngine::wake`).
+const IDLE_AFTER: Duration = Duration::from_secs(3);
+use std::time::Instant;
+
+/// Code degli altoparlanti vuote (la musica in pausa non conta).
+fn speaker_silent(sh: &Shared) -> bool {
+    let s = sh.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    s.voice.is_empty() && s.fx.is_empty() && (s.music.is_empty() || sh.music_paused.load(Ordering::Relaxed))
+}
+
+fn run(rx: mpsc::Receiver<Msg>, sh: Arc<Shared>) {
     let mut streams: Vec<cpal::Stream> = Vec::new();
-    while let Ok(mut setup) = rx.recv() {
+    // indice dello stream degli altoparlanti in `streams`, se aperto
+    let mut speaker: Option<usize> = None;
+    let mut paused = false;
+    let mut last_sound = Instant::now();
+    loop {
+        let mut setup = match rx.recv_timeout(Duration::from_millis(500)) {
+            Ok(Msg::Setup(s)) => s,
+            Ok(Msg::Wake) => {
+                if paused {
+                    if let Some(st) = speaker.and_then(|i| streams.get(i)) {
+                        let _ = st.play();
+                    }
+                    paused = false;
+                }
+                last_sound = Instant::now();
+                continue;
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if !paused && speaker.is_some() {
+                    if !speaker_silent(&sh) {
+                        last_sound = Instant::now();
+                    } else if last_sound.elapsed() > IDLE_AFTER {
+                        // prima `idle`, poi si ricontrolla: un suono accodato nel frattempo manda Wake
+                        sh.idle.store(true, Ordering::SeqCst);
+                        if speaker_silent(&sh) {
+                            if let Some(st) = speaker.and_then(|i| streams.get(i)) {
+                                paused = st.pause().is_ok();
+                            }
+                        }
+                        if !paused {
+                            sh.idle.store(false, Ordering::SeqCst);
+                        }
+                    }
+                }
+                continue;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => return,
+        };
         // più cambi ravvicinati (cursore sulle impostazioni): applica l'ultimo
-        while let Ok(s) = rx.recv_timeout(Duration::from_millis(150)) {
-            setup = s;
+        while let Ok(m) = rx.recv_timeout(Duration::from_millis(150)) {
+            if let Msg::Setup(s) = m {
+                setup = s;
+            }
         }
         streams.clear(); // chiude i vecchi
+        speaker = None;
+        paused = false;
+        sh.idle.store(false, Ordering::SeqCst);
+        last_sound = Instant::now();
         for s in [&sh.speaker, &sh.link] {
-            let mut s = s.lock().unwrap();
+            let mut s = s.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             s.active = false;
             s.clear_all();
         }
-        sh.mic.lock().unwrap().clear();
+        sh.mic.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
         let mut status = Status::default();
 
         // altoparlanti
         match open_output(&setup.output, sh.clone(), false) {
             Ok((name, st)) => {
                 status.output = name;
+                speaker = Some(streams.len());
                 streams.push(st);
             }
             Err(e) => status.output_error = Some(e),
@@ -387,7 +463,7 @@ fn run(rx: mpsc::Receiver<Setup>, sh: Arc<Shared>) {
                 Some(cable_name) => match open_output(&cable_name, sh.clone(), true) {
                     Err(e) => status.link_error = Some(e),
                     Ok((cable_name, out)) => {
-                        let rate = sh.link.lock().unwrap().rate;
+                        let rate = sh.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner).rate;
                         match open_mic(mic, rate, sh.clone()) {
                             Ok((mic_name, inp)) if is_cable_capture(&mic_name) => {
                                 drop(inp);
@@ -412,10 +488,10 @@ fn run(rx: mpsc::Receiver<Setup>, sh: Arc<Shared>) {
                 },
             }
             if !status.link_active {
-                sh.link.lock().unwrap().active = false;
+                sh.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner).active = false;
             }
         }
-        *sh.status.lock().unwrap() = status;
+        *sh.status.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = status;
     }
 }
 
@@ -432,7 +508,7 @@ fn open_output(name: &str, sh: Arc<Shared>, link: bool) -> Result<(String, cpal:
     let rate = config.sample_rate().0;
     let channels = config.channels() as usize;
     {
-        let mut s = if link { sh.link.lock().unwrap() } else { sh.speaker.lock().unwrap() };
+        let mut s = if link { sh.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner) } else { sh.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner) };
         s.rate = rate;
         s.clear_all();
     }
@@ -443,11 +519,11 @@ fn open_output(name: &str, sh: Arc<Shared>, link: bool) -> Result<(String, cpal:
     let mut played: Vec<f32> = Vec::with_capacity(4096);
     let render = move |frames: usize, buf: &mut Vec<(f32, f32)>| {
         buf.clear();
-        let g = *sh.gains.lock().unwrap();
+        let g = *sh.gains.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let music_on = !sh.music_paused.load(Ordering::Relaxed);
         let gain = f32::from_bits(sh.music_gain.load(Ordering::Relaxed));
-        let mut mic = if link { Some(sh.mic.lock().unwrap()) } else { None };
-        let mut s = if link { sh.link.lock().unwrap() } else { sh.speaker.lock().unwrap() };
+        let mut mic = if link { Some(sh.mic.lock().unwrap_or_else(std::sync::PoisonError::into_inner)) } else { None };
+        let mut s = if link { sh.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner) } else { sh.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner) };
         played.clear();
         for _ in 0..frames {
             let v = s.voice.pop_front().unwrap_or(0.0) + s.fx.pop_front().unwrap_or(0.0);
@@ -502,7 +578,7 @@ fn open_output(name: &str, sh: Arc<Shared>, link: bool) -> Result<(String, cpal:
     .map_err(|e| format!("{dev_name}: {e}"))?;
     stream.play().map_err(|e| format!("{dev_name}: {e}"))?;
     // la coda si riempie solo quando lo stream gira davvero
-    if link { sh2.link.lock().unwrap() } else { sh2.speaker.lock().unwrap() }.active = true;
+    if link { sh2.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner) } else { sh2.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner) }.active = true;
     Ok((dev_name, stream))
 }
 
@@ -563,8 +639,8 @@ fn open_mic(name: &str, link_rate: u32, sh: Arc<Shared>) -> Result<(String, cpal
                 acc = 0.0;
             }
         }
-        let ns = *sh.ns.lock().unwrap();
-        let mut q = sh.mic.lock().unwrap();
+        let ns = *sh.ns.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut q = sh.mic.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if ns.enabled {
             buf48.clear();
             rs48.push(&mono, &mut buf48);
@@ -597,6 +673,21 @@ fn open_mic(name: &str, link_rate: u32, sh: Arc<Shared>) -> Result<(String, cpal
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Con la scheda audio vera: `cargo test idle_pause_and_wake -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn idle_pause_and_wake() {
+        let e = AudioEngine::new();
+        e.configure(&crate::config::AudioConfig::default());
+        std::thread::sleep(Duration::from_secs(5)); // apertura + 3 s di silenzio
+        assert!(e.shared.idle.load(Ordering::SeqCst), "da fermo gli altoparlanti vanno in pausa");
+        let tone: Vec<f32> = (0..4800).map(|i| (i as f32 * 0.06).sin() * 0.05).collect(); // 0,1 s quasi muto
+        e.play(&tone, 48_000, Kind::Voice);
+        assert!(!e.shared.idle.load(Ordering::SeqCst));
+        std::thread::sleep(Duration::from_millis(800));
+        assert_eq!(e.voice_remaining(), 0.0, "dopo il risveglio la voce viene suonata");
+    }
 
     #[test]
     fn mix_overlaps_from_now() {
@@ -633,15 +724,15 @@ mod tests {
     fn link_sink_gets_voice_only_when_active() {
         let e = AudioEngine::new();
         {
-            let mut s = e.shared.speaker.lock().unwrap();
+            let mut s = e.shared.speaker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             s.rate = 48_000;
             s.active = true;
         }
-        e.shared.link.lock().unwrap().rate = 48_000;
+        e.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner).rate = 48_000;
         let d = e.play(&[0.5; 24_000], 24_000, Kind::Voice);
         assert!((d - 1.0).abs() < 1e-6);
         assert!((e.voice_remaining() - 1.0).abs() < 0.01);
-        assert!(e.shared.link.lock().unwrap().voice.is_empty());
+        assert!(e.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner).voice.is_empty());
         e.stop();
         assert_eq!(e.voice_remaining(), 0.0);
     }

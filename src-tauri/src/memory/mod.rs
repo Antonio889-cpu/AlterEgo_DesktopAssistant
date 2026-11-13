@@ -89,20 +89,20 @@ impl Memory {
     }
 
     pub fn add_message(&self, role: &str, content: &str) -> R<i64> {
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         c.execute("INSERT INTO messages (ts, role, content) VALUES (?1, ?2, ?3)", params![now(), role, content])
             .map_err(e)?;
         Ok(c.last_insert_rowid())
     }
 
     pub fn delete_message(&self, id: i64) -> R<()> {
-        self.conn.lock().unwrap().execute("DELETE FROM messages WHERE id = ?1", [id]).map_err(e)?;
+        self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner).execute("DELETE FROM messages WHERE id = ?1", [id]).map_err(e)?;
         Ok(())
     }
 
     /// Ultimi `n` messaggi, in ordine cronologico.
     pub fn recent(&self, n: usize) -> R<Vec<Message>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut st = c
             .prepare("SELECT id, ts, role, content FROM messages ORDER BY id DESC LIMIT ?1")
             .map_err(e)?;
@@ -116,12 +116,12 @@ impl Memory {
     }
 
     pub fn count(&self) -> R<usize> {
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         c.query_row("SELECT COUNT(*) FROM messages", [], |r| r.get::<_, i64>(0)).map(|n| n as usize).map_err(e)
     }
 
     pub fn latest_summary(&self) -> R<Option<(i64, String)>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         c.query_row("SELECT upto_id, content FROM summaries ORDER BY id DESC LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?)))
             .optional()
             .map_err(e)
@@ -130,7 +130,7 @@ impl Memory {
     /// Messaggi non ancora riassunti e già usciti dalla finestra degli ultimi `window`.
     pub fn pending_for_summary(&self, window: usize) -> R<Vec<Message>> {
         let upto = self.latest_summary()?.map(|s| s.0).unwrap_or(0);
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut st = c
             .prepare(
                 "SELECT id, ts, role, content FROM messages
@@ -166,7 +166,7 @@ impl Memory {
     }
 
     fn items(&self, sql: &str) -> R<Vec<Item>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut st = c.prepare(sql).map_err(e)?;
         let v = st
             .query_map([], |r| Ok(Item { id: r.get(0)?, ts: r.get(1)?, content: r.get(2)? }))
@@ -191,7 +191,7 @@ impl Memory {
     }
 
     pub fn delete_fact(&self, id: i64) -> R<()> {
-        self.conn.lock().unwrap().execute("DELETE FROM facts WHERE id = ?1", [id]).map_err(e)?;
+        self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner).execute("DELETE FROM facts WHERE id = ?1", [id]).map_err(e)?;
         Ok(())
     }
 
@@ -211,13 +211,13 @@ impl Memory {
     }
 
     pub fn add_reminder(&self, due: i64, text: &str) -> R<i64> {
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         c.execute("INSERT INTO reminders (ts, due, text) VALUES (?1, ?2, ?3)", params![now(), due, text]).map_err(e)?;
         Ok(c.last_insert_rowid())
     }
 
     pub fn pending_reminders(&self) -> R<Vec<Reminder>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut st = c.prepare("SELECT id, due, text FROM reminders WHERE done = 0 ORDER BY due").map_err(e)?;
         let v = st
             .query_map([], |r| Ok(Reminder { id: r.get(0)?, due: r.get(1)?, text: r.get(2)? }))
@@ -228,14 +228,14 @@ impl Memory {
     }
 
     pub fn cancel_reminder(&self, id: i64) -> R<()> {
-        let n = self.conn.lock().unwrap().execute("DELETE FROM reminders WHERE id = ?1 AND done = 0", [id]).map_err(e)?;
+        let n = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner).execute("DELETE FROM reminders WHERE id = ?1 AND done = 0", [id]).map_err(e)?;
         if n == 0 { Err("promemoria non trovato".into()) } else { Ok(()) }
     }
 
     /// Promemoria scaduti: li segna come fatti e li restituisce.
     pub fn take_due_reminders(&self, now_ts: i64) -> R<Vec<Reminder>> {
         let due: Vec<Reminder> = self.pending_reminders()?.into_iter().filter(|r| r.due <= now_ts).collect();
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         for r in &due {
             c.execute("UPDATE reminders SET done = 1 WHERE id = ?1", [r.id]).map_err(e)?;
         }
@@ -244,7 +244,7 @@ impl Memory {
 
     /// Sostituisce tutti i fatti (dopo la compattazione).
     pub fn replace_facts(&self, facts: &[String]) -> R<()> {
-        let mut c = self.conn.lock().unwrap();
+        let mut c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let tx = c.transaction().map_err(e)?;
         tx.execute("DELETE FROM facts", []).map_err(e)?;
         for f in facts {
@@ -260,7 +260,7 @@ impl Memory {
     /// e riassunti vecchi. Poi compatta il file. Restituisce (messaggi, riassunti) eliminati.
     pub fn prune(&self, keep: usize) -> R<(usize, usize)> {
         let Some((upto, _)) = self.latest_summary()? else { return Ok((0, 0)) };
-        let c = self.conn.lock().unwrap();
+        let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let msgs = c
             .execute("DELETE FROM messages WHERE id <= ?1 AND id NOT IN (SELECT id FROM messages ORDER BY id DESC LIMIT ?2)", params![upto, keep as i64])
             .map_err(e)?;

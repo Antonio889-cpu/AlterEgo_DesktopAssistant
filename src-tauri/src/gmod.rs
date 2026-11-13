@@ -425,7 +425,7 @@ struct GmodEvent {
 
 /// Thread unico: controlla ogni 3 s se la funzione è attiva e GMod è aperto; intanto ascolta.
 pub fn spawn(app: AppHandle) {
-    std::thread::spawn(move || {
+    let _ = std::thread::Builder::new().name("gmod".into()).spawn(move || {
         let mut matcher: Option<(PathBuf, Matcher)> = None;
         let mut failed_gma: Option<PathBuf> = None;
         let mut live: Option<(cpal::Stream, mpsc::Receiver<Vec<f32>>, u32, Arc<AtomicBool>)> = None;
@@ -433,7 +433,7 @@ pub fn spawn(app: AppHandle) {
         loop {
             if Instant::now() >= next {
                 next = Instant::now() + Duration::from_secs(3);
-                let on = app.state::<AppState>().cfg.lock().unwrap().gmod;
+                let on = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).gmod;
                 let gma = if on { crate::apps::exe_path(&["gmod", "hl2"]).filter(|p| p.to_string_lossy().to_lowercase().contains("garrysmod")).and_then(|p| sounds_gma(&p)) } else { None };
                 if live.as_ref().is_some_and(|l| l.3.load(Ordering::Relaxed)) {
                     live = None; // dispositivo cambiato o scollegato: si riapre
@@ -443,6 +443,7 @@ pub fn spawn(app: AppHandle) {
                         if live.take().is_some() {
                             crate::applog::info("gmod", "ascolto fermato");
                         }
+                        matcher = None; // gioco chiuso: via l'indice dei suoni dalla memoria (si ricarica in ~2 s)
                     }
                     Some(p) => {
                         if matcher.as_ref().map(|m| &m.0) != Some(&p) && failed_gma.as_ref() != Some(&p) {

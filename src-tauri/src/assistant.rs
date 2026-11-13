@@ -47,7 +47,7 @@ fn msg(role: &str, content: &str) -> providers::ChatMessage {
 
 /// Chiavi Groq (per Whisper) in ordine di prova.
 pub fn groq_keys(app: &AppHandle) -> Vec<String> {
-    let cfg = app.state::<AppState>().cfg.lock().unwrap().ai.clone();
+    let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.clone();
     let ids = cfg.providers.get("groq").map(|p| p.key_ids()).unwrap_or_default();
     app.state::<AppState>().ai.key_order("groq", &ids).into_iter().map(|(_, k)| k).collect()
 }
@@ -61,7 +61,7 @@ pub async fn chat(
 ) -> Result<providers::ChatResult, String> {
     let state = app.state::<AppState>();
     let conv = app.state::<Conversation>();
-    let cfg = state.cfg.lock().unwrap().clone();
+    let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     let text: String = text.trim().chars().take(4000).collect();
     if text.is_empty() {
         return Err("messaggio vuoto".into());
@@ -102,7 +102,7 @@ pub async fn chat(
             (recent, Some(id), summary, facts)
         }
         None => {
-            let mut s = conv.session.lock().unwrap();
+            let mut s = conv.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             s.push(msg("user", &text));
             let start = providers::prompt::window_start(s.len(), max);
             (s[start..].to_vec(), None, None, Vec::new())
@@ -190,7 +190,7 @@ pub async fn chat(
                         }
                     });
                 }
-                None => conv.session.lock().unwrap().push(msg("assistant", &res.text)),
+                None => conv.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(msg("assistant", &res.text)),
             }
             Ok(res)
         }
@@ -198,7 +198,7 @@ pub async fn chat(
             // domanda senza risposta: non resta nel contesto
             match (mem, user_id) {
                 (Some(m), Some(id)) => { let _ = m.delete_message(id); }
-                _ => { conv.session.lock().unwrap().pop(); }
+                _ => { conv.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner).pop(); }
             }
             Err(e)
         }
@@ -247,7 +247,7 @@ async fn run_with_tools(
     if cfg.saving.tool_groups && all_tools.is_some() {
         let mut g = crate::saving::pick_groups(question);
         if g.is_empty() && conv.last_used_tools.load(Ordering::Relaxed) {
-            g = conv.last_groups.lock().unwrap().clone();
+            g = conv.last_groups.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
         }
         if !g.is_empty() {
             active = Some(g);
@@ -309,7 +309,7 @@ async fn run_with_tools(
             conv.last_used_tools.store(used_tools, Ordering::Relaxed);
             if used_tools {
                 if let Some(g) = &active {
-                    *conv.last_groups.lock().unwrap() = g.clone();
+                    *conv.last_groups.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = g.clone();
                 }
             }
             let mut res = res;
@@ -464,7 +464,7 @@ pub fn memory_delete_fact(conv: State<Conversation>, id: i64) -> Result<(), Stri
 
 #[tauri::command]
 pub fn memory_forget_all(conv: State<Conversation>) -> Result<(), String> {
-    conv.session.lock().unwrap().clear();
+    conv.session.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clear();
     memory_or_err(&conv)?.forget_all()
 }
 
@@ -473,7 +473,7 @@ pub fn memory_forget_all(conv: State<Conversation>) -> Result<(), String> {
 pub async fn memory_compact(app: AppHandle) -> Result<String, String> {
     let conv = app.state::<Conversation>();
     let m = memory_or_err(&conv)?;
-    let ai_cfg = app.state::<AppState>().cfg.lock().unwrap().ai.clone();
+    let ai_cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.clone();
     let (before, after, msgs) = memory::summarize::compact(&conv.ai_bg, ai_cfg, m).await?;
     crate::applog::info("memoria", &format!("compattata: fatti {before} → {after}, messaggi eliminati {msgs}"));
     Ok(crate::tr!(
@@ -522,7 +522,7 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
         crate::window::show_main(app); // si fa vedere subito, prima che parta il microfono
     }
     let conv = app.state::<Conversation>();
-    let provider = app.state::<AppState>().cfg.lock().unwrap().stt.provider.clone();
+    let provider = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).stt.provider.clone();
     if pressed {
         if conv.recorder.is_recording() {
             return;
@@ -535,7 +535,7 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
         let app = app.clone();
         std::thread::spawn(move || {
             let conv = app.state::<Conversation>();
-            let mic = app.state::<AppState>().cfg.lock().unwrap().audio.input_device.clone();
+            let mic = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.input_device.clone();
             match conv.recorder.start(&mic) {
                 Ok(()) => emit_stt(&app, stt::SttEvent::Recording),
                 Err(e) => emit_stt(&app, stt::SttEvent::Error { message: e }),
@@ -559,7 +559,7 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
             Ok(t) if t.is_empty() => emit_stt(&app, stt::SttEvent::Empty),
             Ok(text) => {
                 // frase della clip: si esegue subito, senza modello
-                let clip = app.state::<AppState>().cfg.lock().unwrap().clip.clone();
+                let clip = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clip.clone();
                 if actions::clip::matches(&clip, &text) {
                     let r = do_clip(&app, &clip);
                     emit_stt(&app, stt::SttEvent::Clip { ok: r.is_ok(), message: r.unwrap_or_else(|e| e) });
@@ -574,7 +574,7 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
 
 /// Trascrive con il servizio scelto e, se fallisce, con quello di riserva (Groq ⇄ Gemini, o il server locale).
 pub async fn transcribe(app: &AppHandle, wav: Vec<u8>) -> Result<String, String> {
-    let cfg = app.state::<AppState>().cfg.lock().unwrap().stt.clone();
+    let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).stt.clone();
     let mut order = vec![cfg.provider.clone()];
     if cfg.fallback != "none" && cfg.fallback != cfg.provider {
         order.push(cfg.fallback.clone());
@@ -586,7 +586,7 @@ pub async fn transcribe(app: &AppHandle, wav: Vec<u8>) -> Result<String, String>
         let res = match p.as_str() {
             "gemini" => {
                 let state = app.state::<AppState>();
-                let ids = state.cfg.lock().unwrap().ai.providers.get("gemini").map(|p| p.key_ids()).unwrap_or_default();
+                let ids = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.providers.get("gemini").map(|p| p.key_ids()).unwrap_or_default();
                 let keys: Vec<String> = state.ai.key_order("gemini", &ids).into_iter().map(|(_, k)| k).collect();
                 let r = stt::transcribe_gemini(&state.ai.http, &cfg.gemini_model, &cfg.language, &wav, keys).await;
                 if let Ok((_, input, output)) = &r {
@@ -649,7 +649,7 @@ fn log_stt_cost(app: &AppHandle, cfg: &config::SttConfig, secs: f64, t0: std::ti
 #[tauri::command]
 pub async fn stt_test(app: AppHandle) -> Result<String, String> {
     let conv = app.state::<Conversation>();
-    let mic = app.state::<AppState>().cfg.lock().unwrap().audio.input_device.clone();
+    let mic = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.input_device.clone();
     conv.recorder.start(&mic)?;
     tokio::time::sleep(std::time::Duration::from_secs(4)).await;
     let wav = conv.recorder.finish()?.ok_or(crate::i18n::tr("nessun audio registrato", "no audio recorded"))?;
@@ -675,7 +675,7 @@ pub fn set_clip(app: AppHandle, clip: config::ClipConfig) {
 /// Prova le scorciatoie delle clip dalle impostazioni.
 #[tauri::command]
 pub fn test_clip(app: AppHandle) -> Result<String, String> {
-    let clip = app.state::<AppState>().cfg.lock().unwrap().clip.clone();
+    let clip = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clip.clone();
     actions::clip::trigger(&clip).map(|names| format!("Inviata a: {}", names.join(", ")))
 }
 

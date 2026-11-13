@@ -247,7 +247,7 @@ impl Ai {
         let input = n("/prompt_tokens")
             .or_else(|| n("/prompt_cache_miss_tokens").map(|m| m + hit))
             .unwrap_or(hit);
-        let mut all = self.usage.lock().unwrap();
+        let mut all = self.usage.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let e = all.entry(provider.to_string()).or_default();
         e.requests += 1;
         e.input += input;
@@ -270,18 +270,18 @@ impl Ai {
     }
 
     pub fn log_cost(&self, e: crate::costs::Entry) {
-        if let Some(p) = self.cost_log.lock().unwrap().as_ref() {
+        if let Some(p) = self.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref() {
             crate::costs::append(p, &e);
         }
     }
 
     pub fn usage(&self) -> HashMap<String, Usage> {
-        self.usage.lock().unwrap().clone()
+        self.usage.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
     }
 
     /// Chiavi del provider in ordine di prova (partendo dall'ultima che ha funzionato).
     pub fn key_order(&self, provider: &str, ids: &[String]) -> Vec<(usize, String)> {
-        let start = self.sticky.lock().unwrap().get(provider).copied().unwrap_or(0);
+        let start = self.sticky.lock().unwrap_or_else(std::sync::PoisonError::into_inner).get(provider).copied().unwrap_or(0);
         let n = ids.len();
         (0..n)
             .map(|i| (start + i) % n)
@@ -290,7 +290,7 @@ impl Ai {
     }
 
     pub fn mark_good(&self, provider: &str, index: usize) {
-        self.sticky.lock().unwrap().insert(provider.to_string(), index);
+        self.sticky.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(provider.to_string(), index);
     }
 }
 
@@ -504,7 +504,7 @@ mod usage_tests {
         let ai = Ai::new();
         let log = std::env::temp_dir().join(format!("ae-usage-{}.jsonl", std::process::id()));
         let _ = std::fs::remove_file(&log);
-        *ai.cost_log.lock().unwrap() = Some(log.clone());
+        *ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(log.clone());
         ai.record_usage("deepseek", "deepseek-flash", &serde_json::json!({"prompt_tokens": 1000, "prompt_cache_hit_tokens": 900, "prompt_cache_miss_tokens": 100, "completion_tokens": 50}), 1200);
         ai.record_usage("openrouter", "x", &serde_json::json!({"prompt_tokens": 10, "prompt_tokens_details": {"cached_tokens": 4}, "completion_tokens": 2, "cost": 0.5}), 10);
         let rows = crate::costs::read(&log, 10);
@@ -546,7 +546,7 @@ mod tests {
         let l = log.clone();
         let ch = Channel::new(move |body| {
             if let tauri::ipc::InvokeResponseBody::Json(s) = body {
-                l.lock().unwrap().push(s);
+                l.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(s);
             }
             Ok(())
         });
@@ -563,7 +563,7 @@ mod tests {
         let (ch, log) = channel();
         let r = chat(&ai, cfg(&[("ollama", "http://127.0.0.1:18080/ok/v1")]), "sys".into(), user("ciao"), None, ch).await.unwrap();
         assert_eq!(r.text, "[happy]\nCiao! Sono il mock (m).");
-        assert!(log.lock().unwrap().iter().filter(|e| e.contains("delta")).count() >= 4);
+        assert!(log.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().filter(|e| e.contains("delta")).count() >= 4);
     }
 
     #[tokio::test]
@@ -575,7 +575,7 @@ mod tests {
         let err = chat(&ai, c, "s".into(), user("x"), None, ch).await.unwrap_err();
         assert!(err.contains("gemini: chiave API mancante"), "{err}");
         assert!(err.contains("ollama: errore del server (HTTP 500): boom"), "{err}");
-        assert!(log.lock().unwrap().iter().any(|e| e.contains("fallback")));
+        assert!(log.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().any(|e| e.contains("fallback")));
     }
 
     #[tokio::test]
@@ -620,11 +620,11 @@ mod tests {
         let (ch, log) = channel();
         let r = chat(&ai, c.clone(), "s".into(), user("x"), None, ch).await.unwrap();
         assert!(r.text.contains("mock"));
-        assert_eq!(log.lock().unwrap().iter().filter(|e| e.contains("chiave successiva")).count(), 2);
+        assert_eq!(log.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().filter(|e| e.contains("chiave successiva")).count(), 2);
         // la volta dopo parte direttamente dalla chiave buona
         let (ch, log) = channel();
         chat(&ai, c, "s".into(), user("x"), None, ch).await.unwrap();
-        assert_eq!(log.lock().unwrap().iter().filter(|e| e.contains("chiave successiva")).count(), 0);
+        assert_eq!(log.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().filter(|e| e.contains("chiave successiva")).count(), 0);
     }
 
     #[tokio::test]
@@ -636,7 +636,7 @@ mod tests {
         let (ch, log) = channel();
         let r = chat(&ai, c.clone(), "s".into(), user("x"), None, ch).await.unwrap();
         assert_eq!(r.text, "[happy]\nctx=32768 keep=30m think=False");
-        assert!(log.lock().unwrap().iter().filter(|e| e.contains("delta")).count() >= 2);
+        assert!(log.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().filter(|e| e.contains("delta")).count() >= 2);
         // chiamata a strumento nel formato nativo
         let tools = serde_json::json!([{ "type": "function", "function": { "name": "list_reminders", "parameters": {} } }]);
         let (ch, _) = channel();

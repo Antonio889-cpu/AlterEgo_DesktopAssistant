@@ -403,7 +403,7 @@ mod tests {
         let p = synth(&reqwest::Client::new(), &a, "Ciao", "it", None).await.unwrap();
         assert_eq!(p.rate, 24_000);
         assert!(!p.samples.is_empty());
-        let last: serde_json::Value = serde_json::from_str(&std::fs::read_to_string("/tmp/mock_speech.json").unwrap()).unwrap();
+        let last: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(std::env::temp_dir().join("mock_speech.json")).unwrap()).unwrap();
         assert_eq!(last["voice"], "if_sara");
         assert_eq!(last["response_format"], "wav");
     }

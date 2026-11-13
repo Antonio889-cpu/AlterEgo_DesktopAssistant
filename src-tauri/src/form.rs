@@ -35,7 +35,7 @@ pub async fn ask(app: &AppHandle, title: &str, intro: &str, fields: Vec<Value>) 
     let (tx, rx) = oneshot::channel();
     let spec = json!({ "id": id, "title": title, "intro": intro, "fields": fields });
     // un modulo alla volta: quello vecchio si annulla
-    if let Some((_, _, old)) = forms.pending.lock().unwrap().replace((id, spec, tx)) {
+    if let Some((_, _, old)) = forms.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner).replace((id, spec, tx)) {
         let _ = old.send(None);
     }
     if let Some(w) = app.get_webview_window(LABEL) {
@@ -52,14 +52,14 @@ pub async fn ask(app: &AppHandle, title: &str, intro: &str, fields: Vec<Value>) 
         .build();
     if let Err(e) = built {
         crate::applog::error("modulo", &format!("finestra non aperta: {e}"));
-        forms.pending.lock().unwrap().take();
+        forms.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take();
         return None;
     }
     let answer = tokio::time::timeout(Duration::from_secs(300), rx).await;
     if let Some(w) = app.get_webview_window(LABEL) {
         let _ = w.close();
     }
-    let mut p = forms.pending.lock().unwrap();
+    let mut p = forms.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if p.as_ref().is_some_and(|(pid, _, _)| *pid == id) {
         p.take();
     }
@@ -70,7 +70,7 @@ pub async fn ask(app: &AppHandle, title: &str, intro: &str, fields: Vec<Value>) 
 #[tauri::command]
 pub fn form_spec(app: AppHandle) -> Option<Value> {
     let forms = app.state::<Forms>();
-    let p = forms.pending.lock().unwrap();
+    let p = forms.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let (id, spec, _) = p.as_ref()?;
     forms.shown.store(*id, Ordering::SeqCst);
     Some(spec.clone())
@@ -80,7 +80,7 @@ pub fn form_spec(app: AppHandle) -> Option<Value> {
 #[tauri::command]
 pub fn form_submit(app: AppHandle, id: u64, values: Option<Value>) {
     let forms = app.state::<Forms>();
-    let mut p = forms.pending.lock().unwrap();
+    let mut p = forms.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if p.as_ref().is_some_and(|(pid, _, _)| *pid == id) {
         if let Some((_, _, tx)) = p.take() {
             let _ = tx.send(values);
@@ -92,7 +92,7 @@ pub fn form_submit(app: AppHandle, id: u64, values: Option<Value>) {
 pub fn closed(app: &AppHandle) {
     let forms = app.state::<Forms>();
     let shown = forms.shown.swap(0, Ordering::SeqCst);
-    let mut p = forms.pending.lock().unwrap();
+    let mut p = forms.pending.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if p.as_ref().is_some_and(|(id, _, _)| *id == shown) {
         if let Some((_, _, tx)) = p.take() {
             let _ = tx.send(None);

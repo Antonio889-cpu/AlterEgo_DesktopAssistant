@@ -154,7 +154,7 @@ function position() {
     $("now-fill").style.width = (st.duration ? (p / st.duration) * 100 : 0) + "%";
     $("now-pos").textContent = fmt(p);
   }
-  requestAnimationFrame(loop);
+  setTimeout(loop, st?.playing && !st?.paused ? 250 : 1000); // barra di avanzamento: non serve a 60 fps
 })();
 
 // ---------- comandi ----------

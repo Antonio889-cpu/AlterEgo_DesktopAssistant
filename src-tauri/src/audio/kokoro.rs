@@ -95,7 +95,7 @@ impl Kokoro {
     }
 
     pub fn running(&self) -> bool {
-        let mut c = self.child.lock().unwrap();
+        let mut c = self.child.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         match c.as_mut().map(|ch| ch.try_wait()) {
             Some(Ok(None)) => true,
             Some(_) => {
@@ -143,12 +143,12 @@ impl Kokoro {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
         let child = cmd.spawn().map_err(|e| crate::tr!("avvio del server Kokoro non riuscito: {e}", "could not start the Kokoro server: {e}"))?;
-        *self.child.lock().unwrap() = Some(child);
+        *self.child.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(child);
         Ok(())
     }
 
     pub fn stop(&self) {
-        if let Some(mut c) = self.child.lock().unwrap().take() {
+        if let Some(mut c) = self.child.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() {
             let _ = c.kill();
             let _ = c.wait();
         }

@@ -1,3 +1,12 @@
+## Alter Ego 1.8.2
+
+- Lighter at rest: the speakers pause when there's nothing to play, the music player and Venue no longer redraw 60 times a second, the Garry's Mod sound index is freed when the game closes.
+- Push-to-talk from the keyboard no longer hooks the mouse (no extra mouse latency in games).
+- More stable: a crash in one part no longer breaks the others (locks recover), the action log is capped at 5 MB.
+- All tests pass on Windows too.
+
+`AlterEgo_1.8.2_setup.exe` / `AlterEgo_1.8.2_portable.zip` Windows · `AlterEgo_1.8.2_amd64.AppImage` / `AlterEgo_1.8.2_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.8.1
 
 - Fix: the model catalog window opened blank on Windows.

@@ -37,13 +37,13 @@ pub struct Recorder {
 
 impl Recorder {
     pub fn is_recording(&self) -> bool {
-        self.worker.lock().unwrap().is_some()
+        self.worker.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_some()
     }
 
     /// Avvia la registrazione in un thread dedicato (lo stream cpal non è Send).
     /// `device`: nome del microfono ("" = predefinito di Windows).
     pub fn start(&self, device: &str) -> Result<(), String> {
-        let mut worker = self.worker.lock().unwrap();
+        let mut worker = self.worker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if worker.is_some() {
             return Ok(());
         }
@@ -51,7 +51,7 @@ impl Recorder {
         let (ready_tx, ready_rx) = mpsc::channel::<Result<(), String>>();
         let device = device.to_string();
         *worker = Some(std::thread::spawn(move || capture(&device, rx, ready_tx)));
-        *self.stop.lock().unwrap() = Some(tx);
+        *self.stop.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(tx);
         drop(worker);
         match ready_rx.recv_timeout(Duration::from_secs(5)) {
             Ok(Ok(())) => Ok(()),
@@ -68,10 +68,10 @@ impl Recorder {
 
     /// Ferma la registrazione e restituisce il WAV (None se troppo corta).
     pub fn finish(&self) -> Result<Option<Vec<u8>>, String> {
-        if let Some(tx) = self.stop.lock().unwrap().take() {
+        if let Some(tx) = self.stop.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() {
             let _ = tx.send(());
         }
-        let Some(handle) = self.worker.lock().unwrap().take() else {
+        let Some(handle) = self.worker.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() else {
             return Ok(None);
         };
         let (samples, rate) = handle.join().map_err(|_| "registrazione interrotta".to_string())??;
@@ -102,7 +102,7 @@ fn capture(name: &str, stop: mpsc::Receiver<()>, ready: mpsc::Sender<Result<(), 
 
     // media dei canali → mono
     fn push<T: Copy>(buf: &Mutex<Vec<f32>>, data: &[T], channels: usize, max: usize, conv: impl Fn(T) -> f32) {
-        let mut b = buf.lock().unwrap();
+        let mut b = buf.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         for frame in data.chunks(channels) {
             if b.len() >= max {
                 break;
@@ -131,7 +131,7 @@ fn capture(name: &str, stop: mpsc::Receiver<()>, ready: mpsc::Sender<Result<(), 
     let _ = ready.send(Ok(()));
     let _ = stop.recv_timeout(Duration::from_secs(MAX_SECONDS));
     drop(stream);
-    let samples = std::mem::take(&mut *buf.lock().unwrap());
+    let samples = std::mem::take(&mut *buf.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
     Ok((samples, rate))
 }
 

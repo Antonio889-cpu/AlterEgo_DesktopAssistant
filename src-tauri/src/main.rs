@@ -61,7 +61,7 @@ pub struct AppState {
 pub fn flush_config(app: &AppHandle) {
     let state = app.state::<AppState>();
     if state.dirty.swap(false, Ordering::Relaxed) {
-        let cfg = state.cfg.lock().unwrap().clone();
+        let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
         if let Err(e) = config::save(&state.cfg_path, &cfg) {
             applog::error("config", &format!("salvataggio config fallito: {e}"));
             state.dirty.store(true, Ordering::Relaxed);
@@ -114,8 +114,8 @@ pub struct FrontConfig {
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
     let state = app.state::<AppState>();
-    let hotkey_errors = state.hotkey_errors.lock().unwrap().clone();
-    let cfg = state.cfg.lock().unwrap();
+    let hotkey_errors = state.hotkey_errors.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+    let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     FrontConfig {
         hotkey_errors,
         opacity: cfg.opacity,
@@ -159,7 +159,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
 /// Modifica la config, la segna da salvare e notifica il frontend.
 pub fn update_config(app: &AppHandle, f: impl FnOnce(&mut config::Config)) {
     let state = app.state::<AppState>();
-    f(&mut state.cfg.lock().unwrap());
+    f(&mut state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
     state.dirty.store(true, Ordering::Relaxed);
     let _ = app.emit("config", front_config(app));
     tray::refresh(app);
@@ -197,7 +197,7 @@ fn set_resolved_language(app: AppHandle, lang: String) {
 /// Modalità compatta della finestra principale (la decide il frontend: musica in corso e Alter Ego inattiva).
 #[tauri::command]
 fn set_compact(app: AppHandle, on: bool) {
-    let enabled = app.state::<AppState>().cfg.lock().unwrap().music.compact;
+    let enabled = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.compact;
     window::set_compact(&app, on && enabled);
 }
 
@@ -314,7 +314,7 @@ fn move_api_key(app: AppHandle, provider: String, id: String, delta: i32) {
 #[tauri::command]
 async fn list_models(app: AppHandle, provider: String) -> Result<Vec<String>, String> {
     let state = app.state::<AppState>();
-    let cfg = state.cfg.lock().unwrap().ai.clone();
+    let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.clone();
     providers::list_models(&state.ai, &cfg, &provider).await
 }
 
@@ -329,7 +329,7 @@ struct CostRow {
 #[tauri::command]
 fn costs_list(app: AppHandle, limit: Option<usize>) -> Vec<CostRow> {
     let path = app.state::<assistant::Conversation>().data_dir.join("costs.jsonl");
-    let prices = app.state::<AppState>().cfg.lock().unwrap().prices.clone();
+    let prices = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).prices.clone();
     costs::read(&path, limit.unwrap_or(5000).min(50_000))
         .into_iter()
         .map(|e| CostRow { cost: costs::cost(&prices, &e), entry: e })
@@ -386,7 +386,7 @@ fn ai_usage(app: AppHandle) -> HashMap<String, providers::Usage> {
 #[tauri::command]
 async fn test_provider(app: AppHandle, provider: String) -> Result<String, String> {
     let state = app.state::<AppState>();
-    let cfg = state.cfg.lock().unwrap().ai.clone();
+    let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.clone();
     providers::test(&state.ai, &cfg, &provider).await
 }
 
@@ -514,8 +514,8 @@ fn main() {
                 hotkey_errors: Mutex::new(Vec::new()),
                 ai: providers::Ai::new(),
             });
-            *app.state::<AppState>().ai.cost_log.lock().unwrap() = Some(cost_log.clone());
-            *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap() = Some(cost_log);
+            *app.state::<AppState>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
+            *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             voicestudio::autostart(&handle);

@@ -18,7 +18,7 @@ pub fn audio_status(engine: State<AudioEngine>) -> super::Status {
 /// Blip del dialogo ("blip", con `seed` = carattere) o jingle ("chime").
 #[tauri::command]
 pub fn audio_sfx(app: AppHandle, kind: String, seed: u32) {
-    let a = app.state::<AppState>().cfg.lock().unwrap().audio.clone();
+    let a = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.clone();
     let samples = match kind.as_str() {
         "chime" if a.blips != "off" => synth::chime(a.blip_volume as f32),
         "blip" if a.blip_volume > 0.0 => synth::blip(&a.blips, seed, a.blip_volume as f32),
@@ -40,7 +40,7 @@ pub async fn tts_say(app: AppHandle, text: String, lang: Option<String>) -> Resu
     let engine = app.state::<AudioEngine>();
     engine.stop();
     let gen = engine.voice_gen.load(Ordering::SeqCst);
-    let a = app.state::<AppState>().cfg.lock().unwrap().audio.clone();
+    let a = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.clone();
     if a.tts == "off" || text.trim().is_empty() {
         return Ok(());
     }
@@ -97,7 +97,7 @@ pub async fn tts_voices(engine: String) -> Result<Vec<tts::Voice>, String> {
 
 #[tauri::command]
 pub async fn kokoro_status(app: AppHandle) -> Result<super::kokoro::KokoroStatus, String> {
-    let url = app.state::<AppState>().cfg.lock().unwrap().audio.kokoro_url.clone();
+    let url = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.kokoro_url.clone();
     let http = app.state::<AppState>().ai.client_for(&url).clone();
     Ok(app.state::<Kokoro>().status(&http, &url).await)
 }
@@ -109,7 +109,7 @@ pub fn kokoro_install(app: AppHandle, cuda: bool) -> Result<(), String> {
 
 #[tauri::command]
 pub fn kokoro_start(app: AppHandle) -> Result<(), String> {
-    let url = app.state::<AppState>().cfg.lock().unwrap().audio.kokoro_url.clone();
+    let url = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.kokoro_url.clone();
     app.state::<Kokoro>().start(&url)
 }
 
@@ -125,7 +125,7 @@ pub async fn mic_link_rename(app: AppHandle) -> Result<String, String> {
     {
         tauri::async_runtime::spawn_blocking(super::rename::request).await.map_err(|e| e.to_string())??;
         // i nomi dei dispositivi sono cambiati: riapre gli stream
-        let a = app.state::<AppState>().cfg.lock().unwrap().audio.clone();
+        let a = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.clone();
         let engine = app.state::<AudioEngine>();
         engine.configure(&crate::config::AudioConfig { mic_link: Default::default(), ..a.clone() });
         engine.configure(&a);
@@ -151,7 +151,7 @@ pub fn open_vbcable_page() -> Result<(), String> {
 
 /// Dopo un cambio di impostazioni audio: dispositivi, Mic-Link, server Kokoro.
 pub fn apply(app: &AppHandle) {
-    let a = app.state::<AppState>().cfg.lock().unwrap().audio.clone();
+    let a = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).audio.clone();
     app.state::<AudioEngine>().configure(&a);
     let k = app.state::<Kokoro>();
     if a.tts == "kokoro" && a.kokoro_autostart && k.installed() {

@@ -41,7 +41,7 @@ static LIBRARY: Mutex<Option<(std::time::Instant, Vec<Model>)>> = Mutex::new(Non
 
 /// Indirizzo del server (dall'URL del provider Ollama, senza /v1).
 pub fn base(app: &AppHandle) -> String {
-    let url = app.state::<AppState>().cfg.lock().unwrap().ai.providers.get("ollama").map(|p| p.base_url.clone()).unwrap_or_default();
+    let url = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).ai.providers.get("ollama").map(|p| p.base_url.clone()).unwrap_or_default();
     let u = url.trim().trim_end_matches('/');
     if u.is_empty() {
         DEFAULT_BASE.into()
@@ -169,7 +169,7 @@ fn serve_log(app: &AppHandle) -> PathBuf {
 /// Avvia `ollama serve` gestito da Alter Ego (con le variabili della GPU).
 fn spawn_serve(app: &AppHandle) -> Result<(), String> {
     let bin = binary(app).ok_or_else(|| crate::i18n::tr("Ollama non è installato", "Ollama is not installed").to_string())?;
-    let c = app.state::<AppState>().cfg.lock().unwrap().local.clone();
+    let c = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).local.clone();
     let log = std::fs::File::create(serve_log(app)).map_err(|e| e.to_string())?;
     let mut cmd = Command::new(&bin);
     cmd.arg("serve").stdin(Stdio::null()).stdout(log.try_clone().map_err(|e| e.to_string())?).stderr(log);
@@ -191,7 +191,7 @@ fn spawn_serve(app: &AppHandle) -> Result<(), String> {
     }
     let child = cmd.spawn().map_err(|e| crate::tr!("Ollama non si avvia: {e}", "Ollama does not start: {e}"))?;
     crate::applog::info("ollama", &format!("avviato {} serve (pid {})", bin.display(), child.id()));
-    *SERVE.lock().unwrap() = Some(child);
+    *SERVE.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(child);
     Ok(())
 }
 
@@ -206,7 +206,7 @@ pub async fn ensure_running(app: &AppHandle) -> Result<String, String> {
     match windows_app() {
         Some(a) if managed_env_is_user(app) => {
             // stesse variabili delle impostazioni GPU (Alter Ego potrebbe avere quelle vecchie)
-            let c = app.state::<AppState>().cfg.lock().unwrap().local.clone();
+            let c = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).local.clone();
             let mut cmd = Command::new(a);
             for n in ENV_NAMES {
                 cmd.env_remove(n);
@@ -239,7 +239,7 @@ fn managed_env_is_user(app: &AppHandle) -> bool {
 
 /// Ferma il server avviato da Alter Ego (all'uscita).
 pub fn stop(_app: &AppHandle) {
-    if let Some(mut c) = SERVE.lock().unwrap().take() {
+    if let Some(mut c) = SERVE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() {
         #[cfg(unix)]
         {
             let _ = Command::new("kill").args(["-TERM", &format!("-{}", c.id())]).status();
@@ -256,7 +256,7 @@ pub fn stop(_app: &AppHandle) {
 pub fn autostart(app: &AppHandle) {
     let (on, enabled) = {
         let st = app.state::<AppState>();
-        let c = st.cfg.lock().unwrap();
+        let c = st.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         (c.local.autostart, c.ai.providers.get("ollama").map(|p| p.enabled).unwrap_or(false))
     };
     if !on || !enabled || binary(app).is_none() {
@@ -465,7 +465,7 @@ pub async fn local_status(app: AppHandle) -> Status {
         running: ver.is_some(),
         lfm3_ok: ver.as_deref().is_some_and(|v| version_at_least(v, LFM3_MIN)),
         version: ver.unwrap_or_default(),
-        managed: SERVE.lock().unwrap().is_some(),
+        managed: SERVE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_some(),
         binary: bin.map(|p| p.display().to_string()).unwrap_or_default(),
         base: base(&app),
         models,
@@ -580,9 +580,9 @@ pub async fn local_pull(app: AppHandle, name: String) -> Result<String, String> 
     };
     ensure_running(&app).await?;
     let cancel = std::sync::Arc::new(AtomicBool::new(false));
-    PULLS.lock().unwrap().get_or_insert_with(HashMap::new).insert(model.clone(), cancel.clone());
+    PULLS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).get_or_insert_with(HashMap::new).insert(model.clone(), cancel.clone());
     let r = pull(&app, &model, &cancel).await;
-    PULLS.lock().unwrap().get_or_insert_with(HashMap::new).remove(&model);
+    PULLS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).get_or_insert_with(HashMap::new).remove(&model);
     match &r {
         Ok(_) => {
             crate::applog::info("ollama", &format!("scaricato {model}"));
@@ -661,7 +661,7 @@ fn explain_pull(e: &str) -> String {
 
 #[tauri::command]
 pub fn local_cancel(name: String) {
-    if let Some(f) = PULLS.lock().unwrap().as_ref().and_then(|m| m.get(&name)) {
+    if let Some(f) = PULLS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref().and_then(|m| m.get(&name)) {
         f.store(true, Ordering::SeqCst);
     }
 }
@@ -893,12 +893,12 @@ pub async fn local_search(app: AppHandle, source: String, query: String, chips: 
             parse_search(&get(url).await?.text().await.map_err(|e| e.to_string())?)
         }
         _ => {
-            let cached = LIBRARY.lock().unwrap().as_ref().filter(|(t, _)| t.elapsed() < Duration::from_secs(3600)).map(|(_, m)| m.clone());
+            let cached = LIBRARY.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref().filter(|(t, _)| t.elapsed() < Duration::from_secs(3600)).map(|(_, m)| m.clone());
             match cached {
                 Some(m) => m,
                 None => {
                     let m = parse_library(&get("https://ollama.com/library".into()).await?.text().await.map_err(|e| e.to_string())?);
-                    *LIBRARY.lock().unwrap() = Some((std::time::Instant::now(), m.clone()));
+                    *LIBRARY.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some((std::time::Instant::now(), m.clone()));
                     m
                 }
             }
@@ -1074,7 +1074,7 @@ pub fn parse_ollama_log(log: &str) -> Vec<OllamaDevice> {
 }
 
 fn ollama_log_path(app: &AppHandle) -> Option<PathBuf> {
-    if SERVE.lock().unwrap().is_some() {
+    if SERVE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_some() {
         return Some(serve_log(app));
     }
     let mut c = Vec::new();
@@ -1240,7 +1240,7 @@ pub async fn local_gpu(app: AppHandle) -> GpuInfo {
         advice,
         suggested_backend: backend.into(),
         log: log_path.map(|p| p.display().to_string()).unwrap_or_default(),
-        settings: app.state::<AppState>().cfg.lock().unwrap().local.clone(),
+        settings: app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).local.clone(),
         user_env: managed_env_is_user(&app),
     }
 }

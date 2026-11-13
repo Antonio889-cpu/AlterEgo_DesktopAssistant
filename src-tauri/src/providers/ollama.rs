@@ -97,7 +97,7 @@ pub async fn stream_chat(
 ) -> Result<super::openai_compat::Reply, ProviderError> {
     let url = format!("{}/api/chat", root(&t.base));
     let think_key = format!("{}/{}", t.id, t.model);
-    let mut think = t.thinking_off && !ai.no_think_params.lock().unwrap().contains(&think_key);
+    let mut think = t.thinking_off && !ai.no_think_params.lock().unwrap_or_else(std::sync::PoisonError::into_inner).contains(&think_key);
     // la prima volta Ollama carica il modello (con un contesto grande può volerci parecchio)
     let first_timeout = Duration::from_secs(t.timeout_secs.max(180));
     let idle_timeout = Duration::from_secs(t.timeout_secs.clamp(30, 180));
@@ -115,7 +115,7 @@ pub async fn stream_chat(
         let text = resp.text().await.unwrap_or_default();
         let lower = text.to_lowercase();
         if think && lower.contains("think") {
-            ai.no_think_params.lock().unwrap().insert(think_key.clone());
+            ai.no_think_params.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(think_key.clone());
             think = false;
             continue;
         }

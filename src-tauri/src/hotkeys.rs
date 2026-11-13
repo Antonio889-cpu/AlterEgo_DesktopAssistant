@@ -22,7 +22,7 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 
 fn handle(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
     let state = app.state::<AppState>();
-    let Some(action) = state.hotkey_map.lock().unwrap().get(&shortcut.id()).copied() else {
+    let Some(action) = state.hotkey_map.lock().unwrap_or_else(std::sync::PoisonError::into_inner).get(&shortcut.id()).copied() else {
         return;
     };
     let pressed = event.state() == ShortcutState::Pressed;
@@ -86,7 +86,7 @@ pub fn register(app: &AppHandle, hk: &Hotkeys) -> Vec<String> {
         }
     }
     let state = app.state::<AppState>();
-    *state.hotkey_map.lock().unwrap() = map;
-    *state.hotkey_errors.lock().unwrap() = errors.clone();
+    *state.hotkey_map.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = map;
+    *state.hotkey_errors.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = errors.clone();
     errors
 }

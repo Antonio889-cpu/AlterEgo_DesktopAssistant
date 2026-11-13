@@ -60,7 +60,7 @@ pub fn set_key(app: &AppHandle, key: u32) {
     let _ = APP.set(app.clone());
     KEY.store(key, Ordering::SeqCst);
     if key != 0 {
-        imp::ensure_started();
+        imp::ensure_keyboard();
     }
 }
 
@@ -86,7 +86,7 @@ pub fn set_button(app: &AppHandle, button: u8) {
     let _ = APP.set(app.clone());
     BUTTON.store(button, Ordering::SeqCst);
     if button != 0 {
-        imp::ensure_started();
+        imp::ensure_mouse();
     }
 }
 
@@ -105,8 +105,6 @@ mod imp {
     use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
     use windows_sys::Win32::UI::WindowsAndMessaging::*;
-
-    static START: Once = Once::new();
 
     unsafe extern "system" fn hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
         if code >= 0 {
@@ -151,15 +149,16 @@ mod imp {
         CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
     }
 
-    pub fn ensure_started() {
-        START.call_once(|| {
-            std::thread::spawn(|| unsafe {
-                let h = SetWindowsHookExW(WH_MOUSE_LL, Some(hook), std::ptr::null_mut(), 0);
-                let k = SetWindowsHookExW(WH_KEYBOARD_LL, Some(kb_hook), std::ptr::null_mut(), 0);
-                if h.is_null() || k.is_null() {
-                    crate::applog::warn("hotkey", "hook di mouse/tastiera non installato");
-                }
-                if h.is_null() && k.is_null() {
+    static MOUSE: Once = Once::new();
+    static KEYBOARD: Once = Once::new();
+
+    /// Un thread per hook, installato solo quando serve: l'hook del mouse vede ogni movimento del
+    /// sistema (anche nei giochi), quindi non va acceso per il push-to-talk da tastiera.
+    fn start(once: &'static Once, id: i32, proc_: HOOKPROC, what: &'static str) {
+        once.call_once(move || {
+            std::thread::spawn(move || unsafe {
+                if SetWindowsHookExW(id, proc_, std::ptr::null_mut(), 0).is_null() {
+                    crate::applog::warn("hotkey", &format!("hook {what} non installato"));
                     return;
                 }
                 let mut msg: MSG = std::mem::zeroed();
@@ -170,11 +169,20 @@ mod imp {
             });
         });
     }
+
+    pub fn ensure_mouse() {
+        start(&MOUSE, WH_MOUSE_LL, Some(hook), "del mouse");
+    }
+
+    pub fn ensure_keyboard() {
+        start(&KEYBOARD, WH_KEYBOARD_LL, Some(kb_hook), "della tastiera");
+    }
 }
 
 #[cfg(not(windows))]
 mod imp {
-    pub fn ensure_started() {}
+    pub fn ensure_mouse() {}
+    pub fn ensure_keyboard() {}
 }
 
 #[cfg(test)]

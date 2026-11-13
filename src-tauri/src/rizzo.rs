@@ -27,7 +27,7 @@ static CHILD: Mutex<Option<Child>> = Mutex::new(None);
 static INSTALLING: AtomicBool = AtomicBool::new(false);
 
 fn custom_dir(app: &AppHandle) -> Option<PathBuf> {
-    let d = app.state::<crate::AppState>().cfg.lock().unwrap().rizzo.dir.trim().to_string();
+    let d = app.state::<crate::AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).rizzo.dir.trim().to_string();
     (!d.is_empty()).then(|| PathBuf::from(d))
 }
 
@@ -40,7 +40,7 @@ pub fn dir(app: &AppHandle) -> PathBuf {
 fn installed_sizes(app: &AppHandle) -> Vec<String> {
     let v: Vec<String> = std::fs::read_to_string(dir(app).join(MARK)).unwrap_or_default().split_whitespace().map(str::to_string).collect();
     if v.is_empty() && custom_dir(app).is_some() {
-        return vec![app.state::<crate::AppState>().cfg.lock().unwrap().rizzo.size.clone()];
+        return vec![app.state::<crate::AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).rizzo.size.clone()];
     }
     v
 }
@@ -168,7 +168,7 @@ fn run_step(app: &AppHandle, log: &Path, label: &str, cmd: &mut Command) -> Resu
                         if text.is_empty() {
                             continue;
                         }
-                        let mut l = last.lock().unwrap();
+                        let mut l = last.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                         l.0 = text.clone();
                         if l.1.elapsed() > Duration::from_millis(300) {
                             l.1 = Instant::now();
@@ -188,7 +188,7 @@ fn run_step(app: &AppHandle, log: &Path, label: &str, cmd: &mut Command) -> Resu
     if status.success() {
         Ok(())
     } else {
-        let tail = last.lock().unwrap().0.clone();
+        let tail = last.lock().unwrap_or_else(std::sync::PoisonError::into_inner).0.clone();
         Err(crate::tr!("{} non riuscito ({}): {}", "{} failed ({}): {}", label, status, tail))
     }
 }
@@ -330,7 +330,7 @@ pub async fn install(app: &AppHandle, size: &str) -> Result<String, String> {
 }
 
 fn child_alive() -> bool {
-    let mut c = CHILD.lock().unwrap();
+    let mut c = CHILD.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     match c.as_mut().map(|ch| ch.try_wait()) {
         Some(Ok(None)) => true,
         Some(_) => {
@@ -345,7 +345,7 @@ fn child_alive() -> bool {
 pub fn start(app: &AppHandle) -> Result<(), String> {
     let (url, size) = {
         let st = app.state::<crate::AppState>();
-        let c = st.cfg.lock().unwrap();
+        let c = st.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         (c.saving.router_url.clone(), c.rizzo.size.clone())
     };
     let port = local_port(&url).ok_or_else(|| crate::i18n::tr("l'URL di Rizzo Flow non è locale: va avviato a parte", "Rizzo Flow's URL is not local: start it yourself").to_string())?;
@@ -374,13 +374,13 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
         cmd.process_group(0); // per chiudere anche Python insieme a uv
     }
     let child = hidden(&mut cmd).spawn().map_err(|e| crate::tr!("avvio di Rizzo Flow non riuscito: {e}", "could not start Rizzo Flow: {e}"))?;
-    *CHILD.lock().unwrap() = Some(child);
+    *CHILD.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(child);
     Ok(())
 }
 
 /// Ferma il server avviato da Alter Ego (non uno avviato a mano).
 pub fn stop(_app: &AppHandle) {
-    if let Some(mut c) = CHILD.lock().unwrap().take() {
+    if let Some(mut c) = CHILD.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() {
         let pid = c.id().to_string();
         #[cfg(windows)]
         let _ = hidden(Command::new("taskkill").args(["/PID", &pid, "/T", "/F"])).stdout(Stdio::null()).stderr(Stdio::null()).status();
@@ -393,7 +393,7 @@ pub fn stop(_app: &AppHandle) {
 
 /// All'avvio di Alter Ego.
 pub fn autostart(app: &AppHandle) {
-    let on = app.state::<crate::AppState>().cfg.lock().unwrap().rizzo.autostart;
+    let on = app.state::<crate::AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).rizzo.autostart;
     if on && installed(app) {
         let app = app.clone();
         std::thread::spawn(move || {
@@ -423,7 +423,7 @@ pub struct Status {
 pub async fn rizzo_status(app: AppHandle) -> Status {
     let (url, autostart, size) = {
         let st = app.state::<crate::AppState>();
-        let c = st.cfg.lock().unwrap();
+        let c = st.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         (c.saving.router_url.clone(), c.rizzo.autostart, c.rizzo.size.clone())
     };
     let a = app.clone();

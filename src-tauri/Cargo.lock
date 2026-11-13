@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "alter-ego"
-version = "1.8.1"
+version = "1.8.2"
 dependencies = [
  "arboard",
  "base64 0.22.1",

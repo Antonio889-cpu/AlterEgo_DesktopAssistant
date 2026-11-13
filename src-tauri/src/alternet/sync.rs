@@ -67,7 +67,7 @@ pub fn on_chunk(app: &AppHandle, server: String, msg: &str) {
         return;
     }
     let full = {
-        let mut parts = PARTS.lock().unwrap();
+        let mut parts = PARTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if k == 0 || parts.len() != n {
             *parts = vec![None; n];
         }
@@ -107,7 +107,7 @@ async fn download(app: &AppHandle, server: &str, urls: Vec<String>) {
         have_game |= rel == Path::new(super::GAME);
         let dest = root.join(&rel);
         let ext = rel.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        let fresh = FRESH.contains(&ext.as_str()) && FRESHENED.lock().unwrap().get_or_insert_with(HashSet::new).insert(url.clone());
+        let fresh = FRESH.contains(&ext.as_str()) && FRESHENED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).get_or_insert_with(HashSet::new).insert(url.clone());
         if dest.is_file() && !fresh {
             continue;
         }

@@ -62,14 +62,14 @@ pub async fn run(app: &AppHandle, action: &str, value: Option<f64>) -> Result<St
             ok(tr("Lettore chiuso, musica fermata.", "Player closed, music stopped."))
         }
         "player_bigger" | "player_smaller" | "player_size" => {
-            let cur = app.state::<AppState>().cfg.lock().unwrap().music.player_width;
+            let cur = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.player_width;
             let w = match action {
                 "player_bigger" => cur * 1.2,
                 "player_smaller" => cur / 1.2,
                 _ => value.unwrap_or(cur),
             };
             music::resize_player(app, w);
-            let w = app.state::<AppState>().cfg.lock().unwrap().music.player_width;
+            let w = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.player_width;
             Ok(crate::tr!("Lettore largo {:.0} px.", "Player is {:.0} px wide.", w))
         }
         "open_alter_net" => crate::alternet::open(app, false).await,

@@ -90,7 +90,7 @@ fn visible_on(g: &Geometry, m: &Monitor) -> bool {
 
 fn initial_geometry(app: &AppHandle) -> Geometry {
     let state = app.state::<AppState>();
-    let cfg = state.cfg.lock().unwrap();
+    let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let monitors = app.available_monitors().unwrap_or_default();
     let target = cfg
         .last_monitor
@@ -123,7 +123,7 @@ fn save_geometry(app: &AppHandle, visible: bool, pos: Option<PhysicalPosition<i3
     }
     let state = app.state::<AppState>();
     let name = monitor_name(&mon);
-    let mut cfg = state.cfg.lock().unwrap();
+    let mut cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     cfg.geometry.insert(name.clone(), Geometry { x: pos.x, y: pos.y, width: size.width, height: size.height });
     cfg.last_monitor = Some(name);
     state.dirty.store(true, Ordering::Relaxed);
@@ -220,14 +220,14 @@ pub fn set_compact(app: &AppHandle, on: bool) {
     let (Ok(pos), Ok(size), Ok(scale)) = (win.outer_position(), win.inner_size(), win.scale_factor()) else { return };
     let corner = anchor(&win, pos, size);
     if on {
-        *NORMAL_SIZE.lock().unwrap() = Some((size.width, size.height));
+        *NORMAL_SIZE.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some((size.width, size.height));
         let w = (size.width as f64 * COMPACT_RATIO).max(COMPACT_MIN_LOGICAL * scale).min(size.width as f64);
         let _ = win.set_min_size(Some(tauri::LogicalSize::new(COMPACT_MIN_LOGICAL, COMPACT_MIN_LOGICAL / RATIO)));
         COMPACT.store(true, Ordering::SeqCst);
         let target = PhysicalSize::new(w.round() as u32, (w / RATIO).round() as u32);
         animate_to(win, (pos, size), target, corner, || {});
     } else {
-        let Some((w, h)) = NORMAL_SIZE.lock().unwrap().take() else {
+        let Some((w, h)) = NORMAL_SIZE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() else {
             COMPACT.store(false, Ordering::SeqCst);
             return;
         };
@@ -278,7 +278,7 @@ pub fn show_main(app: &AppHandle) {
 
 /// Nasconde la finestra (o esce dall'app) dopo l'animazione di spegnimento.
 pub fn hide_main(app: &AppHandle, quit: bool) {
-    let anim = app.state::<AppState>().cfg.lock().unwrap().tv_animation;
+    let anim = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).tv_animation;
     let visible = app.get_webview_window(MAIN).is_some_and(|w| w.is_visible().unwrap_or(false));
     PENDING.store(if quit { 2 } else { 1 }, Ordering::SeqCst);
     if !anim || !visible {
@@ -320,7 +320,7 @@ pub fn set_click_through(app: &AppHandle, on: bool) {
     if let Some(win) = app.get_webview_window(MAIN) {
         let _ = win.set_ignore_cursor_events(on);
     }
-    if let Some(item) = state.tray_click_item.lock().unwrap().as_ref() {
+    if let Some(item) = state.tray_click_item.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref() {
         let _ = item.set_checked(on);
     }
     // anche le impostazioni vedono lo stato aggiornato
@@ -332,7 +332,7 @@ pub fn set_click_through(app: &AppHandle, on: bool) {
 /// la posizione del cursore e riattiva gli eventi solo sopra la maniglia.
 /// A click-through spento dorme e non fa nulla.
 pub fn spawn_handle_poller(app: AppHandle) {
-    thread::spawn(move || loop {
+    let _ = thread::Builder::new().name("maniglia".into()).spawn(move || loop {
         let state = app.state::<AppState>();
         if !state.click_through.load(Ordering::Relaxed) || state.modal.load(Ordering::Relaxed) {
             thread::sleep(Duration::from_millis(300));
@@ -362,7 +362,7 @@ pub fn spawn_handle_poller(app: AppHandle) {
 
 /// Salva la config su disco al massimo una volta al secondo, solo se cambiata.
 pub fn spawn_saver(app: AppHandle) {
-    thread::spawn(move || loop {
+    let _ = thread::Builder::new().name("salva-config".into()).spawn(move || loop {
         thread::sleep(Duration::from_secs(1));
         crate::flush_config(&app);
     });

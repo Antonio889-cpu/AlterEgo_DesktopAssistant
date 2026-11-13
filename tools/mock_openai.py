@@ -1,5 +1,6 @@
 """Server finto compatibile OpenAI per i test: /ok, /fail500, /flaky (429 poi ok), /badkey (401), /keycheck (solo 'Bearer good'), /tools (tool calling), /api/chat (Ollama nativo), /audio/transcriptions, /audio/speech (WAV 24 kHz), /health. Porta 18080."""
-import json, os, struct, time
+import json, os, struct, tempfile, time
+TMP = tempfile.gettempdir()
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 calls = {"flaky": 0}
 class H(BaseHTTPRequestHandler):
@@ -19,14 +20,14 @@ class H(BaseHTTPRequestHandler):
             ok = b'name="file"' in raw and b"RIFF" in raw and b'name="language"' in raw
             return self._json(200 if ok else 400, {"text": " Ciao Alter Ego "} if ok else {"error": "multipart non valido"})
         body = json.loads(raw)
-        with open(os.environ.get("MOCK_LAST", "/tmp/mock_last.json"), "w") as f: json.dump(body, f, ensure_ascii=False, indent=1)
+        with open(os.environ.get("MOCK_LAST", os.path.join(TMP, "mock_last.json")), "w") as f: json.dump(body, f, ensure_ascii=False, indent=1)
         if self.path.endswith("/tools/search"):
             ok = self.headers.get("Authorization", "").startswith("Bearer ") and 1 <= len(body.get("query", "")) <= 128
             return self._json(200 if ok else 400, {"results": [{"title": "Risultato per " + body.get("query", ""), "url": "https://example.com/a", "snippet": "estratto di prova"}]})
         if self.path.endswith("/tools/fetch"):
             return self._json(200, {"title": "Pagina", "markdown": "# Pagina di prova\ncontenuto"})
         if self.path.endswith("/audio/speech"):
-            with open("/tmp/mock_speech.json", "w") as f: json.dump(body, f)  # file a parte: i test girano in parallelo
+            with open(os.path.join(TMP, "mock_speech.json"), "w") as f: json.dump(body, f)  # file a parte: i test girano in parallelo
             # 0,2 s di tono a 24 kHz, 16 bit mono
             import math
             pcm = b"".join(struct.pack("<h", int(8000 * math.sin(i / 10))) for i in range(4800))
@@ -34,16 +35,22 @@ class H(BaseHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type", "audio/wav"); self.send_header("Content-Length", str(len(wav))); self.end_headers(); self.wfile.write(wav)
             return
         if self.path.endswith("/api/chat"):
-            # API nativa di Ollama (NDJSON): risponde con le opzioni ricevute, o con una chiamata a strumento
+            # API nativa di Ollama (NDJSON): stesse modalità degli altri endpoint (/fail500, /flaky); con keep_alive
+            # risponde con le opzioni ricevute, altrimenti come il mock OpenAI; oppure una chiamata a strumento
+            mode = self.path.split("/")[1]
+            if mode == "fail500": return self._json(500, {"error": {"message": "boom"}})
+            if mode == "flaky":
+                calls["flaky"] += 1
+                if calls["flaky"] == 1: return self._json(429, {"error": {"message": "slow down"}})
             if body.get("tools") and body["messages"][-1]["role"] != "tool":
                 lines = [{"message": {"role": "assistant", "content": "", "tool_calls": [{"function": {"name": "list_reminders", "arguments": {}}}]}, "done": False},
                          {"message": {"role": "assistant", "content": ""}, "done": True, "prompt_eval_count": 10, "eval_count": 2}]
             else:
                 o = body.get("options", {})
-                text = f"[happy]\nctx={o.get('num_ctx')} keep={body.get('keep_alive')} think={body.get('think')}"
-                lines = [{"message": {"role": "assistant", "content": text[:10]}, "done": False},
-                         {"message": {"role": "assistant", "content": text[10:]}, "done": False},
-                         {"message": {"role": "assistant", "content": ""}, "done": True, "prompt_eval_count": 12, "eval_count": 5}]
+                text = (f"[happy]\nctx={o.get('num_ctx')} keep={body.get('keep_alive')} think={body.get('think')}" if "keep_alive" in body
+                        else f"[happy]\nCiao! Sono il mock ({body['model']}).")
+                lines = [{"message": {"role": "assistant", "content": text[i:i + 8]}, "done": False} for i in range(0, len(text), 8)]
+                lines.append({"message": {"role": "assistant", "content": ""}, "done": True, "prompt_eval_count": 12, "eval_count": 5})
             data = "".join(json.dumps(l) + "\n" for l in lines).encode()
             self.send_response(200); self.send_header("Content-Type", "application/x-ndjson"); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
             return

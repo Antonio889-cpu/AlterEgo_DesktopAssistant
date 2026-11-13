@@ -28,7 +28,7 @@ fn radio(app: &AppHandle, title: &str, prefix: &str, options: &[(&str, &str)], c
 
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let state = app.state::<AppState>();
-    let cfg = state.cfg.lock().unwrap().clone();
+    let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     let click_on = state.click_through.load(Ordering::Relaxed);
 
     let show = MenuItem::with_id(app, "toggle", tr("Mostra / nascondi", "Show / hide"), true, None::<&str>)?;
@@ -71,7 +71,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         app,
         &[&show, &talk, &settings, &venue, &alternet, &demo, &sep, &click, &opacity, &look, &sound, &voice, &reset, &links, &sep2, &quit],
     )?;
-    *state.tray_click_item.lock().unwrap() = Some(click);
+    *state.tray_click_item.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(click);
     Ok(menu)
 }
 
