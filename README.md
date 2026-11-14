@@ -540,7 +540,7 @@ sprite sheet is used; any other image in the file (`urlFront`, `urlStart`, stick
 ```
 
 The sheet is downloaded once into `%APPDATA%\AlterEgo\pets\<name>\`. It has **2 rows of square frames**:
-row 1 *still A, still B, jump, fall*, row 2 the *run* (`runFrames` frames); the character looks to the left (she's mirrored when going right).
+row 1 *still A, still B, jump, fall*, row 2 the *run* (`runFrames` frames); the character looks to the right (she's mirrored when going left).
 
 On Linux she only uses the bottom of the screen and the taskbar: windows are read only on Windows.
 
@@ -711,6 +711,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - SQL Server driver [tiberius](https://github.com/prisma/tiberius) (MIT/Apache-2.0).
 - **VB-CABLE** by VB-Audio Software: donationware, not bundled; download it from the official website.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+- Extra-content office backgrounds (`src/assets/extras/`): made by the project author with a Garry's Mod map.
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),
   adapted for the app (background removed, green CRT tint). Thank you, Ayari! 💚

@@ -1,3 +1,11 @@
+## Alter Ego 1.9.1
+
+- Fix: the pet walked backwards.
+- Fix: the first-start question didn't respond to mouse clicks.
+- New backgrounds for the extra content.
+
+`AlterEgo_1.9.1_setup.exe` / `AlterEgo_1.9.1_portable.zip` Windows · `AlterEgo_1.9.1_amd64.AppImage` / `AlterEgo_1.9.1_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.9.0
 
 - Pet mode: in quiet moments Alter Ego comes out of the TV and lives on your desktop (Settings → Pet).

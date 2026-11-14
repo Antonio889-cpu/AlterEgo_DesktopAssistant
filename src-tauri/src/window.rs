@@ -281,7 +281,8 @@ pub fn takeover(app: &AppHandle, on: bool) {
         if TAKEOVER.swap(true, Ordering::SeqCst) {
             return;
         }
-        set_compact(app, false);
+        // niente set_compact qui: due animazioni insieme si pestano i piedi (dopo l'evento la
+        // modalità compatta la rimette a posto il frontend)
         show_main(app);
         let _ = win.unminimize();
         let (Ok(pos), Ok(size)) = (win.outer_position(), win.outer_size()) else { return };
