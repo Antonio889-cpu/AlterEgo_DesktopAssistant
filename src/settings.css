@@ -143,3 +143,8 @@ button.small { padding: 2px 8px; font-size: 12px; }
 .lo-item .act { grid-column: 2; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 #lo-url { flex: 1; min-width: 300px; }
 .lo-progress[hidden] { display: none; }
+
+/* scheda Pet */
+.pet-head { display: flex; gap: 14px; align-items: flex-start; }
+.pet-head img { width: 96px; height: 96px; flex: none; image-rendering: auto; border-radius: 8px; }
+.pet-head img:not([src]), .pet-head img[src=""] { visibility: hidden; }

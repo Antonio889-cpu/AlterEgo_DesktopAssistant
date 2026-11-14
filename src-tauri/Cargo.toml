@@ -1,6 +1,6 @@
 [package]
 name = "alter-ego"
-version = "1.8.2"
+version = "1.9.0"
 description = "Alter Ego – assistente desktop personale"
 edition = "2021"
 
@@ -43,6 +43,7 @@ tokio-util = { version = "0.7", features = ["compat"] }
 tiberius = { version = "0.13", default-features = false, features = ["winauth"] }
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
+  "Win32_Graphics_Dwm",
   "Win32_Graphics_Gdi",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",

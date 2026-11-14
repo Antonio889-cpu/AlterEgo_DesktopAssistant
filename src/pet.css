@@ -1,0 +1,82 @@
+/* Pet: finestra trasparente con lo sprite. Solo il corpo riceve il mouse (vedi pet/mod.rs). */
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#stage {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  translate: -50% 0;
+  width: min(100vw, 100vh * 128 / 168);
+  aspect-ratio: 128 / 168;
+}
+
+#pet {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  cursor: grab;
+  transform-origin: 50% 100%;
+}
+#pet:active { cursor: grabbing; }
+
+/* presa col mouse: dondola */
+body.held #pet { animation: dangle .5s ease-in-out infinite alternate; transform-origin: 50% 40%; }
+@keyframes dangle {
+  from { transform: rotate(-7deg); }
+  to { transform: rotate(7deg); }
+}
+
+/* esce dalla TV: lampo e "pop" */
+body.spawn #pet { animation: spawn .45s cubic-bezier(.2, 1.6, .4, 1) both; }
+@keyframes spawn {
+  0% { transform: scale(.2, 1.6); opacity: 0; filter: brightness(3); }
+  60% { opacity: 1; filter: brightness(1.6); }
+  100% { transform: scale(1); filter: none; }
+}
+
+/* atterraggio: schiacciata un attimo */
+body.land #pet { animation: land .22s ease-out; }
+@keyframes land {
+  0% { transform: scale(1.12, .86); }
+  100% { transform: scale(1); }
+}
+
+#bubble {
+  position: absolute;
+  left: 50%;
+  top: 25%;
+  width: 34%;
+  aspect-ratio: 1;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px #2b2b2b, 0 2px 6px rgba(0, 0, 0, .35);
+  overflow: hidden;
+  pointer-events: none;
+  animation: pop .25s cubic-bezier(.2, 1.8, .4, 1) both;
+}
+#bubble.hidden { display: none; }
+#bubble.out { animation: fade .3s ease-in both; }
+#sticker { width: 100%; height: 100%; object-fit: cover; }
+@keyframes pop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+@keyframes fade {
+  to { transform: scale(.6) translateY(30%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.held #pet, body.spawn #pet, body.land #pet, #bubble { animation: none; }
+}

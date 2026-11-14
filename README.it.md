@@ -55,6 +55,7 @@ Interfaccia in italiano e in inglese.
 - [Azioni sul PC e permessi](#azioni-sul-pc-e-permessi)
 - [Personalità e memoria](#personalità-e-memoria)
 - [Sprite](#sprite)
+- [Pet](#pet)
 - [Privacy e sicurezza](#privacy-e-sicurezza)
 - [Dove stanno i dati](#dove-stanno-i-dati)
 - [Risoluzione problemi](#risoluzione-problemi)
@@ -101,6 +102,7 @@ Interfaccia in italiano e in inglese.
 - **Memoria locale** (SQLite): ricorda le conversazioni, fa riassunti, impara fatti su di te.
 - **Personalità regolabile** (timida ↔ sicura, formale ↔ affettuosa), modalità imitazione, risposte in italiano, inglese o entrambe.
 - Espressioni del volto pilotate dalle risposte (felice, sorpresa, imbarazzata, triste, preoccupata, pensierosa, errore).
+- **Modalità pet**: nei momenti di calma Alter Ego esce dalla TV come un piccolo sprite in pixel art e vive sul tuo desktop: cammina, salta, sta in piedi sulle finestre aperte e sulla barra delle applicazioni, e puoi prenderla e lanciarla. Rientra quando le parli.
 - Leggera: Tauri 2 (Rust) + HTML/CSS/JS vanilla, installer di circa 6 MB.
 
 ## Screenshot
@@ -513,6 +515,38 @@ Per rigenerare gli sprite inclusi dal foglio (es. dopo averlo modificato), con `
 python tools/process_sprites.py
 ```
 
+## Pet
+
+Quando non succede niente, Alter Ego esce a esplorare: la TV mostra la schermata **START!**, si spegne e lei salta fuori
+come un piccolo sprite in pixel art (quello incluso è **Chihiro**). Poi vive sul tuo desktop da sola:
+
+- cammina, si ferma, salta e si lascia cadere dai bordi;
+- sta in piedi **sopra le finestre aperte** (solo sulla parte visibile del bordo in alto) e sulla **barra delle applicazioni**; se sposti la finestra su cui sta, viaggia con lei; se la chiudi o la riduci a icona, cade;
+- i bordi dello schermo sono muri, e può passare da un monitor all'altro;
+- **trascinala** col mouse e **lanciala** (rimbalza sui bordi); un **click** la fa saltare con uno sticker felice; un **doppio click** la rimanda nella TV.
+
+Rientra nella TV quando le parli (push-to-talk, box di testo), quando deve dirti qualcosa (risposte, promemoria, conferme),
+con *Mostra / nascondi* o l'icona nella tray, e da sola dopo un po'. Non esce mentre suona la musica, e si nasconde mentre un gioco o un video è a schermo intero.
+
+*Impostazioni → Pet*: acceso/spento, dopo quanti minuti di calma può uscire, quanto spesso, quanto resta fuori, dimensione ed *Esplora adesso*.
+Nel menu della tray ci sono *Esplora il desktop* / *Richiama Alter Ego nella TV*.
+
+**Altri pet**: puoi importare un pet da un file `.json` come questo (formato "c2dictionary"):
+
+```json
+{ "c2dictionary": true, "data": {
+  "name": "Chihiro", "longName": "Chihiro Fujisaki", "author": "Lucid On Bound",
+  "urlSprites": "https://…/Sprites.png", "urlFront": "https://…/Front.png", "urlSide": "https://…/Side.png",
+  "urlStart": "https://…/Start.png", "urlSticker1": "https://…/sticker1.png", "urlSticker2": "https://…/sticker2.png",
+  "runFrames": 4 } }
+```
+
+Le immagini vengono scaricate una volta in `%APPDATA%\AlterEgo\pets\<nome>\`. Il foglio sprite (`urlSprites`) ha **2 righe di fotogrammi quadrati**:
+riga 1 *fermo A, fermo B, salto, caduta*, riga 2 la *corsa* (`runFrames` fotogrammi); il personaggio guarda a sinistra (verso destra viene specchiato).
+`urlFront` è l'immagine nelle Impostazioni, `urlStart` la schermata START!, `urlSticker1` la faccina felice e `urlSticker2` quella preoccupata.
+
+Su Linux usa solo il fondo dello schermo e la barra: le finestre si leggono solo su Windows.
+
 ## Privacy e sicurezza
 
 - Config, memoria e registro restano in `%APPDATA%\AlterEgo\`.
@@ -539,6 +573,7 @@ python tools/process_sprites.py
 | `%APPDATA%\AlterEgo\actions.log` | registro delle azioni |
 | `%APPDATA%\AlterEgo\persona\alter_ego.md` | scheda del personaggio |
 | `%APPDATA%\AlterEgo\sprites\` | sprite importati (facoltativi) |
+| `%APPDATA%\AlterEgo\pets\` | pet importati (facoltativi) |
 | `%APPDATA%\AlterEgo\costs.jsonl` | registro dei costi |
 | `%APPDATA%\AlterEgo\tools\`, `music_cache\` | yt-dlp e Deno; brani scaricati (ultimi 30) |
 | `%APPDATA%\AlterEgo\kokoro\` | Kokoro: ambiente Python, server, `server.log` (il modello è nella cache di Hugging Face, `%USERPROFILE%\.cache\huggingface`) |
@@ -665,6 +700,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - Kokoro su CPU impiega circa mezzo secondo per frase su un PC recente; la prima frase dopo l'avvio aspetta il caricamento del modello.
 - La scheda del personaggio è stata scritta senza poter consultare le pagine wiki: arricchiscila tu.
 - Build non firmata: SmartScreen può mostrare un avviso.
+- Il pet legge le finestre aperte solo su Windows (da verificare su un PC vero); su Linux usa solo il fondo dello schermo.
 
 ## Crediti e licenze
 
@@ -677,6 +713,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - Driver di SQL Server [tiberius](https://github.com/prisma/tiberius) (MIT/Apache-2.0).
 - **VB-CABLE** di VB-Audio Software: donationware, non incluso; si scarica dal sito ufficiale.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+- Sprite del **pet Chihiro** (foglio, ritratti, schermata START!, sticker): di **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),
   adattato per l'app (sfondo rimosso, tinta verde CRT). Grazie, Ayari! 💚
 - Logo, sfondo a circuiti, icona e suoni sono stati creati per questo progetto.

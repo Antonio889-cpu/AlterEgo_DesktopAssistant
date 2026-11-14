@@ -1,3 +1,10 @@
+## Alter Ego 1.9.0
+
+- Pet mode: in quiet moments Alter Ego comes out of the TV as a little pixel-art sprite (Chihiro) and lives on your desktop. She walks, jumps, stands on open windows and on the taskbar, rides along when you move a window, and you can grab and throw her. A double-click, talking to her or Show / hide brings her back into the TV.
+- Settings → Pet: when and how often she goes out, how long she stays, size, other pets imported from a JSON file.
+
+`AlterEgo_1.9.0_setup.exe` / `AlterEgo_1.9.0_portable.zip` Windows · `AlterEgo_1.9.0_amd64.AppImage` / `AlterEgo_1.9.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.8.2
 
 - Lighter at rest: the speakers pause when there's nothing to play, the music player and Venue no longer redraw 60 times a second, the Garry's Mod sound index is freed when the game closes.

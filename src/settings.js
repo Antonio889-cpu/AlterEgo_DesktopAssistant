@@ -306,6 +306,7 @@ function showTab(name) {
   if (name === "log") refreshLog();
   if (name === "memory") refreshMemory();
   if (name === "persona") spriteStatus();
+  if (name === "pet") { refreshPet(); invoke("pet_active").then(petState); }
   if (name === "voice" && audio) { refreshDevices().then(refreshAudioStatus); if (audio.tts === "kokoro") refreshKokoro(); }
   if (name === "ai") refreshUsage();
   if (name === "costs") refreshCosts();
@@ -568,6 +569,73 @@ function nsLabels() {
 $("ns-enabled").onchange = (e) => { audio.mic_link.noise_suppression = e.target.checked; saveAudio(); };
 $("ns-strength").oninput = (e) => { audio.mic_link.ns_strength = +e.target.value; nsLabels(); saveAudio(); };
 $("ns-gate").oninput = (e) => { audio.mic_link.ns_gate = +e.target.value; nsLabels(); saveAudio(); };
+
+// ---------- pet ----------
+function fillPet(cfg) {
+  const p = cfg.pet;
+  if (!p) return;
+  $("pet-enabled").checked = p.enabled;
+  $("pet-idle").value = p.idle_minutes;
+  $("pet-frequency").value = p.frequency;
+  const stay = String(p.stay_minutes);
+  if (![...$("pet-stay").options].some((o) => o.value === stay)) $("pet-stay").add(new Option(t("{n} minuti", { n: stay }), stay));
+  $("pet-stay").value = stay;
+  $("pet-size").value = p.size;
+  $("pet-size-val").textContent = Math.round(p.size * 100) + "%";
+}
+const savePet = () => invoke("pet_settings", {
+  enabled: $("pet-enabled").checked,
+  idleMinutes: Math.max(1, Math.min(120, Math.round(+$("pet-idle").value || 3))),
+  frequency: $("pet-frequency").value,
+  stayMinutes: +$("pet-stay").value,
+  size: +$("pet-size").value,
+});
+["pet-enabled", "pet-idle", "pet-frequency", "pet-stay"].forEach((id) => { $(id).onchange = savePet; });
+$("pet-size").oninput = () => { $("pet-size-val").textContent = Math.round($("pet-size").value * 100) + "%"; };
+$("pet-size").onchange = savePet;
+function petResult(text, cls = "") { const r = $("pet-result"); r.textContent = text; r.className = "result " + cls; }
+function petState(active) {
+  $("pet-state").textContent = active ? t("è fuori a esplorare") : t("è nella TV");
+  $("pet-go").disabled = active;
+  $("pet-back").disabled = !active;
+}
+async function refreshPet() {
+  const [a, list] = await Promise.all([invoke("pet_assets"), invoke("pet_list")]);
+  $("pet-front").src = a.front || a.side || "";
+  $("pet-name").textContent = a.longName || a.name || "?";
+  $("pet-author").textContent = a.author ? t(" (sprite di {a})", { a: a.author }) : "";
+  const sel = $("pet-skin");
+  sel.innerHTML = "";
+  for (const p of list) sel.add(new Option(p.name, p.id));
+  sel.value = a.id;
+  $("pet-delete").disabled = !a.id;
+}
+$("pet-skin").onchange = async (e) => {
+  try { await invoke("pet_select", { id: e.target.value }); petResult(""); } catch (err) { petResult(String(err), "bad"); }
+  refreshPet();
+};
+$("pet-file").onchange = async (e) => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  petResult(t("scarico le immagini…"));
+  try {
+    const name = await invoke("pet_import", { json: await f.text() });
+    petResult(t("importato: {name} ✓", { name }), "ok");
+  } catch (err) { petResult(String(err), "bad"); }
+  refreshPet();
+};
+$("pet-dir").onclick = () => invoke("pet_open_dir").catch((e) => petResult(String(e), "bad"));
+$("pet-delete").onclick = async () => {
+  const id = $("pet-skin").value;
+  if (!id || !confirm(t("Eliminare il pet importato?"))) return;
+  try { await invoke("pet_remove", { id }); petResult(t("eliminato"), "ok"); } catch (err) { petResult(String(err), "bad"); }
+  refreshPet();
+};
+$("pet-go").onclick = () => invoke("pet_go").catch((e) => petResult(String(e), "bad"));
+$("pet-back").onclick = () => invoke("pet_home");
+listen("pet", (e) => petState(!!e.payload.active));
+listen("pet-assets", () => refreshPet());
 
 // ---------- musica ----------
 function fillMusic(cfg) {
@@ -1210,6 +1278,7 @@ $("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle
   fillClip(cfg);
   fillPerms(cfg);
   fillMusic(cfg);
+  fillPet(cfg);
   fillPrices(cfg);
   let tab = "general";
   try { tab = localStorage.getItem("tab") || "general"; } catch {}
@@ -1234,6 +1303,7 @@ $("log-clear").onclick = async () => { if (confirm(t("Svuotare il registro delle
     applyLang(e.payload);
     fillGeneral(e.payload);
     fillLook(e.payload);
+    fillPet(e.payload);
   });
 })();
 

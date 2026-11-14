@@ -20,6 +20,7 @@ mod keys;
 mod localai;
 mod memory;
 mod music;
+mod pet;
 mod providers;
 mod rizzo;
 mod saving;
@@ -110,6 +111,7 @@ pub struct FrontConfig {
     spotify: config::SpotifyConfig,
     gmod: bool,
     hermes_brain: bool,
+    pet: config::PetConfig,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -153,6 +155,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         spotify: cfg.spotify.clone(),
         gmod: cfg.gmod,
         hermes_brain: cfg.hermes_brain,
+        pet: cfg.pet.clone(),
     }
 }
 
@@ -477,6 +480,7 @@ fn main() {
             app.manage(actions::Actions::new(&data_dir));
             app.manage(form::Forms::default());
             app.manage(sql::Sql::default());
+            app.manage(pet::PetRt::default());
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
@@ -540,6 +544,7 @@ fn main() {
             actions::spawn_reminder_loop(handle.clone());
             music::spawn_analyzer(handle.clone());
             gmod::spawn(handle.clone());
+            pet::spawn(handle.clone());
             window::spawn_handle_poller(handle);
             Ok(())
         })
@@ -704,6 +709,21 @@ fn main() {
             localai::local_settings,
             set_apps_context,
             window::tv_done,
+            pet::pet_can_explore,
+            pet::pet_explore,
+            pet::pet_home,
+            pet::pet_go,
+            pet::pet_active,
+            pet::pet_grab,
+            pet::pet_release,
+            pet::pet_ready,
+            pet::pet_assets,
+            pet::pet_list,
+            pet::pet_import,
+            pet::pet_select,
+            pet::pet_remove,
+            pet::pet_open_dir,
+            pet::pet_settings,
             assistant::load_user_sprites,
             assistant::import_sprite_sheet,
             assistant::remove_user_sprites,

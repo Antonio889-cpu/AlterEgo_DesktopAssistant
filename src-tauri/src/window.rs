@@ -264,6 +264,8 @@ const TV_FALLBACK: Duration = Duration::from_millis(1500);
 /// Mostra la finestra (se era nascosta) e fa accendere lo schermo.
 pub fn show_main(app: &AppHandle) {
     let Some(win) = app.get_webview_window(MAIN) else { return };
+    // se Alter Ego era fuori a esplorare (pet), rientra nella TV
+    crate::pet::stop(app);
     if PENDING.swap(0, Ordering::SeqCst) == 2 {
         PENDING.store(2, Ordering::SeqCst); // l'uscita non si annulla
         return;

@@ -1,0 +1,15 @@
+{
+    "c2dictionary": true,
+    "data": {
+        "name": 		"Chihiro",
+        "longName": 	"Chihiro Fujisaki",
+        "author": 		"Lucid On Bound",
+        "urlSprites": 	"https://file.garden/ZoiH2w22IXDiRr0a/ChihiroSprites.png",
+        "urlFront": 	"https://file.garden/ZoiH2w22IXDiRr0a/ChihiroFront.png",
+        "urlSide": 		"https://file.garden/ZoiH2w22IXDiRr0a/ChihiroSide.png",
+        "urlStart": 	"https://file.garden/ZoiH2w22IXDiRr0a/ChihiroStart.png",
+        "urlSticker1": 	"https://file.garden/ZoiH2w22IXDiRr0a/Chihirosticker1.png",
+        "urlSticker2": 	"https://file.garden/ZoiH2w22IXDiRr0a/Chihirosticker2.png",
+        "runFrames": 	4
+    }
+}
