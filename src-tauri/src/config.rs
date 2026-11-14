@@ -20,6 +20,8 @@ pub struct Hotkeys {
     pub push_to_talk: String,
     pub text_input: String,
     pub toggle_click_through: String,
+    /// Debug: fa partire subito un evento dei contenuti aggiuntivi (vuoto = spenta).
+    pub test_event: String,
 }
 
 impl Default for Hotkeys {
@@ -29,6 +31,7 @@ impl Default for Hotkeys {
             push_to_talk: "Ctrl+Alt+Space".into(),
             text_input: "Ctrl+Alt+T".into(),
             toggle_click_through: "Ctrl+Alt+C".into(),
+            test_event: String::new(),
         }
     }
 }
@@ -703,6 +706,59 @@ impl Default for SqlConfig {
     }
 }
 
+/// Contenuti aggiuntivi (pacchetto scaricato da un link diretto, vedi extras/).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct ExtrasConfig {
+    /// Eventi durante i giochi.
+    pub events: bool,
+    /// Link diretto del pacchetto (vuoto = quello predefinito).
+    pub url: String,
+    /// La domanda del primo avvio è già stata fatta.
+    pub asked: bool,
+}
+
+impl Default for ExtrasConfig {
+    fn default() -> Self {
+        Self { events: true, url: String::new(), asked: false }
+    }
+}
+
+/// Pet: Alter Ego esce dalla TV e gira per il desktop nei momenti di calma (vedi pet/).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct PetConfig {
+    /// Esce da sola nei momenti di calma.
+    pub enabled: bool,
+    /// Minuti di calma (nessuna domanda, risposta o click) prima che possa uscire.
+    pub idle_minutes: u32,
+    /// Probabilità di uscire a ogni minuto di calma: "rare", "normal" o "often".
+    pub frequency: String,
+    /// Dopo quanto torna nella TV da sola (minuti, 0 = resta fuori finché non la chiami).
+    pub stay_minutes: u32,
+    /// Dimensione dello sprite (1 = 128 px).
+    pub size: f64,
+    /// Pet importato in uso (cartella in `pets\`); vuoto = quello incluso (Chihiro).
+    pub skin: String,
+}
+
+impl Default for PetConfig {
+    fn default() -> Self {
+        Self { enabled: true, idle_minutes: 3, frequency: "normal".into(), stay_minutes: 10, size: 1.0, skin: String::new() }
+    }
+}
+
+impl PetConfig {
+    pub fn normalize(&mut self) {
+        self.idle_minutes = self.idle_minutes.clamp(1, 120);
+        if !["rare", "normal", "often"].contains(&self.frequency.as_str()) {
+            self.frequency = "normal".into();
+        }
+        self.stay_minutes = self.stay_minutes.min(240);
+        self.size = if self.size.is_finite() { self.size.clamp(0.5, 2.5) } else { 1.0 };
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default)]
 pub struct Config {
@@ -761,6 +817,8 @@ pub struct Config {
     pub hermes_brain: bool,
     pub sql: SqlConfig,
     pub local: LocalConfig,
+    pub pet: PetConfig,
+    pub extras: ExtrasConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -802,6 +860,8 @@ impl Default for Config {
             hermes_brain: false,
             sql: SqlConfig::default(),
             local: LocalConfig::default(),
+            pet: PetConfig::default(),
+            extras: ExtrasConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
             last_monitor: None,
@@ -871,6 +931,7 @@ pub fn load(path: &Path) -> Config {
             cfg.bg_intensity = cfg.bg_intensity.clamp(0.0, 1.0);
             cfg.ai.normalize();
             cfg.normalize_voice();
+            cfg.pet.normalize();
             cfg.auto_advance_secs = cfg.auto_advance_secs.clamp(0.5, 30.0);
             cfg.music.player_width = cfg.music.player_width.clamp(crate::music::PLAYER_MIN_W, crate::music::PLAYER_MAX_W);
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {

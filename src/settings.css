@@ -143,3 +143,7 @@ button.small { padding: 2px 8px; font-size: 12px; }
 .lo-item .act { grid-column: 2; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 #lo-url { flex: 1; min-width: 300px; }
 .lo-progress[hidden] { display: none; }
+
+/* scheda Pet */
+.pet-head { display: flex; gap: 14px; align-items: flex-start; }
+.pet-head canvas { width: 96px; height: 96px; flex: none; image-rendering: pixelated; }

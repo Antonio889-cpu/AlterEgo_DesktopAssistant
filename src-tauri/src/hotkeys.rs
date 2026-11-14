@@ -12,6 +12,7 @@ pub enum Action {
     PushToTalk,
     TextInput,
     ToggleClickThrough,
+    TestEvent,
 }
 
 pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
@@ -34,6 +35,7 @@ fn handle(app: &AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
         Action::TextInput => {
             let _ = app.emit("text-input", ());
         }
+        Action::TestEvent => crate::extras::trigger(app, true),
         Action::ToggleClickThrough => {
             let on = !state.click_through.load(Ordering::Relaxed);
             window::set_click_through(app, on);
@@ -54,6 +56,7 @@ pub fn register(app: &AppHandle, hk: &Hotkeys) -> Vec<String> {
         (&hk.push_to_talk, Action::PushToTalk, "parla"),
         (&hk.text_input, Action::TextInput, "input testo"),
         (&hk.toggle_click_through, Action::ToggleClickThrough, "click-through"),
+        (&hk.test_event, Action::TestEvent, "evento di prova"),
     ] {
         if combo.trim().is_empty() {
             continue; // hotkey disattivata

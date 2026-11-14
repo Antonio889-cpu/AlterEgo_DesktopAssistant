@@ -113,8 +113,8 @@ pub fn record_geometry(win: &tauri::Window) {
 }
 
 fn save_geometry(app: &AppHandle, visible: bool, pos: Option<PhysicalPosition<i32>>, size: Option<PhysicalSize<u32>>, mon: Option<Monitor>) {
-    // in modalità compatta (musica) la geometria salvata resta quella normale
-    if !visible || COMPACT.load(Ordering::SeqCst) || ANIMATING.load(Ordering::SeqCst) {
+    // in modalità compatta (musica) o ingrandita da un evento la geometria salvata resta quella normale
+    if !visible || COMPACT.load(Ordering::SeqCst) || ANIMATING.load(Ordering::SeqCst) || TAKEOVER.load(Ordering::SeqCst) {
         return;
     }
     let (Some(pos), Some(size), Some(mon)) = (pos, size, mon) else { return };
@@ -243,6 +243,90 @@ pub fn set_compact(app: &AppHandle, on: bool) {
     }
 }
 
+// ---------- finestra ingrandita al centro (eventi dei contenuti aggiuntivi) ----------
+
+static TAKEOVER: AtomicBool = AtomicBool::new(false);
+/// Posizione e dimensione da ripristinare.
+static BEFORE: Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>)>> = Mutex::new(None);
+
+pub fn is_takeover() -> bool {
+    TAKEOVER.load(Ordering::SeqCst)
+}
+
+/// Sposta e ridimensiona in ~`ms` millisecondi (ease-out), su un thread.
+fn glide(win: WebviewWindow, from: (PhysicalPosition<i32>, PhysicalSize<u32>), to: (PhysicalPosition<i32>, PhysicalSize<u32>), ms: u64, done: impl FnOnce() + Send + 'static) {
+    thread::spawn(move || {
+        const STEPS: u64 = 16;
+        let lerp = |a: f64, b: f64, t: f64| a + (b - a) * t;
+        for i in 1..=STEPS {
+            let t = i as f64 / STEPS as f64;
+            let e = 1.0 - (1.0 - t).powi(3);
+            let w = lerp(from.1.width as f64, to.1.width as f64, e).round() as u32;
+            let h = lerp(from.1.height as f64, to.1.height as f64, e).round() as u32;
+            let x = lerp(from.0.x as f64, to.0.x as f64, e).round() as i32;
+            let y = lerp(from.0.y as f64, to.0.y as f64, e).round() as i32;
+            let _ = win.set_size(PhysicalSize::new(w, h));
+            let _ = win.set_position(PhysicalPosition::new(x, y));
+            thread::sleep(Duration::from_millis(ms / STEPS));
+        }
+        done();
+    });
+}
+
+/// `on`: la finestra principale si mostra, va sopra a tutto e si ingrandisce al centro del
+/// monitor dove sta il mouse (di solito quello del gioco). `off`: torna com'era.
+pub fn takeover(app: &AppHandle, on: bool) {
+    let Some(win) = app.get_webview_window(MAIN) else { return };
+    if on {
+        if TAKEOVER.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        set_compact(app, false);
+        show_main(app);
+        let _ = win.unminimize();
+        let (Ok(pos), Ok(size)) = (win.outer_position(), win.outer_size()) else { return };
+        *BEFORE.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some((pos, size));
+        let mon = app
+            .cursor_position()
+            .ok()
+            .and_then(|c| app.monitor_from_point(c.x, c.y).ok().flatten())
+            .or_else(|| win.current_monitor().ok().flatten());
+        let Some(m) = mon else { return };
+        let a = m.work_area();
+        let (aw, ah) = (a.size.width as f64, a.size.height as f64);
+        let mut w = aw * 0.62;
+        let mut h = w / RATIO;
+        if h > ah * 0.85 {
+            h = ah * 0.85;
+            w = h * RATIO;
+        }
+        let to = (
+            PhysicalPosition::new(a.position.x + ((aw - w) / 2.0) as i32, a.position.y + ((ah - h) / 2.0) as i32),
+            PhysicalSize::new(w as u32, h as u32),
+        );
+        let _ = win.set_always_on_top(true);
+        glide(win, (pos, size), to, 420, || {});
+    } else {
+        if !TAKEOVER.load(Ordering::SeqCst) {
+            return;
+        }
+        let on_top = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).always_on_top;
+        let Some(before) = BEFORE.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() else {
+            TAKEOVER.store(false, Ordering::SeqCst);
+            return;
+        };
+        let (Ok(pos), Ok(size)) = (win.outer_position(), win.outer_size()) else {
+            TAKEOVER.store(false, Ordering::SeqCst);
+            return;
+        };
+        let w2 = win.clone();
+        glide(win, (pos, size), before, 380, move || {
+            let _ = w2.set_always_on_top(on_top);
+            TAKEOVER.store(false, Ordering::SeqCst);
+        });
+    }
+}
+
 pub fn toggle_visibility(app: &AppHandle) {
     if let Some(win) = app.get_webview_window(MAIN) {
         if win.is_visible().unwrap_or(false) && PENDING.load(Ordering::SeqCst) == 0 {
@@ -264,6 +348,12 @@ const TV_FALLBACK: Duration = Duration::from_millis(1500);
 /// Mostra la finestra (se era nascosta) e fa accendere lo schermo.
 pub fn show_main(app: &AppHandle) {
     let Some(win) = app.get_webview_window(MAIN) else { return };
+    // se Alter Ego era fuori a esplorare (pet), rientra nella TV
+    crate::pet::stop(app);
+    // ridotta a icona: per il sistema è ancora "visibile", va riportata su
+    if win.is_minimized().unwrap_or(false) {
+        let _ = win.unminimize();
+    }
     if PENDING.swap(0, Ordering::SeqCst) == 2 {
         PENDING.store(2, Ordering::SeqCst); // l'uscita non si annulla
         return;

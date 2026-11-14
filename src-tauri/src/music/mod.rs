@@ -4,7 +4,7 @@
 //! lo sprite di Alter Ego che cambia a tempo di musica.
 
 mod analyze;
-mod decode;
+pub mod decode;
 pub mod library;
 mod lyrics;
 mod ytdlp;
@@ -33,6 +33,11 @@ const VENUE_H: f64 = 540.0;
 
 /// Guadagno reale dalla posizione del cursore (0–1): curva quadratica, massimo −5 dB.
 /// Così metà corsa è circa −17 dB (volume "normale") invece di quasi tutto il volume.
+/// Il lettore sta usando il canale musica (brano caricato, anche in pausa).
+pub fn player_active(app: &AppHandle) -> bool {
+    app.state::<Music>().ctl.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_some()
+}
+
 pub fn gain(slider: f64) -> f32 {
     let v = slider.clamp(0.0, 1.0);
     (0.56 * v * v) as f32

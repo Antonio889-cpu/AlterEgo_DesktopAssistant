@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale, Music Venue, modulo, finestra SQL)",
+  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale, Music Venue, modulo, finestra SQL, pet)",
   "windows": [
     "main",
     "settings",
@@ -9,7 +9,8 @@
     "venue",
     "form",
     "sqlview",
-    "models"
+    "models",
+    "pet"
   ],
   "permissions": [
     "core:default",

@@ -63,13 +63,20 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &MenuItem::with_id(app, "version", format!("{} {}", tr("Versione", "Version"), crate::update::VERSION), false, None::<&str>)?,
         ],
     )?;
+    let pet = MenuItem::with_id(
+        app,
+        "pet",
+        if crate::pet::is_active() { tr("Richiama Alter Ego nella TV", "Call Alter Ego back into the TV") } else { tr("Esplora il desktop", "Explore the desktop") },
+        true,
+        None::<&str>,
+    )?;
     let reset = MenuItem::with_id(app, "reset", tr("Reimposta posizione", "Reset position"), true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", tr("Esci", "Quit"), true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let sep2 = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
-        &[&show, &talk, &settings, &venue, &alternet, &demo, &sep, &click, &opacity, &look, &sound, &voice, &reset, &links, &sep2, &quit],
+        &[&show, &talk, &pet, &settings, &venue, &alternet, &demo, &sep, &click, &opacity, &look, &sound, &voice, &reset, &links, &sep2, &quit],
     )?;
     *state.tray_click_item.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(click);
     Ok(menu)
@@ -104,6 +111,7 @@ fn on_menu(app: &AppHandle, id: &str) {
             c.audio.tts = if c.audio.tts == "off" { "windows".into() } else { "off".into() };
         }),
         "reset" => window::reset_geometry(app),
+        "pet" => crate::pet::toggle(app),
         "venue" => crate::music::open_venue(app),
         "alternet" => {
             let app = app.clone();

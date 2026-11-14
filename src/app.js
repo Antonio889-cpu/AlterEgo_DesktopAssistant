@@ -91,6 +91,10 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") answerConfirm(false);
     return; // Invio/Spazio agiscono sul pulsante con il focus
   }
+  if (!$("setup").classList.contains("hidden")) {
+    if (e.key === "Escape") $("setup-no").click();
+    return; // Invio/Spazio agiscono sul pulsante con il focus
+  }
   if (e.key === "Escape" && Chat.cancel()) return; // ferma la risposta in corso
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();
@@ -231,7 +235,7 @@ let compact = false;
 let wantSince = 0;
 listen("music-state", (e) => { musicOn = !!(e.payload.playing && !e.payload.paused); });
 function alterEgoBusy() {
-  return Dialog.isOpen() || !$("prompt").classList.contains("hidden") || !$("confirm").classList.contains("hidden")
+  return (typeof Extras !== "undefined" && Extras.active()) || Dialog.isOpen() || !$("prompt").classList.contains("hidden") || !$("confirm").classList.contains("hidden")
     || ["thinking", "listening", "speaking"].includes(State.mode()) || Audio2.isSpeaking();
 }
 setInterval(() => {
@@ -248,6 +252,56 @@ setInterval(() => {
   if (!compact && Date.now() - wantSince > 1500) { compact = true; invoke("set_compact", { on: true }); }
 }, 250);
 
+// ---------- pet: Alter Ego esce dalla TV e gira per il desktop (vedi pet.js e pet/mod.rs) ----------
+// Esce nei momenti di calma, a caso; rientra quando le parli, quando deve parlare lei, con
+// Mostra/nascondi, con un doppio click sul pet o dopo un po' (Impostazioni → Pet).
+const PET_CHANCE = { rare: 0.15, normal: 0.35, often: 0.7 }; // probabilità a ogni minuto di calma
+let petOut = false;
+let petStarting = false;
+let lastActive = Date.now();
+let lastRoll = Date.now();
+const markActive = () => { lastActive = Date.now(); };
+window.addEventListener("pointerdown", markActive, true);
+window.addEventListener("keydown", markActive, true);
+listen("pet", (e) => { petOut = !!e.payload.active; markActive(); });
+function petHome() {
+  if (!petOut) return;
+  petOut = false;
+  invoke("pet_home");
+}
+// le parli (push-to-talk, box di testo) o parla lei (promemoria, frasi dal backend): rientra subito
+document.addEventListener("ae-mode", (e) => {
+  if (["listening", "thinking", "speaking"].includes(e.detail)) { markActive(); petHome(); }
+  // parla (promemoria, avvisi, frasi dal backend): se era nascosta o ridotta a icona ricompare
+  if (e.detail === "speaking") invoke("reveal_main").catch(() => {});
+});
+async function petExplore(manual = false) {
+  if (petOut || petStarting) return;
+  if (!manual && (!config?.pet?.enabled || alterEgoBusy() || musicOn)) return;
+  petStarting = true;
+  try {
+    if (!(await invoke("pet_can_explore"))) return;
+    // la TV si spegne ed esce lei
+    petOut = await invoke("pet_explore");
+  } catch (err) {
+    console.warn("pet:", err);
+  } finally {
+    petStarting = false;
+  }
+}
+listen("pet-go", () => petExplore(true));
+setInterval(async () => {
+  if (alterEgoBusy()) { markActive(); petHome(); return; }
+  const p = config?.pet;
+  if (!p?.enabled || petOut || petStarting) return;
+  const calm = Date.now() - lastActive;
+  if (calm < p.idle_minutes * 60000 || Date.now() - lastRoll < 60000) return;
+  lastRoll = Date.now();
+  let visible = false;
+  try { visible = await appWindow.isVisible(); } catch {}
+  if (visible && Math.random() < (PET_CHANCE[p.frequency] ?? 0.35)) petExplore();
+}, 5000);
+
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 (async () => {
@@ -263,4 +317,6 @@ window.addEventListener("contextmenu", (e) => e.preventDefault());
   State.setMode("speaking");
   await Dialog.say(t("Ciao{name}! Scrivimi con Ctrl+Alt+T, oppure tieni premuto Ctrl+Alt+Spazio e parla.", { name: name ? ", " + name : "" }));
   State.settle();
+  // primo avvio: proposta di scaricare i contenuti aggiuntivi (una volta sola)
+  Extras.askFirstRun();
 })();

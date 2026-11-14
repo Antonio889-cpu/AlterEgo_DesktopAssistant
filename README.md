@@ -55,6 +55,7 @@ Interface in English and Italian.
 - [PC actions and permissions](#pc-actions-and-permissions)
 - [Personality and memory](#personality-and-memory)
 - [Sprites](#sprites)
+- [Pet](#pet)
 - [Privacy and security](#privacy-and-security)
 - [Where the data lives](#where-the-data-lives)
 - [Troubleshooting](#troubleshooting)
@@ -101,6 +102,7 @@ Interface in English and Italian.
 - **Local memory** (SQLite): remembers conversations, writes summaries, learns facts about you.
 - **Adjustable personality** (shy ↔ confident, formal ↔ affectionate), imitation mode, answers in Italian, English or both.
 - Facial expressions driven by the answers (happy, surprised, embarrassed, sad, worried, thinking, error).
+- **Pet mode**: in quiet moments Alter Ego comes out of the TV as a little pixel sprite and lives on your desktop: she walks, jumps, stands on open windows and on the taskbar, and you can grab and throw her. She goes back in when you talk to her.
 - Lightweight: Tauri 2 (Rust) + vanilla HTML/CSS/JS, installer of about 6 MB.
 
 ## Screenshots
@@ -512,6 +514,36 @@ To regenerate the included sprites from the sheet (e.g. after editing it), with 
 python tools/process_sprites.py
 ```
 
+## Pet
+
+When nothing is happening, Alter Ego goes out to explore: the TV switches off and she jumps out
+as a small pixel-art sprite (the built-in one is **Chihiro**). Then she lives on your desktop by herself:
+
+- she walks, stops, jumps, and lets herself drop off the edges;
+- she stands **on top of open windows** (only the visible part of their top edge) and on the **taskbar**; if you move the window she's on, she rides along; if you close or minimize it, she falls;
+- the screen edges are walls, and she can walk from one monitor to another;
+- **drag** her with the mouse and **throw** her (she bounces off the walls); a **click** makes her jump; a **double-click** sends her back into the TV.
+
+She goes back into the TV when you talk to her (push-to-talk, text box), when she has something to say (answers, reminders, confirmations),
+with *Show / hide* or the tray icon, and by herself after a while. She doesn't go out while music is playing, and she hides while a game or a video is full screen.
+
+*Settings → Pet*: on/off, how many quiet minutes before she can go out, how often, how long she stays out, size, and *Explore now*.
+The tray menu has *Explore the desktop* / *Call Alter Ego back into the TV*.
+
+**Other pets**: you can import a pet from a `.json` file like this (the "c2dictionary" format). Only the pixel-art
+sprite sheet is used; any other image in the file (`urlFront`, `urlStart`, stickers…) is ignored:
+
+```json
+{ "c2dictionary": true, "data": {
+  "name": "Chihiro", "longName": "Chihiro Fujisaki", "author": "Lucid On Bound",
+  "urlSprites": "https://…/Sprites.png", "runFrames": 4 } }
+```
+
+The sheet is downloaded once into `%APPDATA%\AlterEgo\pets\<name>\`. It has **2 rows of square frames**:
+row 1 *still A, still B, jump, fall*, row 2 the *run* (`runFrames` frames); the character looks to the left (she's mirrored when going right).
+
+On Linux she only uses the bottom of the screen and the taskbar: windows are read only on Windows.
+
 ## Privacy and security
 
 - Config, memory and logs stay in `%APPDATA%\AlterEgo\`.
@@ -538,6 +570,7 @@ python tools/process_sprites.py
 | `%APPDATA%\AlterEgo\actions.log` | action log |
 | `%APPDATA%\AlterEgo\persona\alter_ego.md` | character sheet |
 | `%APPDATA%\AlterEgo\sprites\` | imported sprites (optional) |
+| `%APPDATA%\AlterEgo\pets\` | imported pets (optional) |
 | `%APPDATA%\AlterEgo\costs.jsonl` | cost log |
 | `%APPDATA%\AlterEgo\tools\`, `music_cache\` | yt-dlp and Deno; downloaded tracks (last 30) |
 | `%APPDATA%\AlterEgo\kokoro\` | Kokoro: Python environment, server, `server.log` (the model is in the Hugging Face cache, `%USERPROFILE%\.cache\huggingface`) |
@@ -665,6 +698,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - Kokoro on CPU takes about half a second per sentence on a recent PC; the first sentence after startup waits for the model to load.
 - The character sheet was written without access to the wiki pages: feel free to enrich it.
 - Unsigned build: SmartScreen may show a warning.
+- The pet reads open windows only on Windows (still to be verified on a real PC); on Linux she uses only the bottom of the screen.
 
 ## Credits and licenses
 
@@ -677,6 +711,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - SQL Server driver [tiberius](https://github.com/prisma/tiberius) (MIT/Apache-2.0).
 - **VB-CABLE** by VB-Audio Software: donationware, not bundled; download it from the official website.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+- **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),
   adapted for the app (background removed, green CRT tint). Thank you, Ayari! 💚
 - Logo, circuit background, icon and sounds were created for this project.

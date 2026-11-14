@@ -369,7 +369,7 @@ body[data-mode="sleep"] #face img.on { animation: breathe 4s ease-in-out infinit
 #dialog.suspended { display: none; }
 
 /* finestra di conferma: stesso stile del box dialogo, al centro */
-#confirm {
+#confirm, #setup {
   position: absolute;
   left: 10%;
   right: 10%;
@@ -377,10 +377,10 @@ body[data-mode="sleep"] #face img.on { animation: breathe 4s ease-in-out infinit
   height: 50%;
   z-index: 9;
 }
-#confirm.hidden { display: none; }
-#confirm .inner { grid-template-columns: auto 1fr; padding: 3vh 3.4vh; }
+#confirm.hidden, #setup.hidden { display: none; }
+#confirm .inner, #setup .inner { grid-template-columns: auto 1fr; padding: 3vh 3.4vh; }
 .confirm-body { display: flex; flex-direction: column; height: 100%; gap: 2vh; min-width: 0; }
-#confirm-text {
+#confirm-text, #setup-text {
   flex: 1;
   font-size: 3.6vh;
   line-height: 1.35;
@@ -399,7 +399,7 @@ body[data-mode="sleep"] #face img.on { animation: breathe 4s ease-in-out infinit
   cursor: pointer;
 }
 .confirm-buttons button:hover, .confirm-buttons button:focus-visible { background: rgba(255, 255, 255, .25); outline: none; }
-#confirm-yes { font-weight: bold; }
+#confirm-yes, #setup-yes { font-weight: bold; }
 
 #toast {
   position: absolute;
@@ -530,4 +530,72 @@ body.click-through #screen, body.click-through #dialog { cursor: default; }
 @keyframes tv-flash-off { 0% { opacity: 0; } 35%, 100% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   #root.tv-on-anim, #root.tv-off-anim { animation-duration: .01s; }
+}
+
+
+/* ---------- contenuti aggiuntivi: interferenza e monitor "preso" ---------- */
+#root.interference #screen { animation: interference .12s steps(2) infinite; }
+@keyframes interference {
+  0% { transform: translate(0, 0) skewX(0); filter: hue-rotate(0) contrast(1.4) brightness(1.3); }
+  50% { transform: translate(-1.5%, .6%) skewX(-6deg); filter: hue-rotate(90deg) contrast(2) brightness(.7); clip-path: inset(12% 0 30% 0); }
+  100% { transform: translate(1.2%, -.4%) skewX(4deg); filter: invert(.2) contrast(1.8); clip-path: inset(0 0 8% 0); }
+}
+body.hijacking #dialog, body.hijacking #prompt, body.hijacking #toast { visibility: hidden; }
+
+#hijack {
+  position: fixed; inset: 0; z-index: 200; overflow: hidden; cursor: pointer;
+  /* parete grigio-verde a pannelli */
+  background:
+    linear-gradient(90deg, transparent 49.6%, rgba(0, 0, 0, .18) 49.8%, rgba(255, 255, 255, .12) 50.2%, transparent 50.4%),
+    linear-gradient(180deg, transparent 49.4%, rgba(0, 0, 0, .14) 49.6%, rgba(255, 255, 255, .1) 50%, transparent 50.2%),
+    radial-gradient(ellipse at 50% 40%, #c9d6c2, #9fae99 70%, #7f8d7a);
+  animation: hj-in .35s ease-out both;
+}
+#hijack.hidden { display: none; }
+@keyframes hj-in { from { opacity: 0; filter: brightness(3); } to { opacity: 1; filter: none; } }
+.hj-speaker {
+  position: absolute; top: 34%; width: 3%; height: 22%; border-radius: .6vh;
+  background: linear-gradient(#262a26, #121512); box-shadow: inset 0 0 0 .4vh #3a403a, 0 .6vh 1.2vh rgba(0, 0, 0, .35);
+  display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
+}
+.hj-speaker.left { left: .7%; }
+.hj-speaker.right { right: .7%; }
+.hj-speaker i { width: 64%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, #050605 30%, #1d211d 34%, #0b0d0b 60%, #2b302b 64%); }
+.hj-monitor {
+  position: absolute; left: 4.4%; right: 4.4%; top: 2.4%; bottom: 2.4%;
+  background: #1b1f1b; padding: .5%; border-radius: .5vh;
+  box-shadow: inset 0 0 0 .25vh #4c544c, 0 0 0 .3vh #a9b6a4, 0 .6vh 1.6vh rgba(0, 0, 0, .4);
+}
+.hj-screen { position: relative; width: 100%; height: 100%; overflow: hidden; background: #071007; }
+.hj-bg { position: absolute; inset: 0; background: center / cover no-repeat; filter: saturate(.5) brightness(.78) contrast(1.05); }
+.hj-sprite {
+  position: absolute; left: 50%; bottom: -4%; height: 104%; translate: -54% 0; image-rendering: auto;
+  filter: drop-shadow(0 0 1.2vh rgba(120, 255, 140, .25));
+}
+.hj-sprite:not([src]) { visibility: hidden; }
+.hj-sprite.pop { animation: hj-pop .32s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes hj-pop { from { transform: translateY(3%) scale(.97); opacity: .4; } to { transform: none; opacity: 1; } }
+.hj-tint { position: absolute; inset: 0; background: rgba(40, 150, 60, .3); mix-blend-mode: overlay; pointer-events: none; }
+.hj-scan { position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .28) 0 2px, transparent 2px 4px);
+  animation: hj-roll 6s linear infinite; }
+@keyframes hj-roll { to { background-position: 0 100px; } }
+.hj-static { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; image-rendering: pixelated; mix-blend-mode: screen; }
+.hj-box {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 36%; padding: 3.2% 5% 0 5%;
+  background: linear-gradient(180deg, transparent 0, rgba(0, 0, 0, .62) 22%, rgba(0, 0, 0, .8));
+  transition: opacity .25s;
+}
+.hj-box.off { opacity: 0; }
+.hj-name { font: 800 5.4vh "HJName", "Montserrat", sans-serif; color: #fff; letter-spacing: .02em; text-shadow: 0 .2vh .4vh #000; }
+.hj-text { margin-top: 1.8%; max-width: 80%; font: 600 5.6vh/1.32 "HJText", "Source Sans 3", sans-serif; color: #e8ebe6; text-shadow: 0 .2vh .4vh #000; }
+.hj-next {
+  position: absolute; right: 3%; bottom: 10%; width: 7vh; height: 7vh; border-radius: 50%;
+  display: grid; place-items: center; font: 700 3vh sans-serif; color: rgba(255, 255, 255, .85);
+  background: rgba(255, 255, 255, .14); box-shadow: inset 0 0 0 .4vh rgba(255, 255, 255, .35); opacity: 0;
+}
+.hj-next.on { opacity: 1; animation: hj-blink 1s steps(2) infinite; }
+@keyframes hj-blink { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  #root.interference #screen, .hj-sprite.pop, .hj-scan, #hijack { animation: none; }
 }

@@ -29,6 +29,7 @@ const State = (() => {
     setMode(next) {
       clearTimeout(holdTimer);
       mode = next;
+      document.dispatchEvent(new CustomEvent("ae-mode", { detail: next }));
       touch();
       render();
     },

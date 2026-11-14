@@ -13,6 +13,7 @@
     <button data-tab="local">Modelli locali</button>
     <button data-tab="persona">Personalità</button>
     <button data-tab="memory">Memoria</button>
+    <button data-tab="pet">Pet</button>
     <button data-tab="voice">Voce e audio</button>
     <button data-tab="hotkeys">Tasti</button>
     <button data-tab="clip">Clip</button>
@@ -73,6 +74,12 @@
       <div class="actions"><span id="update-result" class="result"></span></div>
       <p class="note">L'aggiornamento scarica l'installer dell'ultima release da GitHub, ne controlla lo SHA-256, chiede conferma e chiude
         Alter Ego. Impostazioni, chiavi e memoria restano. Puoi anche dirlo a lei: «controlla gli aggiornamenti».</p>
+      <h3>Contenuti aggiuntivi</h3>
+      <p class="note">Immagini, musica e suoni extra per Alter Ego, scaricati una volta da un link diretto (file .zip).</p>
+      <p id="ex-status" class="note"></p>
+      <label>Link <input id="ex-url" autocomplete="off" spellcheck="false" placeholder="https://…/asset.zip" /></label>
+      <label class="inline"><input type="checkbox" id="ex-events" /> Eventi durante i giochi</label>
+      <div class="actions"><button id="ex-install">Scarica / aggiorna</button> <button id="ex-remove" class="danger">Rimuovi</button> <span id="ex-result" class="result"></span></div>
     </section>
 
     <section data-tab="ai">
@@ -262,6 +269,44 @@
       </div>
     </section>
 
+    <section data-tab="pet">
+      <h2>Pet</h2>
+      <div class="pet-head">
+        <canvas id="pet-preview" width="128" height="128" aria-hidden="true"></canvas>
+        <div>
+          <p class="note">Nei momenti di calma Alter Ego esce dalla TV e vive sul tuo desktop: cammina, salta,
+            si siede sopra le finestre aperte e sulla barra delle applicazioni. Prendila col mouse per spostarla o lanciarla;
+            un click la fa saltare, un <b>doppio click</b> la riporta nella TV.</p>
+          <p class="note">Torna nella TV da sola quando le parli (push-to-talk o box di testo), quando deve dirti qualcosa,
+            con <b>Mostra / nascondi</b> o dopo il tempo scelto qui sotto. Non esce mentre suona la musica,
+            e si nasconde quando un gioco o un video è a schermo intero.</p>
+          <p class="note sub" data-os="linux">Su Linux sta in piedi solo sulla barra e sul fondo dello schermo (le finestre si leggono solo su Windows).</p>
+        </div>
+      </div>
+      <label class="inline"><input type="checkbox" id="pet-enabled" /> Esce da sola nei momenti di calma</label>
+      <label>Dopo quanti minuti di calma <input id="pet-idle" type="number" min="1" max="120" step="1" /></label>
+      <label>Quanto spesso
+        <select id="pet-frequency"><option value="rare">Raramente</option><option value="normal">A volte</option><option value="often">Spesso</option></select>
+      </label>
+      <label>Torna nella TV da sola dopo
+        <select id="pet-stay"><option value="5">5 minuti</option><option value="10">10 minuti</option><option value="20">20 minuti</option><option value="45">45 minuti</option><option value="0">Mai (finché non la chiami)</option></select>
+      </label>
+      <label>Dimensione <input id="pet-size" type="range" min="0.5" max="2.5" step="0.25" /> <span id="pet-size-val"></span></label>
+      <div class="actions"><button id="pet-go">Esplora adesso</button> <button id="pet-back">Richiama nella TV</button> <span id="pet-state" class="result"></span></div>
+      <h3>Sprite del pet</h3>
+      <p class="note">Il pet in uso è <b id="pet-name">Chihiro</b><span id="pet-author"></span>. Puoi importarne un altro da un file
+        <code>.json</code> con l'indirizzo del foglio sprite (<code>urlSprites</code>) e <code>runFrames</code>: il foglio viene scaricato
+        una volta nella cartella dei pet (le altre immagini del file vengono ignorate). Il foglio ha 2 righe di fotogrammi quadrati:
+        fermo, fermo, salto, caduta · corsa.</p>
+      <label>Pet in uso <select id="pet-skin"></select></label>
+      <div class="actions">
+        <label class="button-like">Importa pet (JSON)… <input id="pet-file" type="file" accept=".json,application/json" hidden /></label>
+        <button id="pet-dir">Apri cartella pet</button>
+        <button id="pet-delete" class="danger">Elimina pet importato</button>
+        <span id="pet-result" class="result"></span>
+      </div>
+    </section>
+
     <section data-tab="memory">
       <h2>Memoria</h2>
       <label class="inline"><input type="checkbox" id="memory-enabled" /> Ricorda le conversazioni tra un avvio e l'altro (SQLite, solo su questo PC)</label>
@@ -440,6 +485,7 @@
       <label>Push-to-talk (parla) <input class="hotkey" data-key="push_to_talk" data-mouse="1" readonly /></label>
       <label>Scrivi ad Alter Ego <input class="hotkey" data-key="text_input" readonly /></label>
       <label>Click-through <input class="hotkey" data-key="toggle_click_through" readonly /></label>
+      <label>Debug: evento di prova <input class="hotkey" data-key="test_event" readonly /></label>
       <div class="actions"><button id="save-hotkeys">Salva tasti</button> <span id="hotkey-result" class="result"></span></div>
     </section>
 

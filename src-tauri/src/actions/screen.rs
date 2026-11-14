@@ -282,6 +282,13 @@ fn cursor_grid() -> (f64, f64) {
     (cx as f64 / f, cy as f64 / f)
 }
 
+/// Screenshot piccolo (lato lungo `max` px) senza righelli, per chi deve solo "capire" cosa c'è.
+pub fn small_base64(max: u32) -> Result<String, String> {
+    let (w, h, rgba) = capture_rgba()?;
+    let (nw, nh) = if w >= h { (max.min(w), ((h as f64) * max.min(w) as f64 / w as f64).round() as u32) } else { (((w as f64) * max.min(h) as f64 / h as f64).round() as u32, max.min(h)) };
+    b64(nw, nh, &resample(w, h, &rgba, nw.max(1), nh.max(1)))
+}
+
 /// Screenshot di tutto lo schermo principale alla dimensione della griglia (righelli e cursore se `grid`).
 pub fn screenshot_base64(grid: bool) -> Result<String, String> {
     let (w, h, rgba) = capture_rgba()?;

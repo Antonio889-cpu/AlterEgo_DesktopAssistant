@@ -1,3 +1,11 @@
+## Alter Ego 1.9.0
+
+- Pet mode: in quiet moments Alter Ego comes out of the TV and lives on your desktop (Settings → Pet).
+- Extra content, downloadable on first start or from Settings → General.
+- Fix: Alter Ego reappears when she speaks, even if hidden or minimized.
+
+`AlterEgo_1.9.0_setup.exe` / `AlterEgo_1.9.0_portable.zip` Windows · `AlterEgo_1.9.0_amd64.AppImage` / `AlterEgo_1.9.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.8.2
 
 - Lighter at rest: the speakers pause when there's nothing to play, the music player and Venue no longer redraw 60 times a second, the Garry's Mod sound index is freed when the game closes.

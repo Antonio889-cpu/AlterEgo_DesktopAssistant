@@ -108,6 +108,22 @@
         </div>
       </div>
 
+      <!-- primo avvio: contenuti aggiuntivi -->
+      <div id="setup" class="hidden" role="alertdialog" aria-modal="true" aria-labelledby="setup-text">
+        <div class="box">
+          <div class="inner">
+            <div class="tag">Alter Ego</div>
+            <div class="confirm-body">
+              <div id="setup-text">Ci sono dei contenuti aggiuntivi per me (immagini, musica e suoni). Li scarico adesso?</div>
+              <div class="confirm-buttons">
+                <button id="setup-yes" type="button">Scarica</button>
+                <button id="setup-no" type="button">Più tardi</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- overlay CRT -->
       <div id="scanlines"></div>
       <div id="noise"></div>
@@ -120,6 +136,26 @@
     <div id="ct-handle" title="Disattiva click-through">🔒</div>
     <div id="errors"></div>
   </div>
+
+  <!-- contenuti aggiuntivi: monitor "preso" da un ospite (extras.js) -->
+  <div id="hijack" class="hidden" data-no-i18n>
+    <div class="hj-speaker left"><i></i><i></i></div>
+    <div class="hj-speaker right"><i></i><i></i></div>
+    <div class="hj-monitor">
+      <div class="hj-screen">
+        <div class="hj-bg"></div>
+        <img class="hj-sprite" alt="" />
+        <div class="hj-tint"></div>
+        <div class="hj-box off">
+          <div class="hj-name"></div>
+          <div class="hj-text"></div>
+          <div class="hj-next">▼</div>
+        </div>
+        <div class="hj-scan"></div>
+        <canvas class="hj-static" width="192" height="108"></canvas>
+      </div>
+    </div>
+  </div>
   <script src="i18n.js"></script>
   <script src="sprites.js"></script>
   <script src="dialog.js"></script>
@@ -128,5 +164,6 @@
   <script src="audio.js"></script>
   <script src="chat.js"></script>
   <script src="app.js"></script>
+  <script src="extras.js"></script>
 </body>
 </html>
