@@ -50,7 +50,7 @@ async function demo() {
 // ---------- spostamento ----------
 $("screen").addEventListener("mousedown", (e) => {
   State.touch();
-  if (e.button !== 0 || e.target.closest("#dialog, #prompt, #confirm")) return;
+  if (e.button !== 0 || e.target.closest("#dialog, #prompt, #confirm, #setup")) return;
   appWindow.startDragging();
 });
 

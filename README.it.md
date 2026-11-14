@@ -541,7 +541,7 @@ sprite in pixel art; le altre immagini del file (`urlFront`, `urlStart`, sticker
 ```
 
 Il foglio viene scaricato una volta in `%APPDATA%\AlterEgo\pets\<nome>\`. Ha **2 righe di fotogrammi quadrati**:
-riga 1 *fermo A, fermo B, salto, caduta*, riga 2 la *corsa* (`runFrames` fotogrammi); il personaggio guarda a sinistra (verso destra viene specchiato).
+riga 1 *fermo A, fermo B, salto, caduta*, riga 2 la *corsa* (`runFrames` fotogrammi); il personaggio guarda a destra (verso sinistra viene specchiato).
 
 Su Linux usa solo il fondo dello schermo e la barra: le finestre si leggono solo su Windows.
 

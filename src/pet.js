@@ -4,7 +4,7 @@
 // Foglio sprite: 2 righe di fotogrammi quadrati.
 //   riga 1: fermo A, fermo B, salto, caduta
 //   riga 2: corsa (runFrames fotogrammi)
-// Il personaggio nel foglio guarda/corre verso sinistra: verso destra si specchia.
+// Il personaggio nel foglio guarda/corre verso destra: verso sinistra si specchia.
 
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
@@ -104,7 +104,7 @@ function draw(now) {
   lastKey = key;
   ctx.clearRect(0, 0, W, H);
   ctx.save();
-  if (right) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+  if (!right) { ctx.translate(W, 0); ctx.scale(-1, 1); }
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(sheet, col * frame, row * frame, frame, frame, shiftX, align[`${row}:${col}`] ?? H - F, F, F);
   ctx.restore();

@@ -540,7 +540,7 @@ sprite sheet is used; any other image in the file (`urlFront`, `urlStart`, stick
 ```
 
 The sheet is downloaded once into `%APPDATA%\AlterEgo\pets\<name>\`. It has **2 rows of square frames**:
-row 1 *still A, still B, jump, fall*, row 2 the *run* (`runFrames` frames); the character looks to the left (she's mirrored when going right).
+row 1 *still A, still B, jump, fall*, row 2 the *run* (`runFrames` frames); the character looks to the right (she's mirrored when going left).
 
 On Linux she only uses the bottom of the screen and the taskbar: windows are read only on Windows.
 
