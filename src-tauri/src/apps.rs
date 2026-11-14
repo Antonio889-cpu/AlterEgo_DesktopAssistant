@@ -51,6 +51,12 @@ pub fn exe_path(names: &[&str]) -> Option<std::path::PathBuf> {
     })
 }
 
+/// Finestre principali visibili: (percorso dell'eseguibile, titolo). Solo per riconoscere
+/// alcuni giochi in locale: i titoli non vengono mai mandati al modello AI.
+pub fn titled() -> Vec<(String, String)> {
+    imp::titled()
+}
+
 /// Riga di contesto da aggiungere alla domanda (vuota se non si trova niente).
 pub fn note(apps: &[String], fg: Option<&str>) -> String {
     if apps.is_empty() {
@@ -105,6 +111,27 @@ mod imp {
         1
     }
 
+    unsafe extern "system" fn each_titled(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        let out = &mut *(lparam as *mut Vec<(String, String)>);
+        if IsWindowVisible(hwnd) == 0 || !GetWindow(hwnd, GW_OWNER).is_null() {
+            return 1;
+        }
+        let n = GetWindowTextLengthW(hwnd);
+        if n == 0 {
+            return 1;
+        }
+        let mut buf = vec![0u16; n as usize + 1];
+        let got = GetWindowTextW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+        out.push((exe_of(hwnd), String::from_utf16_lossy(&buf[..got.max(0) as usize])));
+        1
+    }
+
+    pub fn titled() -> Vec<(String, String)> {
+        let mut v: Vec<(String, String)> = Vec::new();
+        unsafe { EnumWindows(Some(each_titled), &mut v as *mut _ as LPARAM) };
+        v
+    }
+
     pub fn windows() -> (Vec<String>, Option<String>) {
         let mut v: Vec<String> = Vec::new();
         unsafe {
@@ -128,6 +155,21 @@ mod imp {
             return None;
         }
         std::fs::read_to_string(format!("/proc/{pid}/comm")).ok().map(|s| s.trim().to_string())
+    }
+
+    pub fn titled() -> Vec<(String, String)> {
+        let Ok(out) = Command::new("xdotool").args(["search", "--onlyvisible", "--name", "."]).output() else {
+            return Vec::new();
+        };
+        String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .take(80)
+            .filter_map(|wid| {
+                let name = Command::new("xdotool").args(["getwindowname", wid]).output().ok()?;
+                let title = String::from_utf8_lossy(&name.stdout).trim().to_string();
+                (!title.is_empty()).then(|| (comm(wid).unwrap_or_default(), title))
+            })
+            .collect()
     }
 
     pub fn windows() -> (Vec<String>, Option<String>) {

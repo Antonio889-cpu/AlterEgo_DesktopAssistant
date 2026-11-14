@@ -76,6 +76,39 @@ fn open(path: &Path) -> Result<(Box<dyn symphonia::core::formats::FormatReader>,
     Ok((probed.format, ()))
 }
 
+/// Decodifica un file breve (Line, effetti) in campioni mono. Al massimo `max_secs` secondi.
+pub fn decode_mono(path: &Path, max_secs: f64) -> Result<(Vec<f32>, u32), String> {
+    let (mut format, _) = open(path)?;
+    let track = format.default_track().ok_or("nessuna traccia audio")?.clone();
+    let rate = track.codec_params.sample_rate.unwrap_or(44_100);
+    let mut decoder = symphonia::default::get_codecs()
+        .make(&track.codec_params, &DecoderOptions::default())
+        .map_err(|e| format!("codec non supportato: {e}"))?;
+    let max = (max_secs * rate as f64) as usize;
+    let mut out = Vec::new();
+    while out.len() < max {
+        let packet = match format.next_packet() {
+            Ok(p) => p,
+            Err(SymErr::ResetRequired) => {
+                decoder.reset();
+                continue;
+            }
+            Err(_) => break,
+        };
+        if packet.track_id() != track.id {
+            continue;
+        }
+        let Ok(decoded) = decoder.decode(&packet) else { continue };
+        let spec = *decoded.spec();
+        let ch = spec.channels.count().max(1);
+        let mut sbuf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+        sbuf.copy_interleaved_ref(decoded);
+        out.extend(sbuf.samples().chunks(ch).map(|f| f.iter().sum::<f32>() / ch as f32));
+    }
+    out.truncate(max);
+    Ok((out, rate))
+}
+
 /// Suona `path` da `start` secondi finché finisce o arriva `Ctl::Stop`.
 /// `on_seek(t)`: chiamata quando la posizione salta (per azzerare il conteggio).
 pub fn play(engine: &AudioEngine, path: &Path, start: f64, rx: &Receiver<Ctl>, on_seek: &dyn Fn(f64)) -> Result<End, String> {

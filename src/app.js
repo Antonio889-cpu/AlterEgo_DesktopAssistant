@@ -231,7 +231,7 @@ let compact = false;
 let wantSince = 0;
 listen("music-state", (e) => { musicOn = !!(e.payload.playing && !e.payload.paused); });
 function alterEgoBusy() {
-  return Dialog.isOpen() || !$("prompt").classList.contains("hidden") || !$("confirm").classList.contains("hidden")
+  return (typeof Extras !== "undefined" && Extras.active()) || Dialog.isOpen() || !$("prompt").classList.contains("hidden") || !$("confirm").classList.contains("hidden")
     || ["thinking", "listening", "speaking"].includes(State.mode()) || Audio2.isSpeaking();
 }
 setInterval(() => {
@@ -268,6 +268,8 @@ function petHome() {
 // le parli (push-to-talk, box di testo) o parla lei (promemoria, frasi dal backend): rientra subito
 document.addEventListener("ae-mode", (e) => {
   if (["listening", "thinking", "speaking"].includes(e.detail)) { markActive(); petHome(); }
+  // parla (promemoria, avvisi, frasi dal backend): se era nascosta o ridotta a icona ricompare
+  if (e.detail === "speaking") invoke("reveal_main").catch(() => {});
 });
 async function petExplore(manual = false) {
   if (petOut || petStarting) return;
@@ -311,4 +313,6 @@ window.addEventListener("contextmenu", (e) => e.preventDefault());
   State.setMode("speaking");
   await Dialog.say(t("Ciao{name}! Scrivimi con Ctrl+Alt+T, oppure tieni premuto Ctrl+Alt+Spazio e parla.", { name: name ? ", " + name : "" }));
   State.settle();
+  // primo avvio: proposta di scaricare i contenuti aggiuntivi (una volta sola)
+  Extras.askFirstRun();
 })();

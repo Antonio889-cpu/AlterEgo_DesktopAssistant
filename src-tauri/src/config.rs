@@ -20,6 +20,8 @@ pub struct Hotkeys {
     pub push_to_talk: String,
     pub text_input: String,
     pub toggle_click_through: String,
+    /// Debug: fa partire subito un evento dei contenuti aggiuntivi (vuoto = spenta).
+    pub test_event: String,
 }
 
 impl Default for Hotkeys {
@@ -29,6 +31,7 @@ impl Default for Hotkeys {
             push_to_talk: "Ctrl+Alt+Space".into(),
             text_input: "Ctrl+Alt+T".into(),
             toggle_click_through: "Ctrl+Alt+C".into(),
+            test_event: String::new(),
         }
     }
 }
@@ -703,6 +706,24 @@ impl Default for SqlConfig {
     }
 }
 
+/// Contenuti aggiuntivi (pacchetto scaricato da un link diretto, vedi extras/).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct ExtrasConfig {
+    /// Eventi durante i giochi.
+    pub events: bool,
+    /// Link diretto del pacchetto (vuoto = quello predefinito).
+    pub url: String,
+    /// La domanda del primo avvio è già stata fatta.
+    pub asked: bool,
+}
+
+impl Default for ExtrasConfig {
+    fn default() -> Self {
+        Self { events: true, url: String::new(), asked: false }
+    }
+}
+
 /// Pet: Alter Ego esce dalla TV e gira per il desktop nei momenti di calma (vedi pet/).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
@@ -797,6 +818,7 @@ pub struct Config {
     pub sql: SqlConfig,
     pub local: LocalConfig,
     pub pet: PetConfig,
+    pub extras: ExtrasConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
     /// Posizione/dimensione salvate per ogni monitor.
@@ -839,6 +861,7 @@ impl Default for Config {
             sql: SqlConfig::default(),
             local: LocalConfig::default(),
             pet: PetConfig::default(),
+            extras: ExtrasConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
             last_monitor: None,

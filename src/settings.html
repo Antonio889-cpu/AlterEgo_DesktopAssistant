@@ -74,6 +74,12 @@
       <div class="actions"><span id="update-result" class="result"></span></div>
       <p class="note">L'aggiornamento scarica l'installer dell'ultima release da GitHub, ne controlla lo SHA-256, chiede conferma e chiude
         Alter Ego. Impostazioni, chiavi e memoria restano. Puoi anche dirlo a lei: «controlla gli aggiornamenti».</p>
+      <h3>Contenuti aggiuntivi</h3>
+      <p class="note">Immagini, musica e suoni extra per Alter Ego, scaricati una volta da un link diretto (file .zip).</p>
+      <p id="ex-status" class="note"></p>
+      <label>Link <input id="ex-url" autocomplete="off" spellcheck="false" placeholder="https://…/asset.zip" /></label>
+      <label class="inline"><input type="checkbox" id="ex-events" /> Eventi durante i giochi</label>
+      <div class="actions"><button id="ex-install">Scarica / aggiorna</button> <button id="ex-remove" class="danger">Rimuovi</button> <span id="ex-result" class="result"></span></div>
     </section>
 
     <section data-tab="ai">
@@ -479,6 +485,7 @@
       <label>Push-to-talk (parla) <input class="hotkey" data-key="push_to_talk" data-mouse="1" readonly /></label>
       <label>Scrivi ad Alter Ego <input class="hotkey" data-key="text_input" readonly /></label>
       <label>Click-through <input class="hotkey" data-key="toggle_click_through" readonly /></label>
+      <label>Debug: evento di prova <input class="hotkey" data-key="test_event" readonly /></label>
       <div class="actions"><button id="save-hotkeys">Salva tasti</button> <span id="hotkey-result" class="result"></span></div>
     </section>
 

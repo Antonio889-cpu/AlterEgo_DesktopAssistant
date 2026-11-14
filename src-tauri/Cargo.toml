@@ -37,6 +37,8 @@ getrandom = "0.2"
 # SQL Server locale (Impostazioni → Permessi → Database SQL Server)
 tiberius = { version = "0.13", default-features = false, features = ["tds80", "rustls", "sql-browser-tokio", "chrono"] }
 tokio-util = { version = "0.7", features = ["compat"] }
+# contenuti aggiuntivi: pacchetto ZIP scaricato da un link
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 # accesso integrato di Windows a SQL Server

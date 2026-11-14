@@ -570,6 +570,40 @@ $("ns-enabled").onchange = (e) => { audio.mic_link.noise_suppression = e.target.
 $("ns-strength").oninput = (e) => { audio.mic_link.ns_strength = +e.target.value; nsLabels(); saveAudio(); };
 $("ns-gate").oninput = (e) => { audio.mic_link.ns_gate = +e.target.value; nsLabels(); saveAudio(); };
 
+// ---------- contenuti aggiuntivi ----------
+function exResult(text, cls = "") { const r = $("ex-result"); r.textContent = text; r.className = "result " + cls; }
+async function refreshExtras() {
+  try {
+    const s = await invoke("extras_status");
+    $("ex-status").textContent = s.installed ? t("Installati ✓") : t("Non installati.");
+    if (document.activeElement !== $("ex-url")) $("ex-url").value = s.url;
+    $("ex-events").checked = s.events;
+    $("ex-remove").disabled = !s.installed;
+  } catch {}
+}
+const saveExtras = () => invoke("extras_settings", { events: $("ex-events").checked, url: $("ex-url").value });
+$("ex-events").onchange = saveExtras;
+$("ex-url").onchange = saveExtras;
+$("ex-install").onclick = async () => {
+  exResult(t("scarico…"));
+  $("ex-install").disabled = true;
+  try { await invoke("extras_install", { url: $("ex-url").value }); exResult(t("installati ✓"), "ok"); }
+  catch (err) { exResult(String(err), "bad"); }
+  $("ex-install").disabled = false;
+  refreshExtras();
+};
+$("ex-remove").onclick = async () => {
+  if (!confirm(t("Rimuovere i contenuti aggiuntivi?"))) return;
+  try { await invoke("extras_remove"); exResult(t("rimossi"), "ok"); } catch (err) { exResult(String(err), "bad"); }
+  refreshExtras();
+};
+listen("extras-progress", (e) => {
+  const { done, total } = e.payload;
+  if (total > 0) exResult(t("scarico… {p}%", { p: Math.floor((done / total) * 100) }));
+});
+listen("extras-changed", () => refreshExtras());
+refreshExtras();
+
 // ---------- pet ----------
 function fillPet(cfg) {
   const p = cfg.pet;

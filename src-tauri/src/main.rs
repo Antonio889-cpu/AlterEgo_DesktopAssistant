@@ -10,6 +10,7 @@ mod assistant;
 mod audio;
 mod config;
 mod costs;
+mod extras;
 mod form;
 mod gmod;
 mod graphify;
@@ -112,6 +113,7 @@ pub struct FrontConfig {
     gmod: bool,
     hermes_brain: bool,
     pet: config::PetConfig,
+    extras: config::ExtrasConfig,
 }
 
 pub fn front_config(app: &AppHandle) -> FrontConfig {
@@ -156,6 +158,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         gmod: cfg.gmod,
         hermes_brain: cfg.hermes_brain,
         pet: cfg.pet.clone(),
+        extras: cfg.extras.clone(),
     }
 }
 
@@ -175,8 +178,8 @@ fn get_config(app: AppHandle) -> FrontConfig {
 
 #[tauri::command]
 fn resize_window(app: AppHandle, width: f64) -> Result<(), String> {
-    if window::is_compact() {
-        return Ok(()); // durante la musica la dimensione la decide la modalità compatta
+    if window::is_compact() || window::is_takeover() {
+        return Ok(()); // durante la musica (o un evento) la dimensione la decide l'app
     }
     let win = app.get_webview_window(window::MAIN).ok_or("finestra assente")?;
     window::resize_keep_ratio(&win, width).map_err(|e| e.to_string())
@@ -200,6 +203,9 @@ fn set_resolved_language(app: AppHandle, lang: String) {
 /// Modalità compatta della finestra principale (la decide il frontend: musica in corso e Alter Ego inattiva).
 #[tauri::command]
 fn set_compact(app: AppHandle, on: bool) {
+    if window::is_takeover() {
+        return;
+    }
     let enabled = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).music.compact;
     window::set_compact(&app, on && enabled);
 }
@@ -242,6 +248,13 @@ fn set_ai_config(app: AppHandle, mut ai: config::AiConfig) {
 #[tauri::command]
 async fn open_settings(app: AppHandle) -> Result<(), String> {
     window::open_settings(&app).map_err(|e| e.to_string())
+}
+
+/// Alter Ego inizia a parlare: la finestra ricompare (anche se era nascosta o ridotta a icona)
+/// senza rubare il focus.
+#[tauri::command]
+fn reveal_main(app: AppHandle) {
+    window::show_main(&app);
 }
 
 /// Dà il focus alla finestra principale (serve per scrivere nell'input di testo).
@@ -481,6 +494,7 @@ fn main() {
             app.manage(form::Forms::default());
             app.manage(sql::Sql::default());
             app.manage(pet::PetRt::default());
+            app.manage(extras::Extras::default());
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
@@ -519,7 +533,8 @@ fn main() {
                 ai: providers::Ai::new(),
             });
             *app.state::<AppState>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
-            *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
+            *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
+            *app.state::<extras::Extras>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             voicestudio::autostart(&handle);
@@ -545,6 +560,7 @@ fn main() {
             music::spawn_analyzer(handle.clone());
             gmod::spawn(handle.clone());
             pet::spawn(handle.clone());
+            extras::spawn(handle.clone());
             window::spawn_handle_poller(handle);
             Ok(())
         })
@@ -578,6 +594,19 @@ fn main() {
             set_ai_config,
             open_settings,
             focus_main,
+            reveal_main,
+            extras::extras_status,
+            extras::extras_install,
+            extras::extras_asked,
+            extras::extras_settings,
+            extras::extras_remove,
+            extras::extras_assets,
+            extras::extras_line,
+            extras::extras_sfx,
+            extras::extras_music,
+            extras::extras_window,
+            extras::extras_prepare,
+            extras::extras_done,
             providers_info,
             add_api_key,
             delete_api_key,
