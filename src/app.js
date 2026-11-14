@@ -91,6 +91,10 @@ window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") answerConfirm(false);
     return; // Invio/Spazio agiscono sul pulsante con il focus
   }
+  if (!$("setup").classList.contains("hidden")) {
+    if (e.key === "Escape") $("setup-no").click();
+    return; // Invio/Spazio agiscono sul pulsante con il focus
+  }
   if (e.key === "Escape" && Chat.cancel()) return; // ferma la risposta in corso
   if (e.key === "Enter" || e.key === " ") {
     e.preventDefault();

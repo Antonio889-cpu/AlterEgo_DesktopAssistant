@@ -36,9 +36,8 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager};
 
-/// Link diretto predefinito del pacchetto (lo ZIP con le risorse). Vuoto = nessun download
-/// proposto finché non si inserisce un link nelle Impostazioni.
-pub const DEFAULT_URL: &str = "";
+/// Link diretto predefinito del pacchetto (lo ZIP con le risorse).
+pub const DEFAULT_URL: &str = "https://alterego.attentoweb.it/asset.zip";
 
 const MAX_ZIP: u64 = 150 * 1024 * 1024;
 

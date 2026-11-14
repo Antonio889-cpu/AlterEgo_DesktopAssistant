@@ -554,17 +554,17 @@ body.hijacking #dialog, body.hijacking #prompt, body.hijacking #toast { visibili
 #hijack.hidden { display: none; }
 @keyframes hj-in { from { opacity: 0; filter: brightness(3); } to { opacity: 1; filter: none; } }
 .hj-speaker {
-  position: absolute; top: 28%; width: 6.4%; height: 26%; border-radius: .8vh;
+  position: absolute; top: 34%; width: 3%; height: 22%; border-radius: .6vh;
   background: linear-gradient(#262a26, #121512); box-shadow: inset 0 0 0 .4vh #3a403a, 0 .6vh 1.2vh rgba(0, 0, 0, .35);
   display: flex; flex-direction: column; justify-content: space-evenly; align-items: center;
 }
-.hj-speaker.left { left: 2.2%; }
-.hj-speaker.right { right: 2.2%; }
+.hj-speaker.left { left: .7%; }
+.hj-speaker.right { right: .7%; }
 .hj-speaker i { width: 64%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, #050605 30%, #1d211d 34%, #0b0d0b 60%, #2b302b 64%); }
 .hj-monitor {
-  position: absolute; left: 11.5%; right: 11.5%; top: 6.5%; bottom: 4.5%;
-  background: #1b1f1b; padding: .9%; border-radius: .6vh;
-  box-shadow: inset 0 0 0 .35vh #4c544c, 0 0 0 .5vh #a9b6a4, 0 1vh 2.4vh rgba(0, 0, 0, .4);
+  position: absolute; left: 4.4%; right: 4.4%; top: 2.4%; bottom: 2.4%;
+  background: #1b1f1b; padding: .5%; border-radius: .5vh;
+  box-shadow: inset 0 0 0 .25vh #4c544c, 0 0 0 .3vh #a9b6a4, 0 .6vh 1.6vh rgba(0, 0, 0, .4);
 }
 .hj-screen { position: relative; width: 100%; height: 100%; overflow: hidden; background: #071007; }
 .hj-bg { position: absolute; inset: 0; background: center / cover no-repeat; filter: saturate(.5) brightness(.78) contrast(1.05); }
