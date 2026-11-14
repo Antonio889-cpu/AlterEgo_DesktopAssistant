@@ -16,6 +16,7 @@ const Extras = (() => {
   const noise = box.querySelector(".hj-static");
   const nctx = noise.getContext("2d");
 
+  const OFFICES = ["assets/extras/office1.jpg", "assets/extras/office2.jpg"];
   let active = false;
   let staticLevel = 0;
   let sprites = {};
@@ -53,7 +54,9 @@ const Extras = (() => {
   let fontsDone = false;
   function applyAssets(a) {
     sprites = a.sprites || {};
-    bg.style.backgroundImage = a.background ? `url("${a.background}")` : "";
+    // uffici inclusi nell'app (a caso a ogni evento); lo sfondo del pacchetto solo se mancano
+    const office = OFFICES[Math.floor(Math.random() * OFFICES.length)] || a.background;
+    bg.style.backgroundImage = office ? `url("${office}")` : "";
     nameEl.textContent = a.nameTag || "";
     if (!fontsDone) {
       const css = [];

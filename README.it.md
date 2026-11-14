@@ -711,6 +711,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - Driver di SQL Server [tiberius](https://github.com/prisma/tiberius) (MIT/Apache-2.0).
 - **VB-CABLE** di VB-Audio Software: donationware, non incluso; si scarica dal sito ufficiale.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
+- Sfondi degli uffici dei contenuti aggiuntivi (`src/assets/extras/`): fatti dall'autore del progetto con una mappa di Garry's Mod.
 - Foglio sprite del **pet Chihiro**: di **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),
   adattato per l'app (sfondo rimosso, tinta verde CRT). Grazie, Ayari! 💚
