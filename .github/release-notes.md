@@ -1,9 +1,8 @@
 ## Alter Ego 1.9.0
 
-- Pet mode: in quiet moments Alter Ego comes out of the TV as a little pixel-art sprite (Chihiro) and lives on your desktop. She walks, jumps, stands on open windows and on the taskbar, rides along when you move a window, and you can grab and throw her. A double-click, talking to her or Show / hide brings her back into the TV.
-- Settings → Pet: when and how often she goes out, how long she stays, size, other pets imported from a JSON file.
-- Fix: when Alter Ego speaks by herself (reminders, notices) she reappears even if she was hidden or minimized.
-- Extra content downloadable from Settings → General.
+- Pet mode: in quiet moments Alter Ego comes out of the TV and lives on your desktop (Settings → Pet).
+- Extra content, downloadable on first start or from Settings → General.
+- Fix: Alter Ego reappears when she speaks, even if hidden or minimized.
 
 `AlterEgo_1.9.0_setup.exe` / `AlterEgo_1.9.0_portable.zip` Windows · `AlterEgo_1.9.0_amd64.AppImage` / `AlterEgo_1.9.0_amd64.deb` Linux · `SHA256SUMS.txt`
 
