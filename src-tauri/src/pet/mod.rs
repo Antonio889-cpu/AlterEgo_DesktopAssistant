@@ -7,15 +7,15 @@
 //! - `surfaces.rs`: finestre aperte e schermo intero (Windows);
 //! - qui: la finestra trasparente del pet, il ciclo a ~60 fps e i comandi.
 //!
-//! Gli sprite: quello incluso (Chihiro, `src/assets/pet/chihiro/`) o uno importato da un file
-//! JSON (formato "c2dictionary" con `urlSprites`, `urlFront`… e `runFrames`) che viene
-//! scaricato in `%APPDATA%\AlterEgo\pets\<nome>\`.
+//! Si usa solo il foglio sprite in pixel art: quello incluso (Chihiro, `src/assets/pet/chihiro/`)
+//! o uno importato da un file JSON (formato "c2dictionary": `urlSprites` e `runFrames`; gli altri
+//! campi vengono ignorati) che viene scaricato in `%APPDATA%\AlterEgo\pets\<nome>\`.
 
 pub mod physics;
 mod surfaces;
 
 use crate::{assistant::Conversation, config::PetConfig, update_config, AppState};
-use physics::{Anim, Area, Event, Pet, World};
+use physics::{Anim, Area, Pet, World};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::VecDeque,
@@ -30,11 +30,11 @@ use std::{
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 
 pub const LABEL: &str = "pet";
-/// Finestra del pet in pixel logici (× dimensione): un fotogramma da 128 più lo spazio per lo sticker.
+/// Finestra del pet in pixel logici (× dimensione): un fotogramma da 128 più un margine sopra la testa (salti).
 const WIN_W: f64 = 128.0;
-const WIN_H: f64 = 168.0;
+const WIN_H: f64 = 136.0;
 /// Corpo predefinito (frazioni della finestra) finché la pagina non misura lo sprite.
-const DEFAULT_HIT: [f64; 4] = [0.28, 0.45, 0.72, 1.0];
+const DEFAULT_HIT: [f64; 4] = [0.28, 0.4, 0.72, 1.0];
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 
@@ -188,7 +188,7 @@ pub fn toggle(app: &AppHandle) {
     }
 }
 
-/// Esce adesso (Impostazioni, tray): la TV mostra "START!" e poi chiama `pet_explore`.
+/// Esce adesso (Impostazioni, tray): la finestra principale controlla e chiama `pet_explore`.
 #[tauri::command]
 pub fn pet_go(app: AppHandle) {
     let _ = app.emit_to(crate::window::MAIN, "pet-go", ());
@@ -240,7 +240,6 @@ fn release(app: &AppHandle) {
             g.go_home = true;
         } else {
             g.last_click = Some(now);
-            let _ = app.emit_to(LABEL, "pet-sticker", 1);
         }
         return;
     }
@@ -400,7 +399,6 @@ pub fn spawn(app: AppHandle) {
                 pet.half_w = (hit[2] - hit[0]) * ws.0 / 2.0;
                 pet.height = (hit[3] - hit[1]) * ws.1;
             }
-            let mut sticker = None;
             if let (Some(grab), Some(c)) = (g.grab.as_mut(), cur) {
                 let now = Instant::now();
                 grab.hist.push_back((now, c.x, c.y));
@@ -409,19 +407,14 @@ pub fn spawn(app: AppHandle) {
                 }
                 if !grab.moved && ((c.x - grab.from.0).abs() > 6.0 || (c.y - grab.from.1).abs() > 6.0) {
                     grab.moved = true;
-                    sticker = Some(2);
                 }
                 let off = grab.off;
                 if let Some(pet) = g.pet.as_mut() {
                     pet.move_held(c.x - off.0, c.y - off.1);
                 }
             }
-            let mut events = Vec::new();
             if let Some(pet) = g.pet.as_mut() {
-                events = pet.step(dt, &world);
-            }
-            if events.contains(&Event::HardLanding) {
-                sticker = Some(2);
+                pet.step(dt, &world);
             }
             let held = g.grab.is_some();
             let expired = g.until.is_some_and(|t| Instant::now() >= t) && !held && g.pet.as_ref().is_some_and(|p| p.on_ground());
@@ -445,9 +438,6 @@ pub fn spawn(app: AppHandle) {
                     let _ = app.emit_to(LABEL, "pet-anim", m);
                 }
                 last_anim = msg;
-            }
-            if let Some(n) = sticker {
-                let _ = app.emit_to(LABEL, "pet-sticker", n);
             }
             // il mouse funziona solo sopra lo sprite: il resto della finestra è trasparente ai click
             if ticks.is_multiple_of(2) || held {
@@ -475,15 +465,8 @@ pub fn spawn(app: AppHandle) {
 
 // ---------- sprite: incluso e importati ----------
 
-/// Campi del JSON → nome del file salvato.
-const FILES: [(&str, &str); 6] = [
-    ("urlSprites", "sprites.png"),
-    ("urlFront", "front.png"),
-    ("urlSide", "side.png"),
-    ("urlStart", "start.png"),
-    ("urlSticker1", "sticker1.png"),
-    ("urlSticker2", "sticker2.png"),
-];
+/// Il foglio sprite salvato (unica immagine usata).
+const SHEET: &str = "sprites.png";
 const BUNDLED_JSON: &str = include_str!("../../../src/assets/pet/chihiro/pet.json");
 const BUNDLED_DIR: &str = "assets/pet/chihiro";
 
@@ -496,11 +479,6 @@ struct PetDef {
     author: String,
     run_frames: u32,
     url_sprites: String,
-    url_front: String,
-    url_side: String,
-    url_start: String,
-    url_sticker1: String,
-    url_sticker2: String,
 }
 
 impl PetDef {
@@ -514,17 +492,6 @@ impl PetDef {
         Ok(d)
     }
 
-    fn url(&self, key: &str) -> &str {
-        match key {
-            "urlSprites" => &self.url_sprites,
-            "urlFront" => &self.url_front,
-            "urlSide" => &self.url_side,
-            "urlStart" => &self.url_start,
-            "urlSticker1" => &self.url_sticker1,
-            "urlSticker2" => &self.url_sticker2,
-            _ => "",
-        }
-    }
 }
 
 /// Quello che serve alle pagine per disegnare il pet.
@@ -538,11 +505,6 @@ pub struct PetAssets {
     author: String,
     run_frames: u32,
     sprites: String,
-    front: String,
-    side: String,
-    start: String,
-    sticker1: String,
-    sticker2: String,
 }
 
 fn pets_dir(app: &AppHandle) -> PathBuf {
@@ -561,12 +523,7 @@ fn assets_from(id: &str, def: &PetDef, file: impl Fn(&str) -> String) -> PetAsse
         long_name: def.long_name.clone(),
         author: def.author.clone(),
         run_frames: def.run_frames.clamp(1, 16),
-        sprites: file("sprites.png"),
-        front: file("front.png"),
-        side: file("side.png"),
-        start: file("start.png"),
-        sticker1: file("sticker1.png"),
-        sticker2: file("sticker2.png"),
+        sprites: file(SHEET),
     }
 }
 
@@ -671,33 +628,22 @@ async fn download(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String
     Ok(b.to_vec())
 }
 
-/// Importa un pet da un file JSON: scarica le immagini nella cartella `pets\<nome>\`
+/// Importa un pet da un file JSON: scarica il foglio sprite nella cartella `pets\<nome>\`
 /// e lo mette in uso. Restituisce il nome.
 #[tauri::command]
 pub async fn pet_import(app: AppHandle, json: String) -> Result<String, String> {
     let def = PetDef::parse(&json)?;
     let id = slug(if def.name.trim().is_empty() { &def.long_name } else { &def.name });
-    let client = reqwest::Client::builder().timeout(Duration::from_secs(30)).build().map_err(|e| e.to_string())?;
-    let mut files = Vec::new();
-    for (key, file) in FILES {
-        let url = def.url(key).trim();
-        if url.is_empty() {
-            continue;
-        }
-        if !(url.starts_with("https://") || url.starts_with("http://")) {
-            return Err(crate::tr!("\"{key}\": serve un indirizzo http(s)", "\"{key}\": an http(s) address is needed"));
-        }
-        let bytes = download(&client, url).await?;
-        if key == "urlSprites" {
-            check_sheet(&bytes, def.run_frames)?;
-        }
-        files.push((file, bytes));
+    let url = def.url_sprites.trim();
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err(crate::i18n::tr("\"urlSprites\": serve un indirizzo http(s)", "\"urlSprites\": an http(s) address is needed").into());
     }
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(30)).build().map_err(|e| e.to_string())?;
+    let bytes = download(&client, url).await?;
+    check_sheet(&bytes, def.run_frames)?;
     let dir = pets_dir(&app).join(&id);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    for (file, bytes) in files {
-        std::fs::write(dir.join(file), bytes).map_err(|e| e.to_string())?;
-    }
+    std::fs::write(dir.join(SHEET), bytes).map_err(|e| e.to_string())?;
     std::fs::write(dir.join("pet.json"), json.as_bytes()).map_err(|e| e.to_string())?;
     update_config(&app, |c| c.pet.skin = id.clone());
     let _ = app.emit("pet-assets", ());
@@ -787,9 +733,7 @@ mod tests {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../src").join(BUNDLED_DIR);
         let sheet = std::fs::read(dir.join("sprites.png")).unwrap();
         check_sheet(&sheet, 4).unwrap();
-        for (_, f) in FILES {
-            assert!(is_png(&std::fs::read(dir.join(f)).unwrap()), "{f}");
-        }
+        assert!(is_png(&sheet));
         let a = bundled();
         assert_eq!(a.sprites, "assets/pet/chihiro/sprites.png");
         assert_eq!(a.run_frames, 4);

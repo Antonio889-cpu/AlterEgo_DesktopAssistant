@@ -275,16 +275,7 @@ async function petExplore(manual = false) {
   petStarting = true;
   try {
     if (!(await invoke("pet_can_explore"))) return;
-    const a = await invoke("pet_assets");
-    // "START!": l'immagine del pet sulla TV, poi la TV si spegne ed esce lei
-    if (a.start && config?.tv_animation !== false) {
-      const box = $("pet-start");
-      box.querySelector("img").src = a.start;
-      box.classList.remove("hidden");
-      await new Promise((r) => setTimeout(r, 1250));
-      box.classList.add("hidden");
-      if (!manual && alterEgoBusy()) return; // nel frattempo le hai parlato
-    }
+    // la TV si spegne ed esce lei
     petOut = await invoke("pet_explore");
   } catch (err) {
     console.warn("pet:", err);

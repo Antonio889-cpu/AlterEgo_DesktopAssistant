@@ -266,7 +266,7 @@
     <section data-tab="pet">
       <h2>Pet</h2>
       <div class="pet-head">
-        <img id="pet-front" alt="" />
+        <canvas id="pet-preview" width="128" height="128" aria-hidden="true"></canvas>
         <div>
           <p class="note">Nei momenti di calma Alter Ego esce dalla TV e vive sul tuo desktop: cammina, salta,
             si siede sopra le finestre aperte e sulla barra delle applicazioni. Prendila col mouse per spostarla o lanciarla;
@@ -289,9 +289,9 @@
       <div class="actions"><button id="pet-go">Esplora adesso</button> <button id="pet-back">Richiama nella TV</button> <span id="pet-state" class="result"></span></div>
       <h3>Sprite del pet</h3>
       <p class="note">Il pet in uso è <b id="pet-name">Chihiro</b><span id="pet-author"></span>. Puoi importarne un altro da un file
-        <code>.json</code> con gli indirizzi delle immagini (<code>urlSprites</code>, <code>urlFront</code>, <code>urlStart</code>,
-        <code>urlSticker1</code>, <code>urlSticker2</code>…) e <code>runFrames</code>: le immagini vengono scaricate una volta
-        nella cartella dei pet. Il foglio sprite ha 2 righe di fotogrammi quadrati: fermo, fermo, salto, caduta · corsa.</p>
+        <code>.json</code> con l'indirizzo del foglio sprite (<code>urlSprites</code>) e <code>runFrames</code>: il foglio viene scaricato
+        una volta nella cartella dei pet (le altre immagini del file vengono ignorate). Il foglio ha 2 righe di fotogrammi quadrati:
+        fermo, fermo, salto, caduta · corsa.</p>
       <label>Pet in uso <select id="pet-skin"></select></label>
       <div class="actions">
         <label class="button-like">Importa pet (JSON)… <input id="pet-file" type="file" accept=".json,application/json" hidden /></label>

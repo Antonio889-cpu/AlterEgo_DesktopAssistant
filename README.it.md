@@ -517,13 +517,13 @@ python tools/process_sprites.py
 
 ## Pet
 
-Quando non succede niente, Alter Ego esce a esplorare: la TV mostra la schermata **START!**, si spegne e lei salta fuori
+Quando non succede niente, Alter Ego esce a esplorare: la TV si spegne e lei salta fuori
 come un piccolo sprite in pixel art (quello incluso è **Chihiro**). Poi vive sul tuo desktop da sola:
 
 - cammina, si ferma, salta e si lascia cadere dai bordi;
 - sta in piedi **sopra le finestre aperte** (solo sulla parte visibile del bordo in alto) e sulla **barra delle applicazioni**; se sposti la finestra su cui sta, viaggia con lei; se la chiudi o la riduci a icona, cade;
 - i bordi dello schermo sono muri, e può passare da un monitor all'altro;
-- **trascinala** col mouse e **lanciala** (rimbalza sui bordi); un **click** la fa saltare con uno sticker felice; un **doppio click** la rimanda nella TV.
+- **trascinala** col mouse e **lanciala** (rimbalza sui bordi); un **click** la fa saltare; un **doppio click** la rimanda nella TV.
 
 Rientra nella TV quando le parli (push-to-talk, box di testo), quando deve dirti qualcosa (risposte, promemoria, conferme),
 con *Mostra / nascondi* o l'icona nella tray, e da sola dopo un po'. Non esce mentre suona la musica, e si nasconde mentre un gioco o un video è a schermo intero.
@@ -531,19 +531,17 @@ con *Mostra / nascondi* o l'icona nella tray, e da sola dopo un po'. Non esce me
 *Impostazioni → Pet*: acceso/spento, dopo quanti minuti di calma può uscire, quanto spesso, quanto resta fuori, dimensione ed *Esplora adesso*.
 Nel menu della tray ci sono *Esplora il desktop* / *Richiama Alter Ego nella TV*.
 
-**Altri pet**: puoi importare un pet da un file `.json` come questo (formato "c2dictionary"):
+**Altri pet**: puoi importare un pet da un file `.json` come questo (formato "c2dictionary"). Si usa solo il foglio
+sprite in pixel art; le altre immagini del file (`urlFront`, `urlStart`, sticker…) vengono ignorate:
 
 ```json
 { "c2dictionary": true, "data": {
   "name": "Chihiro", "longName": "Chihiro Fujisaki", "author": "Lucid On Bound",
-  "urlSprites": "https://…/Sprites.png", "urlFront": "https://…/Front.png", "urlSide": "https://…/Side.png",
-  "urlStart": "https://…/Start.png", "urlSticker1": "https://…/sticker1.png", "urlSticker2": "https://…/sticker2.png",
-  "runFrames": 4 } }
+  "urlSprites": "https://…/Sprites.png", "runFrames": 4 } }
 ```
 
-Le immagini vengono scaricate una volta in `%APPDATA%\AlterEgo\pets\<nome>\`. Il foglio sprite (`urlSprites`) ha **2 righe di fotogrammi quadrati**:
+Il foglio viene scaricato una volta in `%APPDATA%\AlterEgo\pets\<nome>\`. Ha **2 righe di fotogrammi quadrati**:
 riga 1 *fermo A, fermo B, salto, caduta*, riga 2 la *corsa* (`runFrames` fotogrammi); il personaggio guarda a sinistra (verso destra viene specchiato).
-`urlFront` è l'immagine nelle Impostazioni, `urlStart` la schermata START!, `urlSticker1` la faccina felice e `urlSticker2` quella preoccupata.
 
 Su Linux usa solo il fondo dello schermo e la barra: le finestre si leggono solo su Windows.
 
@@ -713,7 +711,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - Driver di SQL Server [tiberius](https://github.com/prisma/tiberius) (MIT/Apache-2.0).
 - **VB-CABLE** di VB-Audio Software: donationware, non incluso; si scarica dal sito ufficiale.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
-- Sprite del **pet Chihiro** (foglio, ritratti, schermata START!, sticker): di **Lucid On Bound** (`src/assets/pet/chihiro/`).
+- Foglio sprite del **pet Chihiro**: di **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),
   adattato per l'app (sfondo rimosso, tinta verde CRT). Grazie, Ayari! 💚
 - Logo, sfondo a circuiti, icona e suoni sono stati creati per questo progetto.

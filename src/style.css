@@ -532,15 +532,3 @@ body.click-through #screen, body.click-through #dialog { cursor: default; }
   #root.tv-on-anim, #root.tv-off-anim { animation-duration: .01s; }
 }
 
-/* ---------- pet: "START!" prima di uscire dalla TV ---------- */
-#pet-start { position: absolute; inset: 0; z-index: 70; display: grid; place-items: center; pointer-events: none;
-  background: radial-gradient(circle, rgba(255, 255, 255, .25), transparent 70%); }
-#pet-start.hidden { display: none; }
-#pet-start img { height: 86%; image-rendering: auto; animation: pet-start 1.3s cubic-bezier(.2, 1.4, .4, 1) both; }
-@keyframes pet-start {
-  0% { transform: scale(.1) rotate(-12deg); opacity: 0; }
-  25% { transform: scale(1.08) rotate(3deg); opacity: 1; }
-  35%, 80% { transform: scale(1) rotate(0); opacity: 1; }
-  100% { transform: scale(1.6); opacity: 0; filter: brightness(2); }
-}
-@media (prefers-reduced-motion: reduce) { #pet-start img { animation-duration: .01s; } }

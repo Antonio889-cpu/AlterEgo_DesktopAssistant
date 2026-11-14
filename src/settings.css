@@ -146,5 +146,4 @@ button.small { padding: 2px 8px; font-size: 12px; }
 
 /* scheda Pet */
 .pet-head { display: flex; gap: 14px; align-items: flex-start; }
-.pet-head img { width: 96px; height: 96px; flex: none; image-rendering: auto; border-radius: 8px; }
-.pet-head img:not([src]), .pet-head img[src=""] { visibility: hidden; }
+.pet-head canvas { width: 96px; height: 96px; flex: none; image-rendering: pixelated; }

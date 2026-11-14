@@ -9,18 +9,15 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
-const W = 128, H = 168, F = 128; // canvas e fotogramma (pixel dello sprite)
+const W = 128, H = 136, F = 128; // canvas e fotogramma (pixel dello sprite)
 const cv = document.getElementById("pet");
 const ctx = cv.getContext("2d");
-const bubble = document.getElementById("bubble");
-const sticker = document.getElementById("sticker");
 
 let sheet = null;
 let frame = 128;         // lato di un fotogramma nel foglio
 let runFrames = 4;
 let align = [];          // per fotogramma: spostamento verticale per avere i piedi sul fondo
 let shiftX = 0;          // centratura orizzontale comune
-let stickers = { 1: "", 2: "" };
 let anim = "fall";
 let right = false;
 let since = performance.now();
@@ -126,24 +123,8 @@ async function load() {
     return;
   }
   frame = sheet.naturalHeight / 2;
-  stickers = { 1: a.sticker1, 2: a.sticker2 };
   measure();
   lastKey = "";
-}
-
-// ---------- sticker ----------
-let bubbleTimer = null;
-function showSticker(n) {
-  const src = stickers[n];
-  if (!src) return;
-  clearTimeout(bubbleTimer);
-  sticker.src = src;
-  bubble.classList.remove("hidden", "out");
-  void bubble.offsetWidth;
-  bubbleTimer = setTimeout(() => {
-    bubble.classList.add("out");
-    bubbleTimer = setTimeout(() => bubble.classList.add("hidden"), 300);
-  }, n === 1 ? 1600 : 2200);
 }
 
 // ---------- eventi dal backend ----------
@@ -161,7 +142,6 @@ listen("pet-anim", (e) => {
   document.body.classList.toggle("held", anim === "held");
   if (prev === "fall" && (anim === "idle" || anim === "run")) flash("land", 220);
 });
-listen("pet-sticker", (e) => showSticker(e.payload));
 listen("pet-spawn", () => { anim = "jump"; since = performance.now(); flash("spawn", 450); });
 listen("pet-assets", () => load());
 listen("config", (e) => I18N.setLang(I18N.resolve(e.payload.ui_language)));

@@ -599,9 +599,24 @@ function petState(active) {
   $("pet-go").disabled = active;
   $("pet-back").disabled = !active;
 }
+/** Anteprima: il primo fotogramma del foglio sprite (fermo), in pixel art. */
+function drawPetPreview(src) {
+  const cv = $("pet-preview");
+  const g = cv.getContext("2d");
+  g.clearRect(0, 0, cv.width, cv.height);
+  if (!src) return;
+  const img = new Image();
+  img.onload = () => {
+    const f = img.naturalHeight / 2;
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, cv.width, cv.height);
+    g.drawImage(img, 0, 0, f, f, 0, 0, cv.width, cv.height);
+  };
+  img.src = src;
+}
 async function refreshPet() {
   const [a, list] = await Promise.all([invoke("pet_assets"), invoke("pet_list")]);
-  $("pet-front").src = a.front || a.side || "";
+  drawPetPreview(a.sprites);
   $("pet-name").textContent = a.longName || a.name || "?";
   $("pet-author").textContent = a.author ? t(" (sprite di {a})", { a: a.author }) : "";
   const sel = $("pet-skin");
@@ -618,7 +633,7 @@ $("pet-file").onchange = async (e) => {
   const f = e.target.files[0];
   e.target.value = "";
   if (!f) return;
-  petResult(t("scarico le immagini…"));
+  petResult(t("scarico il foglio sprite…"));
   try {
     const name = await invoke("pet_import", { json: await f.text() });
     petResult(t("importato: {name} ✓", { name }), "ok");
