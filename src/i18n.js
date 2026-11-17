@@ -713,8 +713,8 @@ const I18N = (() => {
       "Can write Lua scripts for long jobs (they run in a sandbox: only her actions, no files or console)",
     "Commenti spontanei": "Spontaneous comments", "Mai": "Never", "Pochi": "Few", "Normali": "Normal", "Tanti": "Many",
     "Nome nel gioco": "In-game name", "Modello del personaggio": "Character model",
-    "Serve un modello NPC (con le animazioni da NPC): molti modelli «playermodel» restano fermi in posa a T.":
-      "It needs an NPC model (with NPC animations): many “playermodels” stay frozen in a T-pose.",
+    "Più comodo dal gioco: tieni premuto C → icona «Alter Ego» e scegli tra i playermodel installati (con anteprima). Vanno bene sia i playermodel sia i modelli NPC.":
+      "Easier from the game: hold C → “Alter Ego” icon and pick one of the installed playermodels (with preview). Both playermodels and NPC models work.",
     "Cartella di Garry's Mod": "Garry's Mod folder", "trovata da sola (gioco aperto o libreria Steam)": "found automatically (open game or Steam library)",
     "Garry's Mod non trovato: indica la cartella qui sotto": "Garry's Mod not found: enter the folder below",
     "Alter Ego è nel gioco ✓": "Alter Ego is in the game ✓", "Gioco collegato ✓ (lei non è ancora entrata)": "Game linked ✓ (she hasn't joined yet)",

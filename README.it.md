@@ -533,7 +533,7 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
 - L'app e il gioco si parlano con due file in `garrysmod/data/alterego/`: niente opzioni di avvio né moduli binari.
   Single player e server che ospiti tu (l'addon deve girare sul server).
 - Usa la modalità video **finestra senza bordi**: un gioco a schermo intero esclusivo copre ogni altra finestra.
-- Modello del personaggio: funziona meglio un modello NPC (i playermodel spesso restano in posa a T); di base è una cittadina di Half-Life 2.
+- Modello del personaggio: nel gioco tieni premuto **C** → **Alter Ego** e scegli uno dei playermodel installati (con anteprima), oppure «come il mio». Il playermodel viene incollato (bonemerge) su un corpo NPC invisibile, così si anima bene; vanno bene anche i modelli NPC. Di base è una cittadina di Half-Life 2.
 
 ## Pet
 

@@ -61,7 +61,8 @@ function E:SetSchedule(s)
 end
 for _, n in ipairs({ "Activate", "SetKeyValue", "SetName", "SetMaxHealth",
   "SetIdealYawAndUpdate", "SetEyeTarget", "AddEntityRelationship", "SetEnemy", "UpdateEnemyMemory", "AddGestureSequence",
-  "SetFlexWeight", "EmitSound" }) do E[n] = rec(n) end
+  "SetFlexWeight", "EmitSound", "SetRenderMode", "SetColor", "DrawShadow", "AddEffects", "SetNotSolid" }) do E[n] = rec(n) end
+function E:SetParent(p) self.parent = p end
 function E:SetVelocity(v) self.vel = v end
 function E:Spawn() self.spawned = true end
 function E:Remove() self.alive = false MOCK.ents[self.id] = nil end
@@ -108,6 +109,7 @@ end
 -- giocatori
 function E:Nick() return self.name end
 function E:IsListenServerHost() return self.host end
+function E:IsSuperAdmin() return false end
 function E:Alive() return self.hp > 0 end
 function E:GetEyeTrace() return { HitPos = self.pos + Vector(300, 0, 0), Entity = self.lookAt } end
 
@@ -131,7 +133,17 @@ timer = {
 }
 concommand = { Add = function() end }
 net = { Start = function(n) MOCK.netmsg = { n } end, WriteString = function(s) table.insert(MOCK.netmsg, s) end,
-  Broadcast = function() MOCK.net[#MOCK.net + 1] = MOCK.netmsg end }
+  Broadcast = function() MOCK.net[#MOCK.net + 1] = MOCK.netmsg end,
+  Receive = function(n, f) MOCK.receivers = MOCK.receivers or {} MOCK.receivers[n] = f end,
+  ReadString = function() return table.remove(MOCK.incoming, 1) end }
+--- Messaggio dal client (menu) come se l'avesse mandato `ply`.
+function MOCK.fromClient(name, ply, ...)
+  MOCK.incoming = { ... }
+  MOCK.receivers[name](0, ply)
+end
+function Color(r, g, b, a) return { r = r, g = g, b = b, a = a } end
+player_manager = { AllValidModels = function() return { chihiro = "models/dr/chihiro.mdl" } end }
+RENDERMODE_NORMAL, RENDERMODE_TRANSALPHA, EF_BONEMERGE = 0, 4, 1
 util = {
   AddNetworkString = function() end, Effect = function() end, IsValidModel = function() return true end,
   TraceLine = function(t) return { HitPos = t.endpos } end,
