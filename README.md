@@ -532,7 +532,7 @@ Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Se
 - The app and the game talk through two files in `garrysmod/data/alterego/`: no launch options, no binary modules.
   Single player and servers you host (the addon has to run on the server).
 - Use the **borderless window** video mode: an exclusive full-screen game hides every other window.
-- Character model: an NPC model works best (playermodels often stay in a T-pose); by default she's a Half-Life 2 citizen.
+- Character model: in the game hold **C** → **Alter Ego** and pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default she's a Half-Life 2 citizen.
 
 ## Pet
 

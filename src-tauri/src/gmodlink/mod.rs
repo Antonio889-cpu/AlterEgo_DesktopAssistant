@@ -496,6 +496,21 @@ fn on_event(app: &AppHandle, e: Value) {
         "hurt" => comment(app, &format!("[event] {} hit you ({} damage)", s("by"), e["dmg"]), false),
         "died" => comment(app, &format!("[event] you were killed by {}; you'll respawn in a moment", s("by")), false),
         "player_died" => comment(app, &format!("[event] {} died ({})", s("who"), s("by")), false),
+        // scelti nel menu del gioco (C → Alter Ego): si salvano nelle impostazioni
+        "model" => {
+            let m = s("model");
+            update_config(app, |c| c.gmodlink.model = m);
+            lock(app).dirty = true;
+        }
+        "name" => {
+            let n = s("name");
+            if !n.trim().is_empty() {
+                update_config(app, |c| {
+                    c.gmodlink.name = n;
+                    c.gmodlink.normalize();
+                });
+            }
+        }
         "joined" | "left" => {
             let _ = app.emit("gmod-link", kind);
         }

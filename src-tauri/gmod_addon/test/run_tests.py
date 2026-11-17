@@ -83,7 +83,23 @@ with open(os.path.join(ROOT, "test", "sample_state.json"), "w") as f:
 # configurazione dall'app (nome, modello)
 G.MOCK.files["alterego/cmd.json"] = json.dumps({"t": int(__import__("time").time()), "cmds": [], "config": {"name": "Chihiro", "model": "models/x.mdl", "auto_join": True, "tasks": True}})
 L.execute("MOCK.advance(0.3)")
-check(L.eval("AELink.name") == "Chihiro" and L.eval("AELink.bot.model") == "models/x.mdl", "nome e modello dalle impostazioni")
+check(L.eval("AELink.name") == "Chihiro" and L.eval("AELink.model") == "models/x.mdl", "nome e modello dalle impostazioni")
+
+# menu C: playermodel scelto nel gioco → NPC invisibile + playermodel incollato sopra
+L.execute('MOCK.fromClient("alterego_menu", Entity(%d), "model", "models/dr/chihiro.mdl")' % host.id)
+skin = L.eval("AELink.bot.AESkin")
+check(skin is not None and skin.model == "models/dr/chihiro.mdl" and L.eval("AELink.bot.AESkin.parent == AELink.bot"), "playermodel incollato sull'NPC")
+L.execute("MOCK.advance(1.2)")
+check(any(e["kind"] == "model" and e["model"] == "models/dr/chihiro.mdl" for e in state()["events"]), "evento model per l'app")
+# l'app ha ancora il vecchio modello nelle impostazioni: non deve sovrascrivere la scelta del menu
+G.MOCK.files["alterego/cmd.json"] = json.dumps({"t": int(__import__("time").time()), "cmds": [], "config": {"model": "models/x.mdl"}})
+L.execute("MOCK.advance(0.3)")
+check(L.eval("AELink.model") == "models/dr/chihiro.mdl", "la scelta del menu non viene sovrascritta")
+# un modello NPC va direttamente sul corpo
+L.execute('MOCK.fromClient("alterego_menu", Entity(%d), "model", "models/humans/group02/female_02.mdl")' % host.id)
+check(L.eval("AELink.bot.AESkin") is None and L.eval("AELink.bot.model") == "models/humans/group02/female_02.mdl", "modello NPC direttamente sul corpo")
+L.execute('MOCK.fromClient("alterego_menu", Entity(%d), "name", "Chihiro")' % host.id)
+check(L.eval("AELink.bot.nw.AEName") == "Chihiro", "nome dal menu")
 
 # comandi
 send([{"id": 1, "op": "say", "text": "Ciao!"}, {"id": 2, "op": "spawn", "what": "crate", "n": 2}, {"id": 3, "op": "gesture", "name": "wave"}])

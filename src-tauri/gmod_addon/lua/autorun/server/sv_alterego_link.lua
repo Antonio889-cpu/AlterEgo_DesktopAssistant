@@ -16,6 +16,7 @@ L.DIR = "alterego"
 
 local Sandbox = include("alterego/sandbox.lua")
 util.AddNetworkString("alterego_chat")
+util.AddNetworkString("alterego_menu")
 
 -- ---------- stato ----------
 L.bot = L.bot or nil
@@ -27,7 +28,7 @@ L.events = L.events or {}
 L.seq = L.seq or 0
 L.lastCmd = L.lastCmd or -1
 L.linkedAt = 0                       -- ultimo battito dell'app (os.time)
-L.model = "models/humans/group01/female_01.mdl"
+L.model = ""                         -- vuoto = cittadina di Half-Life 2
 L.name = "Alter Ego"
 L.autoJoin = true
 L.allowTasks = true
@@ -142,6 +143,53 @@ end
 L.resolve = resolve
 
 -- ---------- corpo ----------
+-- Il corpo che si muove è un npc_citizen (navigazione, armi, animazioni da NPC). Se il modello
+-- scelto è un playermodel (senza animazioni da NPC) l'NPC resta invisibile e il playermodel gli
+-- viene "incollato" sopra (bonemerge): stesso scheletro ValveBiped, ne copia le animazioni.
+local function isPlayerModel(m)
+  m = tostring(m or ""):lower()
+  if m:find("/player/", 1, true) then return true end
+  for _, v in pairs(player_manager and player_manager.AllValidModels() or {}) do
+    if v:lower() == m then return true end
+  end
+  return false
+end
+L.isPlayerModel = isPlayerModel
+
+function L.applyModel(bot, model)
+  if not IsValid(bot) then return end
+  if IsValid(bot.AESkin) then bot.AESkin:Remove() end
+  bot.AESkin = nil
+  if not model or model == "" or not util.IsValidModel(model) then
+    bot:SetModel("models/humans/group01/female_01.mdl")
+    bot:SetRenderMode(RENDERMODE_NORMAL)
+    bot:SetColor(Color(255, 255, 255, 255))
+    return
+  end
+  if not isPlayerModel(model) then
+    bot:SetModel(model)
+    bot:SetRenderMode(RENDERMODE_NORMAL)
+    bot:SetColor(Color(255, 255, 255, 255))
+    return
+  end
+  bot:SetModel("models/humans/group01/female_01.mdl")
+  -- invisibile ma "disegnato" (le ossa servono al bonemerge)
+  bot:SetRenderMode(RENDERMODE_TRANSALPHA)
+  bot:SetColor(Color(255, 255, 255, 0))
+  bot:DrawShadow(false)
+  local skin = ents.Create("prop_dynamic")
+  if not IsValid(skin) then return end
+  skin:SetModel(model)
+  skin:SetPos(bot:GetPos())
+  skin:SetAngles(bot:GetAngles())
+  skin:SetParent(bot)
+  skin:Spawn()
+  skin:AddEffects(EF_BONEMERGE)
+  skin:SetNotSolid(true)
+  skin:SetNWBool("AESkin", true)
+  bot.AESkin = skin
+  bot:SetNWEntity("AESkinEnt", skin)
+end
 local function relate(bot)
   for _, p in ipairs(player.GetAll()) do
     pcall(bot.AddEntityRelationship, bot, p, D_LI, 99)
@@ -166,7 +214,7 @@ function L.join(model, name)
   bot:SetKeyValue("spawnflags", tostring(1048576 + 8192))
   bot:Spawn()
   bot:Activate()
-  if util.IsValidModel(L.model) then bot:SetModel(L.model) end
+  L.applyModel(bot, L.model)
   bot:SetName("alterego")
   bot:SetNWString("AEName", L.name)
   bot:SetNWBool("AELink", true)
@@ -563,9 +611,12 @@ OPS.cancel = function(c)
   if c.name and c.name ~= "" and c.name ~= "all" then Sandbox.cancel(c.name, "cancelled") else Sandbox.cancel_all("cancelled") end
 end
 OPS.config = function(c)
-  if c.model and c.model ~= "" then
+  -- il modello scelto nel menu del gioco vale più di quello delle impostazioni (finché l'app non si aggiorna)
+  if c.model and c.model ~= "" and c.model ~= L.model and not L.menuModel then
     L.model = c.model
-    if botOk() and util.IsValidModel(c.model) then L.bot:SetModel(c.model) end
+    if botOk() then L.applyModel(L.bot, c.model) end
+  elseif L.menuModel and c.model == L.menuModel then
+    L.menuModel = nil
   end
   if c.name and c.name ~= "" then L.name = c.name end
   if c.auto_join ~= nil then L.autoJoin = c.auto_join end
@@ -665,11 +716,13 @@ local function brain()
   local now = CurTime()
   holdTick()
   -- bocca mentre parla
-  local fid = L.bot:GetFlexIDByName("jaw_drop")
-  if fid then
-    local open = 0
-    if now < L.speakUntil then open = math.Clamp(math.abs(math.sin(now * 12)) * 0.6 + math.abs(math.sin(now * 20.7)) * 0.3, 0, 1) end
-    L.bot:SetFlexWeight(fid, open)
+  local open = 0
+  if now < L.speakUntil then open = math.Clamp(math.abs(math.sin(now * 12)) * 0.6 + math.abs(math.sin(now * 20.7)) * 0.3, 0, 1) end
+  for _, ent in ipairs({ L.bot, L.bot.AESkin }) do
+    if IsValid(ent) then
+      local fid = ent:GetFlexIDByName("jaw_drop")
+      if fid then ent:SetFlexWeight(fid, open) end
+    end
   end
   if now < nextBrain then return end
   nextBrain = now + 0.5
@@ -789,6 +842,30 @@ L.leave = function(...) L.left = true return leave(...) end
 L.join = function(...) L.left = false return join(...) end
 OPS.leave = function() L.leave() end
 OPS.join = function(c) L.join(c.model, c.name) end
+
+-- menu "Alter Ego" nel menu contestuale (C): modello, nome, entra/esci
+net.Receive("alterego_menu", function(_, ply)
+  if not IsValid(ply) or not (ply == host() or ply:IsSuperAdmin()) then return end
+  local what = net.ReadString()
+  local arg = net.ReadString()
+  if what == "model" then
+    arg = arg:sub(1, 200)
+    if arg ~= "" and not util.IsValidModel(arg) then return end
+    L.model = arg
+    L.menuModel = arg
+    if botOk() then L.applyModel(L.bot, arg) end
+    L.event("model", { model = arg })
+  elseif what == "name" then
+    arg = arg:gsub("[%c]", ""):sub(1, 32)
+    if arg ~= "" then
+      L.name = arg
+      if IsValid(L.bot) then L.bot:SetNWString("AEName", arg) end
+      L.event("name", { name = arg })
+    end
+  elseif what == "join" then L.join()
+  elseif what == "leave" then L.leave()
+  end
+end)
 
 concommand.Add("alterego_join", function(ply) if not IsValid(ply) or ply == host() then L.join() end end)
 concommand.Add("alterego_leave", function(ply) if not IsValid(ply) or ply == host() then L.leave() end end)
