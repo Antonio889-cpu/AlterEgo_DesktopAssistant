@@ -199,7 +199,11 @@ pub struct SttConfig {
     pub model: String,
     /// Server Whisper locale compatibile OpenAI (solo provider "local").
     pub base_url: String,
+    /// Lingua parlata ("it", "en"…); vuota = come la lingua delle risposte.
     pub language: String,
+    /// true dopo il passaggio al nuovo predefinito (lingua automatica). Manca nei file vecchi → false.
+    #[serde(default)]
+    pub auto_lang: bool,
     /// Se il primo fallisce: "none", "groq", "gemini" o "local".
     pub fallback: String,
     /// Modello Gemini per la trascrizione (chiavi Gemini).
@@ -212,7 +216,8 @@ impl Default for SttConfig {
             provider: "groq".into(),
             model: "whisper-large-v3-turbo".into(),
             base_url: "http://localhost:8000/v1".into(),
-            language: "it".into(),
+            language: String::new(),
+            auto_lang: true,
             fallback: "gemini".into(),
             gemini_model: "gemini-2.5-flash".into(),
         }
@@ -724,6 +729,44 @@ impl Default for ExtrasConfig {
     }
 }
 
+/// Garry's Mod sandbox: Alter Ego entra nel gioco con l'addon Alter Ego Link (vedi gmodlink/).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct GmodLinkConfig {
+    pub enabled: bool,
+    /// Entra da sola quando carichi una mappa (con l'app aperta).
+    pub auto_join: bool,
+    /// Commenti spontanei sugli eventi: "off", "low", "normal", "often".
+    pub chatter: String,
+    /// Può scrivere piccoli script Lua per i compiti lunghi.
+    pub tasks: bool,
+    /// Modello del personaggio (vuoto = cittadina di Half-Life 2).
+    pub model: String,
+    /// Nome sopra la testa e in chat.
+    pub name: String,
+    /// Cartella di Garry's Mod (vuota = trovata da sola).
+    pub dir: String,
+}
+
+impl Default for GmodLinkConfig {
+    fn default() -> Self {
+        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new() }
+    }
+}
+
+impl GmodLinkConfig {
+    pub fn normalize(&mut self) {
+        if !["off", "low", "normal", "often"].contains(&self.chatter.as_str()) {
+            self.chatter = "low".into();
+        }
+        self.name = self.name.trim().chars().take(32).collect();
+        if self.name.is_empty() {
+            self.name = "Alter Ego".into();
+        }
+        self.model = self.model.trim().replace('\\', "/").chars().take(200).collect();
+    }
+}
+
 /// Pet: Alter Ego esce dalla TV e gira per il desktop nei momenti di calma (vedi pet/).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
@@ -812,12 +855,15 @@ pub struct Config {
     pub spotify: SpotifyConfig,
     /// Reagisce ai suoni di Garry's Mod (Shinri Trial) ascoltando l'audio del PC (spento di default).
     pub gmod: bool,
+    /// Suoni di Shinri Trial a cui NON reagire (es. "hurt"): vuoto = tutti.
+    pub gmod_off: Vec<String>,
     pub rizzo: RizzoConfig,
     /// Hermes Agent come "cervello": ogni messaggio va a Hermes (spento di default).
     pub hermes_brain: bool,
     pub sql: SqlConfig,
     pub local: LocalConfig,
     pub pet: PetConfig,
+    pub gmodlink: GmodLinkConfig,
     pub extras: ExtrasConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
@@ -856,11 +902,13 @@ impl Default for Config {
             saving: SavingConfig::default(),
             spotify: SpotifyConfig::default(),
             gmod: false,
+            gmod_off: Vec::new(),
             rizzo: RizzoConfig::default(),
             hermes_brain: false,
             sql: SqlConfig::default(),
             local: LocalConfig::default(),
             pet: PetConfig::default(),
+            gmodlink: GmodLinkConfig::default(),
             extras: ExtrasConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
@@ -872,6 +920,13 @@ impl Default for Config {
 
 impl Config {
     pub fn normalize_voice(&mut self) {
+        // 1.10: la trascrizione segue la lingua delle risposte (il vecchio "it" fisso era solo il predefinito)
+        if !self.stt.auto_lang {
+            if self.stt.language.trim() == "it" {
+                self.stt.language.clear();
+            }
+            self.stt.auto_lang = true;
+        }
         if !["auto", "it", "it_en", "en"].contains(&self.language.as_str()) {
             self.language = "it".into();
         }
@@ -932,6 +987,7 @@ pub fn load(path: &Path) -> Config {
             cfg.ai.normalize();
             cfg.normalize_voice();
             cfg.pet.normalize();
+            cfg.gmodlink.normalize();
             cfg.auto_advance_secs = cfg.auto_advance_secs.clamp(0.5, 30.0);
             cfg.music.player_width = cfg.music.player_width.clamp(crate::music::PLAYER_MIN_W, crate::music::PLAYER_MAX_W);
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {

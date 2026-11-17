@@ -62,9 +62,9 @@ pub fn note(apps: &[String], fg: Option<&str>) -> String {
     if apps.is_empty() {
         return String::new();
     }
-    let mut s = format!("\n\n[Contesto automatico, non scritto dall'utente — app aperte sul PC: {}", apps.join(", "));
+    let mut s = format!("\n\n[Automatic context, not written by the user — apps open on the PC: {}", apps.join(", "));
     if let Some(f) = fg {
-        s.push_str(&format!("; in primo piano: {f}"));
+        s.push_str(&format!("; in the foreground: {f}"));
     }
     s.push(']');
     s
@@ -195,6 +195,6 @@ mod tests {
         assert_eq!(friendly("keepassxc"), "Keepassxc");
         assert_eq!(note(&[], None), "");
         let n = note(&["Chrome".into(), "Discord".into()], Some("Chrome"));
-        assert!(n.contains("app aperte sul PC: Chrome, Discord; in primo piano: Chrome]"), "{n}");
+        assert!(n.contains("apps open on the PC: Chrome, Discord; in the foreground: Chrome]"), "{n}");
     }
 }

@@ -88,19 +88,19 @@ pub fn request() -> Result<(), String> {
     unsafe {
         ShellExecuteExW(&mut info).map_err(|_| "permesso di amministratore negato".to_string())?;
         if info.hProcess.is_invalid() {
-            return Err("processo di rinomina non avviato".into());
+            return Err(crate::i18n::tr("processo di rinomina non avviato", "rename process not started").into());
         }
         let wait = WaitForSingleObject(info.hProcess, 30_000);
         let mut code = 1u32;
         let _ = GetExitCodeProcess(info.hProcess, &mut code);
         let _ = CloseHandle(info.hProcess);
         if wait != WAIT_OBJECT_0 {
-            return Err("la rinomina non ha risposto in tempo".into());
+            return Err(crate::i18n::tr("la rinomina non ha risposto in tempo", "the rename didn't answer in time").into());
         }
         match code {
             0 => Ok(()),
-            2 => Err("cavo VB-CABLE non trovato: installalo e riprova".into()),
-            _ => Err("rinomina non riuscita".into()),
+            2 => Err(crate::i18n::tr("cavo VB-CABLE non trovato: installalo e riprova", "VB-CABLE not found: install it and try again").into()),
+            _ => Err(crate::i18n::tr("rinomina non riuscita", "rename failed").into()),
         }
     }
 }

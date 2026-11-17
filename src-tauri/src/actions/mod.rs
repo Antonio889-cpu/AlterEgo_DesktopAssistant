@@ -65,84 +65,84 @@ pub fn tool_defs(p: &Permissions) -> Option<Value> {
     if p.hermes && crate::hermes::find().is_some() {
         t.push(func(
             "hermes_task",
-            "Delega a Hermes Agent (agente autonomo installato su questo PC, con i suoi strumenti, memoria e skill) un compito lungo o in molti passi: ricerche approfondite, progetti di codice, automazioni. Chiede conferma all'utente. Restituisce la risposta finale di Hermes, da riassumere all'utente.",
-            obj(json!({ "task": { "type": "string", "description": "il compito, completo e autosufficiente (Hermes non vede questa conversazione)" } }), &["task"]),
+            "Delegates to Hermes Agent (an autonomous agent installed on this PC, with its own tools, memory and skills) a long or multi-step task: in-depth research, code projects, automations. Asks the user for confirmation. Returns Hermes's final answer, to summarize for the user.",
+            obj(json!({ "task": { "type": "string", "description": "the task, complete and self-contained (Hermes doesn't see this conversation)" } }), &["task"]),
         ));
     }
     if p.open {
         let names: Vec<_> = p.open_allowlist.iter().map(|n| n.name.as_str()).collect();
         t.push(func(
             "open_target",
-            &format!("Apre un programma o un sito. Nomi consentiti: {}. In alternativa un URL https (chiede conferma).", if names.is_empty() { "(nessuno)".into() } else { names.join(", ") }),
+            &format!("Opens a program or a website. Allowed names: {}. Alternatively an https URL (asks for confirmation).", if names.is_empty() { "(none)".into() } else { names.join(", ") }),
             obj(json!({ "target": { "type": "string" } }), &["target"]),
         ));
     }
     if p.files && (p.files_all || !p.folders.is_empty()) {
         let where_ = if p.files_all {
-            format!("Qualsiasi percorso del PC (cartella utente: {}).", terminal::cwd().display())
+            format!("Any path on the PC (user folder: {}).", terminal::cwd().display())
         } else {
-            format!("Solo dentro: {}.", p.folders.join("; "))
+            format!("Only inside: {}.", p.folders.join("; "))
         };
-        let path = json!({ "type": "string", "description": "percorso assoluto" });
-        t.push(func("list_dir", &format!("Elenca i file di una cartella (con dimensione). {where_}"), obj(json!({ "path": path }), &["path"])));
+        let path = json!({ "type": "string", "description": "absolute path" });
+        t.push(func("list_dir", &format!("Lists the files in a folder (with size). {where_}"), obj(json!({ "path": path }), &["path"])));
         t.push(func(
             "read_file",
-            &format!("Legge un file di testo, al massimo 20 000 caratteri per volta: per i file lunghi usa offset (carattere di partenza) e limit. {where_}"),
+            &format!("Reads a text file, at most 20 000 characters at a time: for long files use offset (starting character) and limit. {where_}"),
             obj(json!({ "path": path, "offset": { "type": "integer", "minimum": 0 }, "limit": { "type": "integer", "minimum": 200, "maximum": 20000 } }), &["path"]),
         ));
         t.push(func(
             "write_file",
-            &format!("Scrive (o aggiunge a) un file di testo; crea le cartelle mancanti. {where_}"),
+            &format!("Writes (or appends to) a text file; creates missing folders. {where_}"),
             obj(json!({ "path": path, "content": { "type": "string" }, "append": { "type": "boolean" } }), &["path", "content"]),
         ));
-        t.push(func("delete_file", &format!("Elimina un file (chiede sempre conferma). {where_}"), obj(json!({ "path": path }), &["path"])));
+        t.push(func("delete_file", &format!("Deletes a file (always asks for confirmation). {where_}"), obj(json!({ "path": path }), &["path"])));
         t.push(func(
             "find_files",
-            &format!("Cerca file e cartelle per nome (anche parziale, senza distinzione di maiuscole) dentro una cartella e le sue sottocartelle. {where_}"),
+            &format!("Finds files and folders by name (partial, case-insensitive) in a folder and its subfolders. {where_}"),
             obj(json!({ "path": path, "name": { "type": "string" }, "max": { "type": "integer", "minimum": 1, "maximum": 200 } }), &["path", "name"]),
         ));
-        t.push(func("make_dir", &format!("Crea una cartella (e quelle mancanti nel percorso). {where_}"), obj(json!({ "path": path }), &["path"])));
+        t.push(func("make_dir", &format!("Creates a folder (and any missing parents). {where_}"), obj(json!({ "path": path }), &["path"])));
         t.push(func(
             "move_path",
-            &format!("Sposta o rinomina un file o una cartella (chiede conferma). {where_}"),
+            &format!("Moves or renames a file or folder (asks for confirmation). {where_}"),
             obj(json!({ "from": path, "to": path }), &["from", "to"]),
         ));
     }
     if p.reminders {
         t.push(func(
             "set_reminder",
-            "Crea un promemoria/timer: notifica del sistema dopo N minuti.",
+            "Creates a reminder/timer: system notification after N minutes.",
             obj(json!({ "text": { "type": "string" }, "minutes": { "type": "integer", "minimum": 1, "maximum": 10080 } }), &["text", "minutes"]),
         ));
-        t.push(func("list_reminders", "Elenca i promemoria in attesa.", obj(json!({}), &[])));
-        t.push(func("cancel_reminder", "Annulla un promemoria.", obj(json!({ "id": { "type": "integer" } }), &["id"])));
+        t.push(func("list_reminders", "Lists pending reminders.", obj(json!({}), &[])));
+        t.push(func("cancel_reminder", "Cancels a reminder.", obj(json!({ "id": { "type": "integer" } }), &["id"])));
     }
     if p.clipboard {
-        t.push(func("read_clipboard", "Legge il testo negli appunti (chiede conferma).", obj(json!({}), &[])));
-        t.push(func("write_clipboard", "Copia un testo negli appunti.", obj(json!({ "text": { "type": "string" } }), &["text"])));
+        t.push(func("read_clipboard", "Reads the clipboard text (asks for confirmation).", obj(json!({}), &[])));
+        t.push(func("write_clipboard", "Copies text to the clipboard.", obj(json!({ "text": { "type": "string" } }), &["text"])));
     }
     if p.screen {
         let (gw, gh, _) = input::grid();
         t.push(func(
             "take_screenshot",
-            &format!("Fa uno screenshot dello schermo ({gw}x{gh}) per guardarlo (chiede conferma). {} Con wait aspetta prima di scattare (pagine o app che stanno ancora caricando).", if p.input_grid { "Ha righelli numerati (coordinate x in alto, y a sinistra, linee tratteggiate) e il cursore cerchiato in rosso." } else { "" }),
-            obj(json!({ "wait": { "type": "integer", "minimum": 0, "maximum": 20, "description": "secondi da aspettare prima dello screenshot (0 = subito)" } }), &[]),
+            &format!("Takes a screenshot ({gw}x{gh}) to look at the screen (asks for confirmation). {} wait = seconds to wait first (pages or apps still loading).", if p.input_grid { "It has numbered rulers (x on top, y on the left, dashed lines) and the cursor circled in red." } else { "" }),
+            obj(json!({ "wait": { "type": "integer", "minimum": 0, "maximum": 20, "description": "seconds to wait before the screenshot (0 = now)" } }), &[]),
         ));
         t.push(func(
             "zoom_screen",
-            "Ingrandisce una zona dello schermo (coordinate della griglia degli screenshot) con i pixel veri: per leggere testo piccolo o trovare il punto esatto di un pulsante. I righelli dello zoom mostrano le coordinate della griglia da usare per cliccare.",
+            "Zooms into an area of the screen (screenshot grid coordinates) at real pixels: to read small text or find the exact spot of a button. The zoom rulers show the grid coordinates to click.",
             obj(json!({ "x": { "type": "integer" }, "y": { "type": "integer" }, "width": { "type": "integer", "minimum": 20 }, "height": { "type": "integer", "minimum": 12 } }), &["x", "y", "width", "height"]),
         ));
     }
     if p.volume {
         t.push(func(
             "set_volume",
-            "Alza, abbassa o silenzia il volume. Ogni step ≈ 2%.",
+            "Raises, lowers or mutes the volume. Each step ≈ 2%.",
             obj(json!({ "action": { "type": "string", "enum": ["up", "down", "mute"] }, "steps": { "type": "integer", "minimum": 1, "maximum": 25 } }), &["action"]),
         ));
         t.push(func(
             "set_brightness",
-            "Imposta la luminosità dello schermo (solo schermi di portatili).",
+            "Sets the screen brightness (laptop screens only).",
             obj(json!({ "level": { "type": "integer", "minimum": 0, "maximum": 100 } }), &["level"]),
         ));
     }
@@ -150,7 +150,7 @@ pub fn tool_defs(p: &Permissions) -> Option<Value> {
         let names: Vec<_> = p.commands.iter().map(|c| c.name.clone()).collect();
         t.push(func(
             "run_command",
-            "Esegue un comando dalla lista consentita (chiede conferma).",
+            "Runs a command from the allowed list (asks for confirmation).",
             obj(json!({ "name": { "type": "string", "enum": names } }), &["name"]),
         ));
     }
@@ -162,9 +162,9 @@ pub fn tool_defs(p: &Permissions) -> Option<Value> {
             obj(
                 json!({
                     "shell": { "type": "string", "enum": shells },
-                    "command": { "type": "string", "description": "comando completo, non interattivo (niente prompt o editor)" },
-                    "cwd": { "type": "string", "description": "cartella in cui eseguire (facoltativa; resta per i comandi successivi)" },
-                    "timeout": { "type": "integer", "minimum": 5, "description": format!("secondi, massimo {}", p.terminal_timeout) }
+                    "command": { "type": "string", "description": "full non-interactive command (no prompts or editors)" },
+                    "cwd": { "type": "string", "description": "folder to run in (optional; kept for the next commands)" },
+                    "timeout": { "type": "integer", "minimum": 5, "description": format!("seconds, max {}", p.terminal_timeout) }
                 }),
                 &["command"],
             ),
@@ -173,57 +173,57 @@ pub fn tool_defs(p: &Permissions) -> Option<Value> {
     if p.web {
         t.push(func(
             "web_search",
-            "Cerca sul web (notizie, fatti recenti, informazioni che non conosci). Restituisce titoli, link ed estratti.",
-            obj(json!({ "query": { "type": "string", "description": "massimo 128 caratteri; operatori site: e \"frase\" ammessi" },
+            "Searches the web (news, recent facts, things you don't know). Returns titles, links and snippets.",
+            obj(json!({ "query": { "type": "string", "description": "max 128 characters; site: and \"phrase\" operators allowed" },
                         "count": { "type": "integer", "minimum": 1, "maximum": 10 } }), &["query"]),
         ));
-        t.push(func("web_fetch", "Legge il contenuto di una pagina web (in Markdown).", obj(json!({ "url": { "type": "string" } }), &["url"])));
+        t.push(func("web_fetch", "Reads a web page's content (as Markdown).", obj(json!({ "url": { "type": "string" } }), &["url"])));
     }
     if p.music {
         t.push(func(
             "play_music",
-            "Cerca un brano (YouTube nel lettore di Alter Ego, oppure Spotify se scelto nelle impostazioni) e lo riproduce o lo mette in coda.",
-            obj(json!({ "query": { "type": "string", "description": "titolo e artista, oppure un link YouTube" },
-                        "enqueue": { "type": "boolean", "description": "true = aggiungi in coda invece di suonare subito" } }), &["query"]),
+            "Finds a song (YouTube in Alter Ego's player, or Spotify if chosen in the settings) and plays or queues it.",
+            obj(json!({ "query": { "type": "string", "description": "title and artist, or a YouTube link" },
+                        "enqueue": { "type": "boolean", "description": "true = add to the queue instead of playing now" } }), &["query"]),
         ));
         t.push(func(
             "music_control",
-            "Controlla il lettore musicale.",
+            "Controls the music player.",
             obj(json!({ "action": { "type": "string", "enum": ["pause", "resume", "next", "previous", "stop", "volume", "status", "favorite", "unfavorite"] },
-                        "value": { "type": "number", "description": "volume 0-100 (solo per volume)" } }), &["action"]),
+                        "value": { "type": "number", "description": "volume 0-100 (volume only)" } }), &["action"]),
         ));
     }
     if p.input {
         let (gw, gh, _) = input::grid();
-        let grid = format!("Coordinate x,y nella griglia {gw}x{gh} (la stessa dello screenshot; 0,0 = in alto a sinistra): leggile dai righelli, non stimarle.");
+        let grid = format!("x,y in the {gw}x{gh} grid (same as the screenshot; 0,0 = top left): read them from the rulers, don't estimate.");
         let xy = json!({ "x": { "type": "integer" }, "y": { "type": "integer" } });
-        t.push(func("mouse_move", &format!("Sposta il cursore del mouse. {grid}"), obj(xy.clone(), &["x", "y"])));
+        t.push(func("mouse_move", &format!("Moves the mouse cursor. {grid}"), obj(xy.clone(), &["x", "y"])));
         t.push(func(
             "mouse_click",
-            &format!("Clicca con il mouse (se dai x,y prima ci si sposta, al centro del punto indicato). {grid}{}", if p.screen && p.input_feedback { " Dopo il clic ricevi uno screenshot di controllo: verifica che abbia colpito il punto giusto." } else { "" }),
+            &format!("Clicks the mouse (with x,y it moves there first, to the center of that point). {grid}{}", if p.screen && p.input_feedback { " After the click you get a check screenshot: verify it hit the right spot." } else { "" }),
             obj(json!({ "x": { "type": "integer" }, "y": { "type": "integer" },
                         "button": { "type": "string", "enum": ["left", "right", "middle"] },
                         "double": { "type": "boolean" } }), &[]),
         ));
         t.push(func(
             "mouse_scroll",
-            "Gira la rotella del mouse dove si trova il cursore. Positivo = su/destra, negativo = giù/sinistra.",
+            "Turns the mouse wheel where the cursor is. Positive = up/right, negative = down/left.",
             obj(json!({ "clicks": { "type": "integer", "minimum": -30, "maximum": 30 }, "horizontal": { "type": "boolean" } }), &["clicks"]),
         ));
         t.push(func(
             "type_text",
-            "Scrive un testo nella finestra in primo piano, come dalla tastiera (\\n = Invio). Prima clicca dove scrivere.",
+            "Types text into the foreground window like a keyboard (\\n = Enter). Click where to type first.",
             obj(json!({ "text": { "type": "string" } }), &["text"]),
         ));
         t.push(func(
             "press_keys",
-            "Preme un tasto o una combinazione (es. \"Ctrl+S\", \"Alt+Tab\", \"Enter\", \"Win+D\").",
+            "Presses a key or a combination (e.g. \"Ctrl+S\", \"Alt+Tab\", \"Enter\", \"Win+D\").",
             obj(json!({ "keys": { "type": "string" } }), &["keys"]),
         ));
         if cfg!(windows) {
             t.push(func(
                 "ui_elements",
-                "Elenca pulsanti, campi, menu e altri controlli della finestra in primo piano (o di quella con `window` nel titolo) con il CENTRO esatto in coordinate della griglia: il modo più preciso per sapere dove cliccare. `filter` = parte del nome da cercare.",
+                "Lists buttons, fields, menus and other controls of the foreground window (or the one with `window` in its title) with their exact CENTER in grid coordinates: the most precise way to know where to click. `filter` = part of the name to look for.",
                 obj(json!({ "window": { "type": "string" }, "filter": { "type": "string" } }), &[]),
             ));
         }
@@ -231,46 +231,46 @@ pub fn tool_defs(p: &Permissions) -> Option<Value> {
     if p.sql {
         t.push(func(
             "sql_connect",
-            "Si collega a un database SQL Server su questo PC: apre all'utente un modulo dove scrive server, database, utente e password (tu non vedi la password). Puoi proporre server/database/utente se li conosci.",
+            "Connects to a SQL Server database on this PC: opens a form where the user types server, database, user and password (you don't see the password). You can suggest server/database/user if you know them.",
             obj(json!({ "server": { "type": "string" }, "database": { "type": "string" }, "user": { "type": "string" } }), &[]),
         ));
         t.push(func(
             "sql_query",
             &format!(
-                "Esegue una query T-SQL sulla connessione aperta e restituisce le righe (le vede anche l'utente nella finestra SQL). {} Per esplorare: INFORMATION_SCHEMA.TABLES / COLUMNS. Usa TOP per le tabelle grandi.",
-                if p.sql_write { "SELECT liberi; INSERT/UPDATE/DELETE/CREATE/ALTER chiedono conferma, DROP/TRUNCATE e DELETE/UPDATE senza WHERE sempre." } else { "Solo lettura (SELECT): le modifiche sono disattivate." }
+                "Runs a T-SQL query on the open connection and returns the rows (the user also sees them in the SQL window). {} To explore: INFORMATION_SCHEMA.TABLES / COLUMNS. Use TOP for large tables.",
+                if p.sql_write { "SELECT is free; INSERT/UPDATE/DELETE/CREATE/ALTER ask for confirmation, DROP/TRUNCATE and DELETE/UPDATE without WHERE always do." } else { "Read-only (SELECT): changes are disabled." }
             ),
             obj(json!({ "query": { "type": "string" }, "max_rows": { "type": "integer", "minimum": 1, "maximum": 200 } }), &["query"]),
         ));
-        t.push(func("sql_disconnect", "Chiude la connessione a SQL Server.", obj(json!({}), &[])));
+        t.push(func("sql_disconnect", "Closes the SQL Server connection.", obj(json!({}), &[])));
     }
     if p.graph && (p.files_all || !p.folders.is_empty()) {
-        let where_ = if p.files_all { "Qualsiasi cartella del PC.".to_string() } else { format!("Solo dentro: {}.", p.folders.join("; ")) };
+        let where_ = if p.files_all { "Any folder on the PC.".to_string() } else { format!("Only inside: {}.", p.folders.join("; ")) };
         t.push(func(
             "graph_build",
-            &format!("Crea o aggiorna la mappa (grafo di conoscenza) di una cartella di codice o progetto, in locale e senza AI: poi rispondi con graph_ask invece di leggere i file uno per uno. Ci può mettere qualche minuto la prima volta. {where_}"),
-            obj(json!({ "path": { "type": "string", "description": "cartella del progetto, percorso assoluto" } }), &["path"]),
+            &format!("Builds or updates the map (knowledge graph) of a code or project folder, locally and without AI: then answer with graph_ask instead of reading files one by one. The first time can take a few minutes. {where_}"),
+            obj(json!({ "path": { "type": "string", "description": "project folder, absolute path" } }), &["path"]),
         ));
         t.push(func(
             "graph_ask",
-            "Interroga la mappa di una cartella: kind=query (domanda in parole, restituisce il sottografo rilevante), explain (un concetto/funzione/classe e i suoi collegamenti), path (come è collegato text a to), god-nodes (i nodi centrali). Molto più economico che leggere i file.",
+            "Queries a folder's map: kind=query (a question in words, returns the relevant subgraph), explain (a concept/function/class and its links), path (how text connects to to), god-nodes (the central nodes). Much cheaper than reading files.",
             obj(json!({
-                "path": { "type": "string", "description": "cartella già mappata con graph_build" },
+                "path": { "type": "string", "description": "folder already mapped with graph_build" },
                 "kind": { "type": "string", "enum": ["query", "explain", "path", "god-nodes"] },
                 "text": { "type": "string" },
-                "to": { "type": "string", "description": "solo per kind=path" },
-                "budget": { "type": "integer", "minimum": 300, "maximum": 6000, "description": "token massimi della risposta (default 1500)" }
+                "to": { "type": "string", "description": "only for kind=path" },
+                "budget": { "type": "integer", "minimum": 300, "maximum": 6000, "description": "max tokens of the answer (default 1500)" }
             }), &["path", "kind"]),
         ));
     }
     if p.app_control {
         t.push(func(
             "app_control",
-            "Controlla l'app Alter Ego stessa (non il PC): finestre, lettore musicale, Music Venue, il gioco Alter Net, aspetto, link, aggiornamenti, impostazioni. \
-Usalo quando l'utente chiede qualcosa sull'app (es. \"apri music venue\", \"apri alter net\", \"chiudi il lettore audio\", \"ingrandisci il lettore\", \"apri il sito\", \"aggiorna\").",
+            "Controls the Alter Ego app itself (not the PC): windows, music player, Music Venue, the Alter Net game, look, links, updates, settings. \
+Use it when the user asks about the app (e.g. \"open music venue\", \"open alter net\", \"close the audio player\", \"enlarge the player\", \"open the website\", \"update\").",
             obj(json!({
                 "action": { "type": "string", "enum": crate::appctl::ACTIONS },
-                "value": { "type": "number", "description": "solo per opacity (20-100) e player_size (420-1200 px)" }
+                "value": { "type": "number", "description": "only for opacity (20-100) and player_size (420-1200 px)" }
             }), &["action"]),
         ));
     }
@@ -282,16 +282,16 @@ Usalo quando l'utente chiede qualcosa sull'app (es. \"apri music venue\", \"apri
 /// Gruppi di strumenti con la descrizione per `load_tools`. Ordine fisso: la lista inviata
 /// resta identica tra una domanda e l'altra con gli stessi gruppi (cache del provider).
 pub const GROUPS: &[(&str, &str)] = &[
-    ("app", "comandi dell'app Alter Ego"),
-    ("sistema", "aprire programmi e siti, terminale, comandi, volume, luminosità, appunti"),
-    ("file", "leggere, scrivere, cercare, spostare file e cartelle"),
-    ("web", "cercare sul web e leggere pagine"),
-    ("schermo", "screenshot, zoom, mouse, tastiera, controlli delle finestre"),
-    ("musica", "suonare e controllare la musica"),
-    ("promemoria", "promemoria, timer, sveglie"),
-    ("database", "SQL Server su questo PC"),
-    ("grafo", "mappa (grafo) di progetti e cartelle di codice e documenti, per rispondere senza leggere tutti i file"),
-    ("agente", "delegare a Hermes Agent compiti lunghi e autonomi in più passi"),
+    ("app", "Alter Ego app commands"),
+    ("sistema", "open programs and sites, terminal, commands, volume, brightness, clipboard"),
+    ("file", "read, write, find, move files and folders"),
+    ("web", "search the web and read pages"),
+    ("schermo", "screenshot, zoom, mouse, keyboard, window controls"),
+    ("musica", "play and control music"),
+    ("promemoria", "reminders, timers, alarms"),
+    ("database", "SQL Server on this PC"),
+    ("grafo", "map (graph) of code/document projects and folders, to answer without reading every file"),
+    ("agente", "delegate long, autonomous multi-step tasks to Hermes Agent"),
 ];
 
 /// Gruppo di uno strumento.
@@ -332,7 +332,7 @@ pub fn select_groups(tools: &Value, groups: &[&str]) -> Value {
         let list: Vec<String> = GROUPS.iter().filter(|(g, _)| missing.contains(g)).map(|(g, d)| format!("{g} ({d})")).collect();
         out.push(func(
             LOAD_TOOLS,
-            &format!("Carica altri strumenti quando quelli che hai non bastano per la richiesta. Gruppi disponibili: {}.", list.join("; ")),
+            &format!("Loads more tools when the ones you have are not enough for the request. Available groups: {}.", list.join("; ")),
             obj(json!({ "groups": { "type": "array", "items": { "type": "string", "enum": missing } } }), &["groups"]),
         ));
     }
@@ -461,14 +461,14 @@ pub fn allowed_path(folders: &[String], path: &str, must_exist: bool) -> Result<
             }
         }
     }
-    Err("percorso fuori dalle cartelle autorizzate (o attiva «tutto il disco» nei Permessi)".into())
+    Err("path outside the allowed folders (or turn on “whole disk” in Permissions)".into())
 }
 
 /// Percorso assoluto risolto (`..` e collegamenti), senza limiti di cartella.
 pub fn resolve(path: &str, must_exist: bool) -> Result<PathBuf, String> {
     let p = Path::new(path.trim());
     if !p.is_absolute() {
-        return Err("serve un percorso assoluto".into());
+        return Err("an absolute path is needed".into());
     }
     if must_exist {
         return p.canonicalize().map_err(|_| "file o cartella inesistente".to_string());
@@ -551,11 +551,11 @@ pub async fn execute(app: &AppHandle, call: &ToolCall) -> Outcome {
 }
 
 async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String, Result<Outcome, String>) {
-    let denied = || Err("l'utente ha negato il permesso".to_string());
+    let denied = || Err("the user denied permission".to_string());
     macro_rules! need {
         ($flag:expr) => {
             if !$flag {
-                return (String::new(), Err("funzione disattivata nel pannello Permessi".into()));
+                return (String::new(), Err("feature turned off in the Permissions panel".into()));
             }
         };
     }
@@ -579,7 +579,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             }
             let is_url = target.starts_with("https://") || target.starts_with("http://");
             if !is_url {
-                return (detail, Err("non è nella lista consentita e non è un URL".into()));
+                return (detail, Err("not in the allowed list and not a URL".into()));
             }
             if !confirm(app, crate::tr!("Aprire questo sito (non è nella lista)?\n{target}", "Open this website (not in the list)?\n{target}")).await {
                 return (detail, denied());
@@ -594,7 +594,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             need!(p.reminders);
             let conv = app.state::<crate::assistant::Conversation>();
             let Some(mem) = conv.memory.as_ref() else {
-                return (String::new(), Err("database non disponibile".into()));
+                return (String::new(), Err("database not available".into()));
             };
             match name {
                 "set_reminder" => {
@@ -602,7 +602,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
                     let minutes = a.get("minutes").and_then(Value::as_i64).unwrap_or(0);
                     let detail = format!("{minutes} min: {}", short(&text, 80));
                     if text.is_empty() || !(1..=10080).contains(&minutes) {
-                        return (detail, Err("testo vuoto o minuti non validi (1–10080)".into()));
+                        return (detail, Err("empty text or invalid minutes (1–10080)".into()));
                     }
                     let r = mem.add_reminder(memory::now() + minutes * 60, &text).map(|id| Outcome::text(format!("Promemoria #{id} tra {minutes} minuti.")));
                     (detail, r)
@@ -690,7 +690,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             need!(p.shell);
             let n = arg(a, "name");
             let Some(cmd) = p.commands.iter().find(|c| c.name == n).cloned() else {
-                return (n.to_string(), Err("comando non nella lista consentita".into()));
+                return (n.to_string(), Err("command not in the allowed list".into()));
             };
             if !confirm(app, crate::tr!("Eseguire il comando «{}»?\n{}", "Run the command “{}”?\n{}", cmd.name, cmd.target)).await {
                 return (cmd.name.clone(), denied());
@@ -703,7 +703,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             let shell = arg(a, "shell").to_string();
             let command = arg(a, "command").trim().to_string();
             if command.is_empty() {
-                return (String::new(), Err("comando vuoto".into()));
+                return (String::new(), Err("empty command".into()));
             }
             let timeout = a.get("timeout").and_then(Value::as_u64).unwrap_or(p.terminal_timeout).clamp(5, p.terminal_timeout);
             let cwd = a.get("cwd").and_then(Value::as_str).map(str::to_string);
@@ -733,7 +733,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             let detail = short(&format!("{path} {} {}", arg(a, "kind"), arg(a, "text")), 200);
             let dir = match file_path(p, path, true) {
                 Ok(d) if d.is_dir() => d,
-                Ok(_) => return (detail, Err("serve una cartella, non un file".into())),
+                Ok(_) => return (detail, Err("a folder is needed, not a file".into())),
                 Err(e) => return (detail, Err(e)),
             };
             if name == "graph_build" {
@@ -804,7 +804,7 @@ async fn run(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String
             let value = a.get("value").and_then(Value::as_f64);
             (action.clone(), crate::appctl::run(app, &action, value).await.map(Outcome::text))
         }
-        other => (String::new(), Err(format!("strumento sconosciuto: {other}"))),
+        other => (String::new(), Err(format!("unknown tool: {other}"))),
     }
 }
 
@@ -855,7 +855,7 @@ fn find_names(root: &Path, needle: &str, max: usize) -> Vec<String> {
 }
 
 async fn files_action(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> (String, Result<Outcome, String>) {
-    let denied = || Err::<Outcome, String>("l'utente ha negato il permesso".to_string());
+    let denied = || Err::<Outcome, String>("the user denied permission".to_string());
     let path = if name == "move_path" { arg(a, "from") } else { arg(a, "path") };
     let detail = if name == "move_path" { short(&format!("{} → {}", arg(a, "from"), arg(a, "to")), 200) } else { short(path, 160) };
     let must_exist = !matches!(name, "write_file" | "make_dir");
@@ -936,7 +936,7 @@ async fn files_action(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -
             let needle = arg(a, "name").trim().to_string();
             let max = a.get("max").and_then(Value::as_u64).unwrap_or(50).clamp(1, 200) as usize;
             if needle.is_empty() {
-                Err("manca il nome da cercare".into())
+                Err("missing the name to look for".into())
             } else {
                 let root = resolved.clone();
                 tauri::async_runtime::spawn_blocking(move || find_names(&root, &needle, max))
@@ -949,7 +949,7 @@ async fn files_action(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -
         "move_path" => {
             let to = dest.unwrap_or_default();
             if to.exists() {
-                Err("la destinazione esiste già".into())
+                Err("the destination already exists".into())
             } else {
                 to.parent()
                     .map(std::fs::create_dir_all)
@@ -999,21 +999,21 @@ async fn sql_action(app: &AppHandle, p: &Permissions, name: &str, a: &Value) -> 
             let query = arg(a, "query").trim().to_string();
             let detail = short(&query.replace('\n', " "), 200);
             if query.is_empty() {
-                return (detail, Err("query vuota".into()));
+                return (detail, Err("empty query".into()));
             }
             if crate::sql::connected(app).await.is_none() {
-                return (detail, Err("nessuna connessione: usa prima sql_connect".into()));
+                return (detail, Err("no connection: use sql_connect first".into()));
             }
             let kind = crate::sql::classify(&query);
             if kind != "read" {
                 if !p.sql_write {
-                    return (detail, Err("le modifiche al database sono disattivate nei Permessi (solo SELECT)".into()));
+                    return (detail, Err("database changes are turned off in Permissions (SELECT only)".into()));
                 }
                 let q = crate::tr!("{}Eseguire questo comando sul database?\n{}", "{}Run this command on the database?\n{}",
                     if kind == "danger" { crate::i18n::tr("⚠ Comando distruttivo. ", "⚠ Destructive command. ") } else { "" }, short(&query, 600));
                 let ok = if kind == "danger" { confirm_always(app, q).await } else { confirm(app, q).await };
                 if !ok {
-                    return (detail, Err("l'utente ha negato il permesso".into()));
+                    return (detail, Err("the user denied permission".into()));
                 }
             }
             let max = a.get("max_rows").and_then(Value::as_u64).map(|n| n as usize).unwrap_or_else(|| app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).sql.max_rows);
@@ -1064,13 +1064,13 @@ async fn pointer_action(app: &AppHandle, p: &Permissions, name: &str, a: &Value)
         _ => (keys.clone(), crate::tr!("Premere {keys}?", "Press {keys}?")),
     };
     if name == "type_text" && text.is_empty() {
-        return (detail, Err("testo vuoto".into()));
+        return (detail, Err("empty text".into()));
     }
     // la conferma porta in primo piano Alter Ego: poi si rimette la finestra di prima
     let fg = pointer::foreground();
     if !p.input_autonomous {
         if !confirm(app, crate::tr!("🖱 {question}\n(mouse nell'angolo in alto a sinistra = stop)", "🖱 {question}\n(mouse in the top-left corner = stop)")).await {
-            return (detail, Err("l'utente ha negato il permesso".into()));
+            return (detail, Err("the user denied permission".into()));
         }
         pointer::set_foreground(fg);
         tokio::time::sleep(Duration::from_millis(180)).await;

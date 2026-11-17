@@ -86,7 +86,7 @@ pub async fn hermes_install(app: AppHandle) -> Result<String, String> {
         "Install Nous Research's Hermes Agent?\nI'll use the official script (hermes-agent.nousresearch.com): it downloads Python, Node and the tools it needs into %LOCALAPPDATA%\\hermes. Then the setup wizard opens (pick the AI model).",
     );
     if !crate::actions::confirm_always(&app, q.into()).await {
-        return Err("l'utente ha negato il permesso".into());
+        return Err("the user denied permission".into());
     }
     let log = std::env::temp_dir().join("alterego-hermes-install.log");
     let mut cmd;

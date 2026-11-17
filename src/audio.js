@@ -38,8 +38,9 @@ const Audio2 = (() => {
     emitSpeaking(false);
   }
 
-  /** Legge il testo con la voce scelta. Non blocca: il typewriter va in parallelo. */
-  function speak(text, lang = "it") {
+  /** Legge il testo con la voce scelta. Non blocca: il typewriter va in parallelo.
+   *  Senza lingua: quella dell'interfaccia (i testi dell'app passano da t()). */
+  function speak(text, lang = I18N.lang()) {
     if (!text || cfg().tts === "off") return;
     invoke("tts_say", { text, lang }).catch((e) => {
       emitSpeaking(false);

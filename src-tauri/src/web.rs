@@ -158,7 +158,7 @@ pub async fn search(app: &AppHandle, query: &str, count: u64) -> Result<Vec<Hit>
             "tavily" => tavily_search(app, &q, count).await,
             "brave" => brave_search(app, &q, count).await,
             "duckduckgo" => ddg_search(app, &q, count).await,
-            other => Err(format!("provider di ricerca sconosciuto: {other}")),
+            other => Err(crate::tr!("provider di ricerca sconosciuto: {other}", "unknown search provider: {other}")),
         };
         match r {
             Ok(h) if !h.is_empty() => return Ok(h),
@@ -473,7 +473,7 @@ pub async fn fetch(app: &AppHandle, url: &str) -> Result<Page, String> {
 #[tauri::command]
 pub fn set_web_key(provider: String, key: String) -> Result<(), String> {
     if !["tavily", "brave"].contains(&provider.as_str()) {
-        return Err("provider senza chiave propria".into());
+        return Err(crate::i18n::tr("provider senza chiave propria", "provider without its own key").into());
     }
     if key.trim().is_empty() { crate::keys::delete_slot(&provider, "1") } else { crate::keys::set_slot(&provider, "1", key.trim()) }
 }

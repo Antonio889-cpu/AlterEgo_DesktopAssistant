@@ -4,6 +4,10 @@
 use serde::Deserialize;
 use std::{
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
@@ -18,7 +22,7 @@ pub struct Tools {
 }
 
 /// Metadati stampati da yt-dlp.
-#[derive(Deserialize, Default, Debug)]
+#[derive(Deserialize, serde::Serialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct Info {
     pub id: String,
@@ -161,8 +165,85 @@ pub async fn update(tools: &Tools) -> Result<(), String> {
     if out.status.success() { Ok(()) } else { Err(String::from_utf8_lossy(&out.stderr).chars().take(300).collect()) }
 }
 
-/// Cerca (o apre il link) e scarica l'audio in `cache`. Restituisce metadati e file.
-pub async fn fetch(tools: &Tools, query: &str, cache: &Path) -> Result<(Info, PathBuf), String> {
+/// Download in corso (o finito) di un brano: il lettore lo suona mentre yt-dlp scrive.
+#[derive(Debug)]
+pub struct Download {
+    /// File finale nella cache.
+    pub file: PathBuf,
+    /// File parziale che yt-dlp scrive durante il download (rinominato in `file` alla fine).
+    pub part: PathBuf,
+    pub done: AtomicBool,
+    pub failed: AtomicBool,
+}
+
+impl Download {
+    pub fn finished(file: PathBuf) -> Arc<Self> {
+        let part = part_of(&file);
+        Arc::new(Self { file, part, done: AtomicBool::new(true), failed: AtomicBool::new(false) })
+    }
+    pub fn is_done(&self) -> bool {
+        self.done.load(Ordering::SeqCst)
+    }
+    pub fn is_failed(&self) -> bool {
+        self.failed.load(Ordering::SeqCst)
+    }
+    /// Finito o fallito: il file non crescerà più.
+    pub fn settled(&self) -> bool {
+        self.is_done() || self.is_failed()
+    }
+}
+
+fn part_of(file: &Path) -> PathBuf {
+    let mut p = file.as_os_str().to_owned();
+    p.push(".part");
+    PathBuf::from(p)
+}
+
+/// Brani già scaricati: ricerca (normalizzata) → metadati. Così un brano già sentito parte
+/// subito, senza chiedere niente a YouTube.
+const INDEX: &str = "index.json";
+
+fn index_key(query: &str) -> String {
+    query.trim().to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn load_index(cache: &Path) -> std::collections::HashMap<String, Info> {
+    std::fs::read_to_string(cache.join(INDEX)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+fn remember(cache: &Path, query: &str, info: &Info) {
+    let mut idx = load_index(cache);
+    idx.insert(index_key(query), info.clone());
+    // le voci dei file non più in cache se ne vanno
+    idx.retain(|_, i| cache.join(format!("{}.{}", i.id, ext_of(i))).exists());
+    if let Ok(s) = serde_json::to_string(&idx) {
+        let _ = std::fs::write(cache.join(INDEX), s);
+    }
+}
+
+fn ext_of(info: &Info) -> &str {
+    if info.ext.is_empty() { "m4a" } else { &info.ext }
+}
+
+/// Brano già in cache per questa ricerca (file completo).
+pub fn cached(query: &str, cache: &Path) -> Option<(Info, Arc<Download>)> {
+    let info = load_index(cache).remove(&index_key(query))?;
+    let file = cache.join(format!("{}.{}", info.id, ext_of(&info)));
+    if !file.is_file() || part_of(&file).exists() {
+        return None;
+    }
+    // il brano risulta "usato adesso" per la pulizia della cache
+    let _ = std::fs::File::options().append(true).open(&file).and_then(|f| f.set_modified(std::time::SystemTime::now()));
+    Some((info, Download::finished(file)))
+}
+
+/// Byte scritti prima di far partire la riproduzione (l'inizio del file ha l'indice del brano).
+const START_BYTES: u64 = 96 * 1024;
+
+/// Cerca (o apre il link) e fa partire il download dell'audio in `cache`. Torna appena il brano
+/// è identificato e i primi dati sono su disco: il resto arriva mentre suona (`Download`).
+pub async fn fetch(tools: &Tools, query: &str, cache: &Path) -> Result<(Info, Arc<Download>), String> {
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt};
     std::fs::create_dir_all(cache).map_err(|e| e.to_string())?;
     let q = query.trim();
     let target = if q.starts_with("http://") || q.starts_with("https://") { q.to_string() } else { format!("ytsearch1:{q}") };
@@ -172,29 +253,89 @@ pub async fn fetch(tools: &Tools, query: &str, cache: &Path) -> Result<(Info, Pa
         .args(["-f", "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/140"])
         .arg("-o")
         .arg(cache.join("%(id)s.%(ext)s"))
+        // i metadati si stampano prima del download
         .args(["--print", "%(.{id,title,track,artist,uploader,channel,duration,thumbnail,ext,webpage_url})j"]);
     if let Some(d) = &tools.deno {
         c.arg("--js-runtimes").arg(format!("deno:{}", d.display()));
     }
-    c.arg(&target);
-    let out = tokio::time::timeout(Duration::from_secs(180), c.output())
-        .await
-        .map_err(|_| crate::i18n::tr("yt-dlp non ha finito entro 3 minuti", "yt-dlp didn't finish within 3 minutes").to_string())?
-        .map_err(|e| crate::tr!("impossibile avviare yt-dlp: {e}", "cannot start yt-dlp: {e}"))?;
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let info: Option<Info> = stdout.lines().rev().find_map(|l| serde_json::from_str(l.trim()).ok());
-    if !out.status.success() || info.is_none() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        let line = err.lines().rev().find(|l| l.contains("ERROR")).unwrap_or(err.trim());
-        return Err(if line.is_empty() { crate::i18n::tr("nessun risultato", "no results").into() } else { line.chars().take(300).collect() });
+    c.arg(&target).stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+    let mut child = c.spawn().map_err(|e| crate::tr!("impossibile avviare yt-dlp: {e}", "cannot start yt-dlp: {e}"))?;
+    let mut stdout = tokio::io::BufReader::new(child.stdout.take().ok_or("yt-dlp: stdout")?).lines();
+    let mut stderr = child.stderr.take().ok_or("yt-dlp: stderr")?;
+    let err_text = Arc::new(std::sync::Mutex::new(String::new()));
+    {
+        let err_text = err_text.clone();
+        tauri::async_runtime::spawn(async move {
+            let mut buf = String::new();
+            let _ = stderr.read_to_string(&mut buf).await;
+            *err_text.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = buf;
+        });
     }
-    let info = info.unwrap();
-    let file = cache.join(format!("{}.{}", info.id, if info.ext.is_empty() { "m4a" } else { &info.ext }));
-    if !file.exists() {
-        return Err(crate::i18n::tr("yt-dlp non ha scaricato il file audio", "yt-dlp didn't download the audio file").into());
+    let fail = |err_text: &Arc<std::sync::Mutex<String>>| -> String {
+        let err = err_text.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+        let line = err.lines().rev().find(|l| l.contains("ERROR")).unwrap_or(err.trim()).to_string();
+        if line.is_empty() { crate::i18n::tr("nessun risultato", "no results").into() } else { line.chars().take(300).collect() }
+    };
+    // 1. metadati (ricerca su YouTube)
+    let info: Info = loop {
+        let line = tokio::time::timeout(Duration::from_secs(120), stdout.next_line())
+            .await
+            .map_err(|_| crate::i18n::tr("yt-dlp non ha risposto entro 2 minuti", "yt-dlp didn't answer within 2 minutes").to_string())?
+            .map_err(|e| e.to_string())?;
+        match line {
+            Some(l) => {
+                if let Ok(i) = serde_json::from_str::<Info>(l.trim()) {
+                    break i;
+                }
+            }
+            None => {
+                let _ = child.wait().await;
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                return Err(fail(&err_text));
+            }
+        }
+    };
+    let file = cache.join(format!("{}.{}", info.id, ext_of(&info)));
+    let dl = Arc::new(Download { part: part_of(&file), file, done: AtomicBool::new(false), failed: AtomicBool::new(false) });
+    // 2. il download continua in background; alla fine si segna (e si ricorda la ricerca)
+    {
+        let dl = dl.clone();
+        let (cache, query, info2) = (cache.to_path_buf(), q.to_string(), info.clone());
+        tauri::async_runtime::spawn(async move {
+            while let Ok(Some(_)) = stdout.next_line().await {}
+            let ok = child.wait().await.is_ok_and(|s| s.success()) && dl.file.is_file();
+            if ok {
+                dl.done.store(true, Ordering::SeqCst);
+                remember(&cache, &query, &info2);
+                prune(&cache, KEEP);
+            } else {
+                dl.failed.store(true, Ordering::SeqCst);
+            }
+        });
     }
-    Ok((info, file))
+    // 3. si aspetta l'inizio del file
+    let t0 = std::time::Instant::now();
+    loop {
+        if dl.is_done() {
+            return Ok((info, dl));
+        }
+        if dl.is_failed() {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            return Err(if dl.file.is_file() { crate::i18n::tr("download interrotto", "download interrupted").into() } else { fail(&err_text) });
+        }
+        let have = std::fs::metadata(&dl.part).or_else(|_| std::fs::metadata(&dl.file)).map(|m| m.len()).unwrap_or(0);
+        if have >= START_BYTES {
+            return Ok((info, dl));
+        }
+        if t0.elapsed() > Duration::from_secs(120) {
+            return Err(crate::i18n::tr("il download non parte", "the download doesn't start").into());
+        }
+        tokio::time::sleep(Duration::from_millis(60)).await;
+    }
 }
+
+/// Brani tenuti nella cache (i più recenti): restano sul PC e la volta dopo partono subito.
+pub const KEEP: usize = 300;
 
 /// Sottotitoli caricati a mano sul video (VTT), usati come testo se le altre fonti non hanno niente.
 pub async fn subtitles(tools: &Tools, url: &str, dir: &Path) -> Option<String> {
@@ -223,6 +364,7 @@ pub fn prune(cache: &Path, keep: usize) {
     let Ok(rd) = std::fs::read_dir(cache) else { return };
     let mut files: Vec<_> = rd
         .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_file() && e.file_name() != INDEX && !e.file_name().to_string_lossy().ends_with(".part"))
         .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
         .collect();
     files.sort_by(|a, b| b.0.cmp(&a.0));

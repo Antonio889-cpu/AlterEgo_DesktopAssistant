@@ -29,7 +29,7 @@ pub fn get_slot(provider: &str, slot: &str) -> Option<String> {
 pub fn set_slot(provider: &str, slot: &str, key: &str) -> Result<(), String> {
     let key = key.trim();
     if key.is_empty() {
-        return Err("chiave vuota".into());
+        return Err(crate::i18n::tr("chiave vuota", "empty key").into());
     }
     entry(&account(provider, slot))?.set_password(key).map_err(|e| format!("salvataggio chiave fallito: {e}"))
 }
@@ -37,7 +37,7 @@ pub fn set_slot(provider: &str, slot: &str, key: &str) -> Result<(), String> {
 pub fn delete_slot(provider: &str, slot: &str) -> Result<(), String> {
     match entry(&account(provider, slot))?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(format!("cancellazione chiave fallita: {e}")),
+        Err(e) => Err(crate::tr!("cancellazione chiave fallita: {e}", "key deletion failed: {e}")),
     }
 }
 

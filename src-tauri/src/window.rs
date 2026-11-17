@@ -306,7 +306,12 @@ pub fn takeover(app: &AppHandle, on: bool) {
             PhysicalSize::new(w as u32, h as u32),
         );
         let _ = win.set_always_on_top(true);
-        glide(win, (pos, size), to, 420, || {});
+        // il mouse e la tastiera passano dal gioco alla finestra dell'evento
+        let state = app.state::<AppState>();
+        state.modal.store(true, Ordering::SeqCst);
+        let _ = win.set_ignore_cursor_events(false);
+        let w2 = win.clone();
+        glide(win, (pos, size), to, 420, move || focus::grab(&w2));
     } else {
         if !TAKEOVER.load(Ordering::SeqCst) {
             return;
@@ -320,10 +325,18 @@ pub fn takeover(app: &AppHandle, on: bool) {
             TAKEOVER.store(false, Ordering::SeqCst);
             return;
         };
+        let state = app.state::<AppState>();
+        state.modal.store(false, Ordering::SeqCst);
+        if state.click_through.load(Ordering::Relaxed) {
+            let _ = win.set_ignore_cursor_events(true);
+            state.handle_hover.store(false, Ordering::Relaxed);
+        }
         let w2 = win.clone();
         glide(win, (pos, size), before, 380, move || {
             let _ = w2.set_always_on_top(on_top);
             TAKEOVER.store(false, Ordering::SeqCst);
+            // si torna al gioco (o a quello che c'era prima)
+            focus::restore();
         });
     }
 }
@@ -365,6 +378,44 @@ pub fn show_main(app: &AppHandle) {
         let _ = win.show(); // nessun set_focus: non rubiamo il focus
         let _ = app.emit_to(MAIN, "tv", "on");
     }
+}
+
+/// Porta la finestra sopra tutto (anche sopra un gioco a schermo intero in finestra) senza
+/// rubare il focus: il gioco continua a ricevere mouse e tastiera. Vedi `release_overlay`.
+static RAISED: AtomicBool = AtomicBool::new(false);
+
+pub fn raise_overlay(app: &AppHandle) {
+    let Some(win) = app.get_webview_window(MAIN) else { return };
+    let on_top = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).always_on_top;
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW};
+        if let Ok(h) = win.hwnd() {
+            // SWP_NOACTIVATE: sopra il gioco, ma il focus (mouse e tastiera) resta al gioco
+            unsafe { SetWindowPos(h.0 as _, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW) };
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = win.set_always_on_top(true);
+    RAISED.store(!on_top, Ordering::SeqCst);
+}
+
+/// Fine dell'interazione: se "sempre in primo piano" è spento, la finestra torna normale.
+pub fn release_overlay(app: &AppHandle) {
+    if !RAISED.swap(false, Ordering::SeqCst) || TAKEOVER.load(Ordering::SeqCst) {
+        return;
+    }
+    let on_top = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).always_on_top;
+    let Some(win) = app.get_webview_window(MAIN) else { return };
+    #[cfg(windows)]
+    if !on_top {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_NOTOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+        if let Ok(h) = win.hwnd() {
+            unsafe { SetWindowPos(h.0 as _, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) };
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = win.set_always_on_top(on_top);
 }
 
 /// Nasconde la finestra (o esce dall'app) dopo l'animazione di spegnimento.
@@ -457,4 +508,67 @@ pub fn spawn_saver(app: AppHandle) {
         thread::sleep(Duration::from_secs(1));
         crate::flush_config(&app);
     });
+}
+
+/// Focus "forzato" per l'evento: il gioco in primo piano tiene mouse e tastiera (spesso con il
+/// cursore bloccato nella sua finestra), e Windows non lascia rubare il primo piano a un'altra app.
+mod focus {
+    #[cfg(windows)]
+    static PREV: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
+    #[cfg(windows)]
+    pub fn grab(win: &tauri::WebviewWindow) {
+        use windows_sys::Win32::{
+            Foundation::HWND,
+            System::Threading::{AttachThreadInput, GetCurrentThreadId},
+            UI::WindowsAndMessaging::{BringWindowToTop, ClipCursor, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow, ShowWindow, SW_SHOW},
+        };
+        let Ok(h) = win.hwnd() else { return };
+        let me = h.0 as HWND;
+        unsafe {
+            let fg = GetForegroundWindow();
+            if fg == me {
+                return;
+            }
+            PREV.store(fg as isize, std::sync::atomic::Ordering::SeqCst);
+            // il thread del gioco "presta" il diritto di cambiare il primo piano
+            let fg_thread = GetWindowThreadProcessId(fg, std::ptr::null_mut());
+            let cur = GetCurrentThreadId();
+            let attached = fg_thread != 0 && fg_thread != cur && AttachThreadInput(cur, fg_thread, 1) != 0;
+            ShowWindow(me, SW_SHOW);
+            BringWindowToTop(me);
+            SetForegroundWindow(me);
+            if attached {
+                AttachThreadInput(cur, fg_thread, 0);
+            }
+            // cursore libero (i giochi lo chiudono nella loro finestra)
+            ClipCursor(std::ptr::null());
+        }
+        let _ = win.set_focus();
+    }
+
+    #[cfg(windows)]
+    pub fn restore() {
+        use windows_sys::Win32::{
+            Foundation::HWND,
+            UI::WindowsAndMessaging::{IsWindow, IsIconic, SetForegroundWindow},
+        };
+        let prev = PREV.swap(0, std::sync::atomic::Ordering::SeqCst) as HWND;
+        if prev.is_null() {
+            return;
+        }
+        unsafe {
+            if IsWindow(prev) != 0 && IsIconic(prev) == 0 {
+                SetForegroundWindow(prev);
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    pub fn grab(win: &tauri::WebviewWindow) {
+        let _ = win.set_focus();
+    }
+
+    #[cfg(not(windows))]
+    pub fn restore() {}
 }

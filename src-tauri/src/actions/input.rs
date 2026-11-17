@@ -129,7 +129,7 @@ pub mod pointer {
     }
 
     pub fn move_to(x: i32, y: i32) -> Result<(), String> {
-        if unsafe { SetCursorPos(x, y) } == 0 { Err("cursore non spostato".into()) } else { Ok(()) }
+        if unsafe { SetCursorPos(x, y) } == 0 { Err("cursor not moved".into()) } else { Ok(()) }
     }
 
     /// `button`: "left", "right", "middle".
@@ -384,7 +384,7 @@ pub fn volume(action: &str, steps: u32) -> Result<(), String> {
         "up" => 0xAF,
         "down" => 0xAE,
         "mute" => return imp::press(&[0xAD]),
-        _ => return Err("azione volume non valida".into()),
+        _ => return Err("invalid volume action".into()),
     };
     for _ in 0..steps.clamp(1, 25) {
         imp::press(&[vk])?;

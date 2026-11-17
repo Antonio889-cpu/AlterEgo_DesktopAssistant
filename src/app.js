@@ -274,7 +274,11 @@ document.addEventListener("ae-mode", (e) => {
   if (["listening", "thinking", "speaking"].includes(e.detail)) { markActive(); petHome(); }
   // parla (promemoria, avvisi, frasi dal backend): se era nascosta o ridotta a icona ricompare
   if (e.detail === "speaking") invoke("reveal_main").catch(() => {});
+  // sopra il gioco solo finché serve: poco dopo la fine della risposta torna "normale"
+  clearTimeout(overlayTimer);
+  if (e.detail === "idle") overlayTimer = setTimeout(() => { if (State.mode() === "idle") invoke("overlay_release").catch(() => {}); }, 8000);
 });
+let overlayTimer = null;
 async function petExplore(manual = false) {
   if (petOut || petStarting) return;
   if (!manual && (!config?.pet?.enabled || alterEgoBusy() || musicOn)) return;

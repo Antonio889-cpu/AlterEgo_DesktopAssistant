@@ -10,7 +10,7 @@ fn capture_rgba() -> Result<(u32, u32, Vec<u8>), String> {
         let w = GetSystemMetrics(SM_CXSCREEN);
         let h = GetSystemMetrics(SM_CYSCREEN);
         if w <= 0 || h <= 0 {
-            return Err("schermo non trovato".into());
+            return Err("screen not found".into());
         }
         let screen = GetDC(std::ptr::null_mut());
         let mem = CreateCompatibleDC(screen);
@@ -31,7 +31,7 @@ fn capture_rgba() -> Result<(u32, u32, Vec<u8>), String> {
         DeleteDC(mem);
         ReleaseDC(std::ptr::null_mut(), screen);
         if ok == 0 || lines == 0 {
-            return Err("cattura schermo fallita".into());
+            return Err("screen capture failed".into());
         }
         for px in buf.chunks_exact_mut(4) {
             px.swap(0, 2); // BGRA → RGBA

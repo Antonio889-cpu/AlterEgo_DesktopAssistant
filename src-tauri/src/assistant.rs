@@ -64,7 +64,7 @@ pub async fn chat(
     let cfg = state.cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
     let text: String = text.trim().chars().take(4000).collect();
     if text.is_empty() {
-        return Err("messaggio vuoto".into());
+        return Err(crate::i18n::tr("messaggio vuoto", "empty message").into());
     }
     // frase della clip scritta a mano: niente modello
     if actions::clip::matches(&cfg.clip, &text) {
@@ -74,6 +74,11 @@ pub async fn chat(
             model: "clip".into(),
             tool_calls: vec![],
         });
+    }
+    // in Garry's Mod: risponde il "cervello del gioco" (prompt corto, azioni nel gioco)
+    if crate::gmodlink::wants(&app, &text) {
+        let r = crate::gmodlink::handle(&app, "", &text, None).await?;
+        return Ok(providers::ChatResult { text: r, provider: "gmod".into(), model: "gmod".into(), tool_calls: vec![] });
     }
     // comandi dell'app (apri music venue, chiudi il lettore…): subito, senza modello
     if cfg.permissions.app_control {
@@ -155,16 +160,17 @@ pub async fn chat(
     let result = if cfg.hermes_brain && crate::hermes::find().is_some() {
         // Hermes come cervello: risponde lui, Alter Ego mette voce e faccia
         let prompt = format!(
-            "{}\n\nRispondi in personaggio come Alter Ego. Prima riga: solo l'emozione tra parentesi quadre, una tra [{}]; poi 2-4 frasi brevi, senza markdown.\n\nMessaggio dell'utente:\n{text}",
+            "{}\n\nReply in character as Alter Ego. First line: only the emotion in square brackets, one of [{}]; then 2-4 short sentences, no markdown.\n{}\nUser's message:\n{text}",
             persona.lines().filter(|l| !l.trim_start().starts_with('>')).collect::<Vec<_>>().join("\n"),
-            providers::prompt::EMOTIONS.join("|")
+            providers::prompt::EMOTIONS.join("|"),
+            providers::prompt::language_rule(&cfg)
         );
         crate::hermes::ask(&prompt, std::time::Duration::from_secs(15 * 60))
             .await
             .map(|t| providers::ChatResult { text: t, provider: "hermes".into(), model: "hermes".into(), tool_calls: vec![] })
     } else {
         let system = if route.delegate && cfg.permissions.hermes && crate::hermes::find().is_some() {
-            format!("{system}\n\n(Questa richiesta sembra un compito lungo e autonomo: valuta di delegarla con hermes_task.)")
+            format!("{system}\n\n(This request looks like a long autonomous task: consider delegating it with hermes_task.)")
         } else {
             system
         };
@@ -290,7 +296,7 @@ async fn run_with_tools(
         let t = if !last && !withhold { tools.clone() } else { None };
         let mut sys = if withhold { format!("{system}{}", crate::saving::NO_TOOLS_NOTE) } else { system.clone() };
         if last && used_tools {
-            sys.push_str("\n\n(Passaggi con gli strumenti finiti: rispondi ora con un riepilogo breve di cosa hai fatto e di cosa resta da fare.)");
+            sys.push_str("\n\n(No tool steps left: reply now with a short summary of what you did and what is left to do.)");
         }
         let res = match providers::chat(&state.ai, ai_cfg.clone(), sys, history.clone(), t, on_event.clone()).await {
             Ok(r) => r,
@@ -519,7 +525,9 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
         return;
     }
     if pressed {
-        crate::window::show_main(app); // si fa vedere subito, prima che parta il microfono
+        // si fa vedere subito, prima che parta il microfono, e sopra il gioco (senza togliergli il focus)
+        crate::window::show_main(app);
+        crate::window::raise_overlay(app);
     }
     let conv = app.state::<Conversation>();
     let provider = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).stt.provider.clone();
@@ -572,9 +580,26 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
     });
 }
 
+/// Lingua per la trascrizione: quella scritta nelle impostazioni, altrimenti la lingua delle risposte.
+pub fn stt_language(cfg: &config::Config) -> String {
+    let l = cfg.stt.language.trim();
+    if !l.is_empty() {
+        return l.to_lowercase();
+    }
+    match providers::prompt::reply_lang(cfg) {
+        "en" => "en".into(),
+        _ => "it".into(),
+    }
+}
+
 /// Trascrive con il servizio scelto e, se fallisce, con quello di riserva (Groq ⇄ Gemini, o il server locale).
 pub async fn transcribe(app: &AppHandle, wav: Vec<u8>) -> Result<String, String> {
-    let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).stt.clone();
+    let cfg = {
+        let full = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+        let mut s = full.stt.clone();
+        s.language = stt_language(&full);
+        s
+    };
     let mut order = vec![cfg.provider.clone()];
     if cfg.fallback != "none" && cfg.fallback != cfg.provider {
         order.push(cfg.fallback.clone());

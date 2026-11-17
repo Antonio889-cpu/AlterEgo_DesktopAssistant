@@ -7,7 +7,7 @@ mod analyze;
 pub mod decode;
 pub mod library;
 mod lyrics;
-mod ytdlp;
+pub mod ytdlp;
 
 use crate::{audio::AudioEngine, update_config, AppState};
 use serde::Serialize;
@@ -51,8 +51,9 @@ pub struct Track {
     pub duration: f64,
     pub thumbnail: Option<String>,
     pub url: Option<String>,
+    /// Audio nella cache (anche mentre si scarica).
     #[serde(skip)]
-    pub file: PathBuf,
+    pub dl: Option<std::sync::Arc<ytdlp::Download>>,
     /// Testo sincronizzato: (secondi, riga).
     pub lyrics: Option<Vec<(f64, String)>>,
     /// Fonte del testo (LRCLIB, NetEase, YouTube…).
@@ -657,10 +658,10 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
     if let Some(tx) = m.ctl.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take() {
         let _ = tx.send(decode::Ctl::Stop);
     }
-    let file = {
+    let dl = {
         let mut i = m.inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let Some(t) = i.queue.get(index) else { return };
-        let f = t.file.clone();
+        let Some(f) = t.dl.clone() else { return };
         m.library.lock().unwrap_or_else(std::sync::PoisonError::into_inner).played(entry_of(t));
         i.index = Some(index);
         i.base = start;
@@ -691,7 +692,9 @@ fn start_track(app: &AppHandle, index: usize, start: f64) {
                     app2.state::<AudioEngine>().music_played(true);
                 }
             };
-            let r = decode::play(&engine, &file, start, &rx, &on_seek);
+            let app3 = app.clone();
+            let alive: std::sync::Arc<dyn Fn() -> bool + Send + Sync> = std::sync::Arc::new(move || app3.state::<Music>().gen.load(Ordering::SeqCst) == gen);
+            let r = decode::play(&engine, &dl, start, &rx, &on_seek, alive);
             if app.state::<Music>().gen.load(Ordering::SeqCst) != gen {
                 return; // sostituito da un altro brano
             }
@@ -774,8 +777,12 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
     let http = app.state::<AppState>().ai.http.clone();
     let app2 = app.clone();
     let result = async {
-        let tools = ytdlp::ensure(&http, &m.data_dir, |s| set_status(&app2, s)).await?;
         let cache = m.data_dir.join("music_cache");
+        // già sentito: parte subito dalla cache, senza YouTube
+        if let Some(hit) = ytdlp::cached(query, &cache) {
+            return Ok(hit);
+        }
+        let tools = ytdlp::ensure(&http, &m.data_dir, |s| set_status(&app2, s)).await?;
         set_status(app, &crate::tr!("Scarico «{query}» da YouTube…", "Downloading “{query}” from YouTube…"));
         let r = match ytdlp::fetch(&tools, query, &cache).await {
             Ok(r) => r,
@@ -787,11 +794,10 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
             }
             Err(e) => return Err(e),
         };
-        ytdlp::prune(&cache, 30);
         Ok::<_, String>(r)
     }
     .await;
-    let (info, file) = match result {
+    let (info, dl) = match result {
         Ok(r) => r,
         Err(e) => {
             set_status(app, &crate::tr!("Non trovato: {e}", "Not found: {e}"));
@@ -804,7 +810,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
     // nel lettore e nella Venue: titolo e canale di YouTube; per i testi: titolo e artista ripuliti
     let (title, artist) = ytdlp::display_meta(&info);
     let (lyr_title, lyr_artist) = ytdlp::clean_meta(&info);
-    let duration = info.duration.filter(|d| *d > 0.0).or_else(|| decode::duration(&file)).unwrap_or(0.0);
+    let duration = info.duration.filter(|d| *d > 0.0).or_else(|| dl.is_done().then(|| decode::duration(&dl.file)).flatten()).unwrap_or(0.0);
     let track = Track {
         id: info.id.clone(),
         title: title.clone(),
@@ -812,7 +818,7 @@ pub async fn play(app: &AppHandle, query: &str, enqueue: bool) -> Result<String,
         duration,
         thumbnail: info.thumbnail.clone(),
         url: info.webpage_url.clone(),
-        file,
+        dl: Some(dl),
         lyrics: None,
         lyrics_source: None,
         lyrics_synced: false,

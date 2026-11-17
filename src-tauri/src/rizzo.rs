@@ -297,7 +297,7 @@ pub async fn install(app: &AppHandle, size: &str) -> Result<String, String> {
     );
     if !crate::actions::confirm_always(app, q).await {
         INSTALLING.store(false, Ordering::SeqCst);
-        return Err("l'utente ha negato il permesso".into());
+        return Err("the user denied permission".into());
     }
     stop(app);
     let r = install_flow(app, size).await;

@@ -32,6 +32,11 @@ const Chat = (() => {
     return l === "auto" ? I18N.lang() : l;
   }
 
+  /** Lingua della voce per le risposte del modello ("it_en": si legge la parte italiana). */
+  function speechLang() {
+    return answerLang() === "en" ? "en" : "it";
+  }
+
   /** Testo da mostrare secondo la lingua scelta (solo IT / IT+EN / solo EN). */
   function displayText(reply) {
     const lang = answerLang();
@@ -58,7 +63,7 @@ const Chat = (() => {
       State.setMode("speaking");
       busy = false;
       const shown = displayText(reply);
-      Audio2.speak(reply.it || reply.en, answerLang() === "en" ? "en" : "it");
+      Audio2.speak(reply.it || reply.en, speechLang());
       if (res.model === "clip") Audio2.chime();
       await Dialog.say(shown);
     } catch (err) {

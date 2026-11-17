@@ -821,7 +821,7 @@ $("tts-test").onclick = async () => {
   r.textContent = audio.tts === "kokoro" ? "sintetizzo… (la prima volta Kokoro carica il modello)" : "sintetizzo…";
   r.className = "result";
   try {
-    await invoke("tts_say", { text: "Ciao! Sono Alter Ego. Così suona la mia voce.", lang: "it" });
+    await invoke("tts_say", { text: t("Ciao! Sono Alter Ego. Così suona la mia voce."), lang: I18N.lang() });
     r.textContent = "ok"; r.className = "result ok";
   } catch (e) { r.textContent = String(e); r.className = "result bad"; }
 };
@@ -1207,6 +1207,8 @@ function fillSpotify(cfg) {
   $("sp-client").value = cfg.spotify.client_id || "";
   $("sp-enabled").checked = !!cfg.spotify.enabled;
   $("gmod-enabled").checked = !!cfg.gmod;
+  fillGmodEvents(cfg.gmod_off || []);
+  fillGmodLink(cfg.gmodlink);
   spotifyStatus();
 }
 $("sp-dev").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "spotify_dev" }); };
@@ -1220,7 +1222,84 @@ $("sp-connect").onclick = async (e) => {
 };
 $("sp-disconnect").onclick = async () => { await invoke("spotify_disconnect"); spotifyStatus(); };
 $("sp-enabled").onchange = (e) => invoke("spotify_settings", { enabled: e.target.checked });
-$("gmod-enabled").onchange = (e) => invoke("gmod_settings", { enabled: e.target.checked });
+// Shinri Trial: un interruttore per ogni suono riconosciuto (gmod.rs: EVENTS)
+const GMOD_EVENTS = [
+  ["game_start", "Inizio partita"], ["body", "Corpo scoperto"], ["check_body", "Esame del corpo"],
+  ["investigation", "Inizio indagine"], ["trial", "Processo di classe"], ["voting", "Votazione"],
+  ["verdict_true", "Verdetto giusto"], ["verdict_false", "Verdetto sbagliato"], ["end_peaceful", "Fine senza vittime"],
+  ["end_failure", "Fine con sconfitta"], ["blackout", "Evento: blackout"], ["disguise", "Evento: travestimenti"],
+  ["teleport", "Evento: teletrasporto"], ["killer", "Diventi l'assassino"], ["hurt", "Colpito"],
+  ["death", "Morte"], ["low_sleep", "Sonno basso"],
+];
+function fillGmodEvents(off) {
+  const box = $("gmod-events");
+  box.innerHTML = "";
+  for (const [id, label] of GMOD_EVENTS) {
+    const l = document.createElement("label");
+    l.className = "inline";
+    l.innerHTML = `<input type="checkbox" data-ev="${id}" /> <span></span>`;
+    l.querySelector("span").textContent = t(label);
+    l.querySelector("input").checked = !off.includes(id);
+    box.appendChild(l);
+  }
+  box.querySelectorAll("input").forEach((i) => { i.disabled = !$("gmod-enabled").checked; });
+}
+function saveGmod() {
+  const off = [...$("gmod-events").querySelectorAll("input")].filter((i) => !i.checked).map((i) => i.dataset.ev);
+  $("gmod-events").querySelectorAll("input").forEach((i) => { i.disabled = !$("gmod-enabled").checked; });
+  invoke("gmod_settings", { enabled: $("gmod-enabled").checked, off });
+}
+$("gmod-enabled").onchange = saveGmod;
+
+// ---------- Garry's Mod sandbox (Alter Ego Link) ----------
+function fillGmodLink(g) {
+  if (!g) return;
+  $("gl-enabled").checked = !!g.enabled;
+  $("gl-auto").checked = !!g.auto_join;
+  $("gl-tasks").checked = !!g.tasks;
+  $("gl-chatter").value = g.chatter || "low";
+  $("gl-name").value = g.name || "";
+  $("gl-model").value = g.model || "";
+  $("gl-dir").value = g.dir || "";
+  gmodLinkStatus();
+}
+function gmodLinkSettings() {
+  return {
+    enabled: $("gl-enabled").checked, auto_join: $("gl-auto").checked, tasks: $("gl-tasks").checked,
+    chatter: $("gl-chatter").value, name: $("gl-name").value.trim(), model: $("gl-model").value.trim(), dir: $("gl-dir").value.trim(),
+  };
+}
+async function gmodLinkStatus() {
+  const el = $("gl-status");
+  try {
+    const s = await invoke("gmodlink_status");
+    if (!s.dir) { el.textContent = t("Garry's Mod non trovato: indica la cartella qui sotto"); el.className = "result bad"; return; }
+    if (s.in_game) { el.textContent = t("Alter Ego è nel gioco ✓"); el.className = "result ok"; }
+    else if (s.linked) { el.textContent = t("Gioco collegato ✓ (lei non è ancora entrata)"); el.className = "result ok"; }
+    else if (s.installed) { el.textContent = s.game_running ? t("Addon installato: ricarica la mappa per attivarlo") : t("Addon installato ✓"); el.className = "result"; }
+    else { el.textContent = t("Addon non installato"); el.className = "result"; }
+  } catch (e) { el.textContent = String(e); el.className = "result bad"; }
+}
+async function saveGmodLink() {
+  await invoke("gmodlink_settings", { settings: gmodLinkSettings() });
+  gmodLinkStatus();
+}
+for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir"]) $(id).onchange = saveGmodLink;
+$("gl-enabled").onchange = async (e) => {
+  await saveGmodLink();
+  if (e.target.checked) $("gl-install").click();
+};
+$("gl-install").onclick = async () => {
+  const el = $("gl-status");
+  try {
+    const dir = await invoke("gmodlink_install");
+    el.textContent = t("Addon installato in {d}: carica (o ricarica) una mappa", { d: dir }); el.className = "result ok";
+  } catch (e) { el.textContent = String(e); el.className = "result bad"; }
+};
+$("gl-join").onclick = () => { invoke("gmodlink_join", { join: true }); setTimeout(gmodLinkStatus, 1500); };
+$("gl-leave").onclick = () => { invoke("gmodlink_join", { join: false }); setTimeout(gmodLinkStatus, 1500); };
+listen("gmod-link", () => gmodLinkStatus());
+$("gmod-events").onchange = saveGmod;
 
 // ---------- alter net ----------
 async function alterNetInfo() {

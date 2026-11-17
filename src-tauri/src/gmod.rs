@@ -291,7 +291,7 @@ fn read_gma(path: &Path, wanted: impl Fn(&str) -> bool) -> Result<Vec<(String, V
     let mut head = [0u8; 4 + 1 + 16];
     r.read_exact(&mut head).map_err(bad)?;
     if &head[..4] != b"GMAD" {
-        return Err("non è un file GMA".into());
+        return Err(crate::i18n::tr("non è un file GMA", "not a GMA file").into());
     }
     while !cstr(&mut r).map_err(bad)?.is_empty() {} // contenuti richiesti
     for _ in 0..3 {
@@ -368,7 +368,7 @@ pub fn load(gma: &Path) -> Result<(Matcher, Vec<String>), String> {
         }
     }
     if m.clips.is_empty() {
-        return Err("nessun suono di riferimento trovato nell'addon".into());
+        return Err(crate::i18n::tr("nessun suono di riferimento trovato nell'addon", "no reference sound found in the addon").into());
     }
     Ok((m, failed))
 }
@@ -411,7 +411,7 @@ fn open_loopback(tx: mpsc::SyncSender<Vec<f32>>, broken: Arc<AtomicBool>) -> Res
             err,
             None,
         ),
-        f => return Err(format!("{name}: formato {f:?} non supportato")),
+        f => return Err(crate::tr!("{name}: formato {f:?} non supportato", "{name}: unsupported format {f:?}")),
     }
     .map_err(|e| format!("{name}: {e}"))?;
     stream.play().map_err(|e| format!("{name}: {e}"))?;
@@ -483,21 +483,44 @@ pub fn spawn(app: AppHandle) {
             let Ok(block) = rx.recv_timeout(Duration::from_millis(200)) else { continue };
             let Some((_, m)) = matcher.as_mut() else { continue };
             for ev in m.feed(&block, *rate) {
-                crate::applog::info("gmod", &format!("evento: {ev}"));
+                let off = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).gmod_off.iter().any(|e| e == ev);
+                crate::applog::info("gmod", &format!("evento: {ev}{}", if off { " (spento nelle impostazioni)" } else { "" }));
+                if off {
+                    continue;
+                }
                 let _ = app.emit("gmod", GmodEvent { event: ev });
             }
         }
     });
 }
 
+/// Eventi riconosciuti, nell'ordine delle impostazioni.
+pub const EVENTS: &[&str] = &[
+    "game_start", "body", "check_body", "investigation", "trial", "voting", "verdict_true", "verdict_false", "end_peaceful",
+    "end_failure", "blackout", "disguise", "teleport", "killer", "hurt", "death", "low_sleep",
+];
+
+/// `off`: eventi a cui non reagire (None = lascia com'è).
 #[tauri::command]
-pub fn gmod_settings(app: AppHandle, enabled: bool) {
-    update_config(&app, |c| c.gmod = enabled);
+pub fn gmod_settings(app: AppHandle, enabled: bool, off: Option<Vec<String>>) {
+    update_config(&app, |c| {
+        c.gmod = enabled;
+        if let Some(off) = off {
+            c.gmod_off = off.into_iter().filter(|e| EVENTS.contains(&e.as_str())).collect();
+        }
+    });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_clip_has_a_toggle() {
+        for (ev, _) in CLIPS {
+            assert!(EVENTS.contains(ev), "{ev} manca nelle impostazioni");
+        }
+    }
 
     /// Rumore deterministico.
     fn noise(seed: &mut u32, n: usize, amp: f32) -> Vec<f32> {
