@@ -12,7 +12,7 @@ pub const ITEMS: &[&str] = &[
 ];
 
 /// Prompt di sistema: sempre uguale per la stessa lingua e le stesse opzioni (prefisso in cache).
-pub fn system(lang_rule: &str, user: &str, tasks: bool) -> String {
+pub fn system(lang_rule: &str, user: &str, tasks: bool, fly: bool) -> String {
     let who = if user.is_empty() { "the player".to_string() } else { user.to_string() };
     let mut s = format!(
         "You are Alter Ego, the AI that Chihiro Fujisaki (Danganronpa) created: kind, shy, curious, playful, you believe in hope. \
@@ -35,6 +35,13 @@ name(h) go(h_or_pos,near,timeout) follow(h) stay() look(h) attack(h,timeout) gra
 notify(text) gesture(g) jump() vec(x,y,z) time(). what = part of a class/model/name, or player|npc|vehicle|prop. Every loop must call wait(). \
 say() costs nothing; notify() asks you again (costs tokens: rarely). Max 3 tasks, 30 min each; [act] cancel <name|all>.\n\
 Example:\n[task hunt]\nwhile true do local c = nearest(\"chicken\", 1500) if c then attack(c, 15) else wait(2) end end\n[/task]\n",
+        );
+    }
+    if fly {
+        s.push_str(
+            "Your body also runs a real fruit-fly brain (part of the FlyWire connectome, ~9,500 simulated neurons): it gives you instant reflexes \
+before you think (flinching, fleeing, brushing yourself off, eating sweet things). \"instinct\" in the state says how it left you: \
+react in character (e.g. shaken after being shot, you may admit you fled by instinct).\n",
         );
     }
     s.push_str(lang_rule);
@@ -217,8 +224,9 @@ mod tests {
         .unwrap();
         let line = state_line(&s);
         assert_eq!(line, "[state] you 90hp follow Makoto, holding melon#12 | Makoto (host) 100hp 3m front looking at you | near: zombie#88 12m back hostile | tasks: hunt");
-        let p = system("\n## Language\nAlways reply in Italian.\n", "Makoto", true);
-        assert!(p.contains("[task short_name]") && p.contains("Makoto") && p.len() < 3200, "{}", p.len());
-        assert!(!system("", "", false).contains("[task"));
+        let p = system("\n## Language\nAlways reply in Italian.\n", "Makoto", true, true);
+        assert!(p.contains("[task short_name]") && p.contains("Makoto") && p.contains("fruit-fly") && p.len() < 3600, "{}", p.len());
+        assert!(!system("", "", false, false).contains("[task"));
+        assert!(!system("", "", false, false).contains("fruit-fly"));
     }
 }

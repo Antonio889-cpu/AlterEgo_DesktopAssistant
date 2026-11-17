@@ -536,6 +536,21 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
 - **Corpo**: con [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (addon del Workshop di StarFrost, non incluso: iscriviti da Steam) è un Lambda Player e si muove come un giocatore vero (corsa, salto, armi da giocatore, physgun vera); le sue decisioni, la sua chat e la sua voce sono spente, comanda Alter Ego. Senza, è un NPC cittadino. *Automatico* sceglie Lambda quando è installato; si sceglie nelle impostazioni o nel menu C.
 - Modello del personaggio: nel gioco tieni premuto **C** → **Alter Ego** e scegli uno dei playermodel installati (con anteprima), oppure «come il mio». Il playermodel viene incollato (bonemerge) su un corpo NPC invisibile, così si anima bene; vanno bene anche i modelli NPC. Di base è una cittadina di Half-Life 2.
 
+### Cervello di moscerino (riflessi)
+
+Il suo corpo ha anche un **vero cervello di moscerino**: un pezzo del connettoma di *Drosophila melanogaster* mappato neurone per neurone
+da [FlyWire](https://flywire.ai) (~9.500 neuroni e ~690.000 sinapsi, quelli che rispondono ai sensi usati nel gioco),
+simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu et al. (Nature 2024). Attivo di base; zero token.
+
+- **Sensi** (sempre attivi): dolore (colpi, fuoco), oggetti in arrivo (*looming*: un prop o una macchina che le vola addosso, da sinistra o da destra), dolce (un'anguria a portata), tocco (physgun, *usa*).
+  Sensi in più nelle impostazioni: olfatto (cibo, fumo, esplosioni), temperatura e acqua, udito (spari, rumori forti), luce (torcia in faccia), vento (quando la lanci).
+- **Riflessi**: vengono dai veri neuroni discendenti. Qualcosa che le vola addosso accende la **Giant Fiber** e lei scappa con un salto
+  (i neuroni di svolta scelgono il lato), i neuroni *moonwalker* la fanno indietreggiare, quelli delle setole la fanno spolverare,
+  il dolce attiva i motoneuroni della proboscide e lei va a **mangiare l'anguria** (+15 HP).
+- **Istinto**: dolore e fughe accumulano uno "stress" che svanisce in circa 40 s e arriva al modello in una riga corta,
+  così dopo che le spari può essere scossa. Si possono spegnere i riflessi, lo stress, o mostrare l'attività dei neuroni sopra la sua testa.
+- Come è stato estratto il circuito: [`tools/flybrain/`](tools/flybrain/).
+
 ## Pet
 
 Quando non succede niente, Alter Ego esce a esplorare: la TV si spegne e lei salta fuori
@@ -734,6 +749,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 - Sfondi degli uffici dei contenuti aggiuntivi (`src/assets/extras/`): fatti dall'autore del progetto con una mappa di Garry's Mod.
 - **Lambda Players** di StarFrost: facoltativo, non incluso; Alter Ego Link usa solo i suoi hook e le sue funzioni pubbliche.
+- **Connettoma FlyWire** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([dati](https://zenodo.org/records/10676866), [annotazioni](https://github.com/flyconnectome/flywire_annotations)). Parametri del modello da Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` è un sottoinsieme dei dati FlyWire (solo i neuroni attivi, segno delle sinapsi dai neurotrasmettitori previsti).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): scritto per questo progetto; alcune idee (corpo da NPC, movimento della bocca, diario degli eventi) vengono da [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) di SonnyTaylor (MIT).
 - Foglio sprite del **pet Chihiro**: di **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),

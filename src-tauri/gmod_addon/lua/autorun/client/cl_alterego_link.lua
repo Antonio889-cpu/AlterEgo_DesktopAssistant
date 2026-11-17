@@ -23,6 +23,44 @@ local function T(it, en)
   return (cv and cv:GetString() == "it") and it or en
 end
 
+local FLY = {
+  { "e", "fuga", "escape", Color(255, 90, 90) }, { "b", "indietro", "back", Color(255, 160, 80) },
+  { "g", "grooming", "grooming", Color(255, 220, 90) }, { "f", "mangia", "eat", Color(120, 255, 120) },
+  { "d", "beve", "drink", Color(90, 200, 255) }, { "l", "ascolta", "listen", Color(180, 140, 255) },
+  { "s", "abbagliata", "dazzled", Color(255, 255, 200) }, { "w", "vento", "wind", Color(160, 220, 220) },
+  { "tl", "gira sx", "turn L", Color(200, 200, 200) }, { "tr", "gira dx", "turn R", Color(200, 200, 200) },
+}
+local function drawFly(b, me, raw)
+  local vals, act = {}, 0
+  for tok in raw:gmatch("%S+") do
+    local k, v = tok:match("^(%a+)=([%d%.]+)$")
+    if k then vals[k] = tonumber(v) else act = tonumber(tok) or act end
+  end
+  local top = b:GetClass() == "npc_lambdaplayer" and 90 or 76
+  cam.Start3D2D(b:GetPos() + Vector(0, 0, top), Angle(0, me:EyeAngles().y - 90, 90), 0.08)
+    -- scintille: più spike al secondo, più puntini accesi
+    local dots = math.min(40, math.floor(math.sqrt(act)))
+    for i = 1, 40 do
+      local on = i <= dots and math.random() < 0.8
+      surface.SetDrawColor(on and Color(140, 255, 170, 230) or Color(40, 60, 50, 140))
+      surface.DrawRect(-200 + (i - 1) * 10, -26, 7, 7)
+    end
+    local x = -200
+    for _, f in ipairs(FLY) do
+      local v = vals[f[1]] or 0
+      if v > 0 then
+        surface.SetDrawColor(0, 0, 0, 170)
+        surface.DrawRect(x, 0, 76, 40)
+        surface.SetDrawColor(f[4].r, f[4].g, f[4].b, 230)
+        surface.DrawRect(x + 3, 31, math.floor(70 * v), 6)
+        draw.SimpleText(T(f[2], f[3]), "DermaDefault", x + 38, 14, f[4], TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        x = x + 82
+      end
+    end
+    draw.SimpleTextOutlined(T("cervello di moscerino", "fruit-fly brain") .. "  " .. act .. " spike/s", "DermaDefault", 0, -40, Color(140, 255, 170), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 200))
+  cam.End3D2D()
+end
+
 hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
   if sky then return end
   local me = LocalPlayer()
@@ -43,6 +81,11 @@ hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
         local talking = b:GetNWFloat("AESpeakUntil", 0) > CurTime()
         draw.SimpleTextOutlined(b:GetNWString("AEName", "Alter Ego") .. (talking and " …" or ""), "DermaLarge", 0, 0, Color(150, 255, 170), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0, 200))
       cam.End3D2D()
+    end
+    -- cervello di moscerino: attività dei neuroni sopra la testa (se attivata nell'app)
+    local fly = b:GetNWString("AEFly", "")
+    if fly ~= "" and IsValid(me) and b:GetPos():DistToSqr(me:GetPos()) < 700 * 700 then
+      drawFly(b, me, fly)
     end
   end
 end)

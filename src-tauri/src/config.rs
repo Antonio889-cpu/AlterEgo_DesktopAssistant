@@ -748,11 +748,33 @@ pub struct GmodLinkConfig {
     pub dir: String,
     /// Corpo nel gioco: "auto" (Lambda Player se Lambda Players è installato), "citizen", "lambda".
     pub body: String,
+    /// Cervello di moscerino (connettoma FlyWire): riflessi e istinto.
+    pub fly: FlyConfig,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct FlyConfig {
+    pub enabled: bool,
+    /// Il corpo reagisce da solo (fuga, grooming, mangiare…).
+    pub reflexes: bool,
+    /// Lo stress dei riflessi arriva al modello (qualche token nella riga di stato).
+    pub mood: bool,
+    /// Attività dei neuroni sopra la testa, nel gioco.
+    pub hud: bool,
+    /// Sensi opzionali: "smell", "thermo", "hearing", "light", "wind".
+    pub senses: Vec<String>,
+}
+
+impl Default for FlyConfig {
+    fn default() -> Self {
+        Self { enabled: true, reflexes: true, mood: true, hud: false, senses: Vec::new() }
+    }
 }
 
 impl Default for GmodLinkConfig {
     fn default() -> Self {
-        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new(), body: "auto".into() }
+        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new(), body: "auto".into(), fly: FlyConfig::default() }
     }
 }
 
@@ -769,6 +791,8 @@ impl GmodLinkConfig {
             self.name = "Alter Ego".into();
         }
         self.model = self.model.trim().replace('\\', "/").chars().take(200).collect();
+        self.fly.senses.retain(|s| ["smell", "thermo", "hearing", "light", "wind"].contains(&s.as_str()));
+        self.fly.senses.dedup();
     }
 }
 

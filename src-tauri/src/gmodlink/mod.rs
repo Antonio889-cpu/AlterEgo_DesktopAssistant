@@ -10,6 +10,7 @@
 //! parla o succede qualcosa di importante, con un prompt corto e fisso (in cache) e lo stato in una
 //! riga. I compiti lunghi diventano piccoli script Lua che girano nel gioco senza altri token.
 
+pub mod fly;
 pub mod prompt;
 pub mod quick;
 
@@ -29,6 +30,7 @@ const ADDON: &[(&str, &str)] = &[
     ("addon.json", include_str!("../../gmod_addon/addon.json")),
     ("lua/alterego/sandbox.lua", include_str!("../../gmod_addon/lua/alterego/sandbox.lua")),
     ("lua/alterego/body_lambda.lua", include_str!("../../gmod_addon/lua/alterego/body_lambda.lua")),
+    ("lua/alterego/fly.lua", include_str!("../../gmod_addon/lua/alterego/fly.lua")),
     ("lua/autorun/server/sv_alterego_link.lua", include_str!("../../gmod_addon/lua/autorun/server/sv_alterego_link.lua")),
     ("lua/autorun/client/cl_alterego_link.lua", include_str!("../../gmod_addon/lua/autorun/client/cl_alterego_link.lua")),
 ];
@@ -124,6 +126,8 @@ pub fn parse_state(raw: &str) -> Option<GState> {
 
 pub struct Link {
     inner: Mutex<Inner>,
+    /// Cervello di moscerino (a parte: la simulazione non blocca il resto).
+    fly: Mutex<FlyState>,
     pub ai: crate::providers::Ai,
     /// Una richiesta al modello alla volta.
     busy: tokio::sync::Mutex<()>,
@@ -153,8 +157,106 @@ struct Inner {
 
 impl Default for Link {
     fn default() -> Self {
-        Self { inner: Mutex::new(Inner { next_id: first_id(), ..Default::default() }), ai: crate::providers::Ai::with_kind("gmod"), busy: tokio::sync::Mutex::new(()) }
+        Self {
+            inner: Mutex::new(Inner { next_id: first_id(), ..Default::default() }),
+            fly: Mutex::new(FlyState::default()),
+            ai: crate::providers::Ai::with_kind("gmod"),
+            busy: tokio::sync::Mutex::new(()),
+        }
     }
+}
+
+#[derive(Default)]
+struct FlyState {
+    brain: Option<Box<fly::Brain>>,
+    mood: fly::Mood,
+    senses: std::collections::HashMap<String, f32>,
+    sense_mtime: Option<SystemTime>,
+    sense_at: Option<Instant>,
+    last_tick: Option<Instant>,
+    out: Vec<(String, f32)>,
+    /// Spike al secondo (attività mostrata sopra la testa).
+    activity: f32,
+}
+
+fn fly_lock(app: &AppHandle) -> std::sync::MutexGuard<'_, FlyState> {
+    app.state::<Link>().inner().fly.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Nomi dei sensi in uso: predefiniti + gruppi opzionali scelti.
+fn fly_senses(cfg: &crate::config::FlyConfig) -> Vec<&'static str> {
+    let mut v: Vec<&'static str> = fly::DEFAULT_SENSES.to_vec();
+    for (g, names) in fly::OPTIONAL {
+        if cfg.senses.iter().any(|s| s == g) {
+            v.extend_from_slice(names);
+        }
+    }
+    v
+}
+
+/// Un giro del cervello: legge i sensi dal gioco, simula il tempo passato, scrive le uscite.
+fn fly_tick(app: &AppHandle, dir: &Path, cfg: &crate::config::FlyConfig) {
+    let d = dir.join("data").join("alterego");
+    let mut f = fly_lock(app);
+    if f.brain.is_none() {
+        match fly::Brain::load() {
+            Some(b) => {
+                crate::applog::info("gmodlink", &format!("cervello di moscerino: {} neuroni, {} sinapsi", b.neurons(), b.synapses()));
+                f.brain = Some(Box::new(b));
+            }
+            None => return,
+        }
+    }
+    let path = d.join("sense.json");
+    if let Ok(mtime) = std::fs::metadata(&path).and_then(|m| m.modified()) {
+        if f.sense_mtime != Some(mtime) {
+            f.sense_mtime = Some(mtime);
+            if let Some(v) = std::fs::read_to_string(&path).ok().and_then(|r| serde_json::from_str::<Value>(&r).ok()) {
+                let allowed = fly_senses(cfg);
+                f.senses = v["s"]
+                    .as_object()
+                    .map(|o| {
+                        o.iter()
+                            .filter(|(k, _)| allowed.contains(&k.as_str()))
+                            .filter_map(|(k, x)| x.as_f64().map(|x| (k.clone(), (x as f32).clamp(0.0, 1.0))))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                f.sense_at = Some(Instant::now());
+            }
+        }
+    }
+    // sensi vecchi (gioco in pausa, lei fuori): si spengono
+    if f.sense_at.is_none_or(|t| t.elapsed() > Duration::from_millis(1500)) {
+        f.senses.clear();
+    }
+    let ms = f.last_tick.map(|t| t.elapsed().as_secs_f32() * 1000.0).unwrap_or(100.0).clamp(10.0, 300.0);
+    f.last_tick = Some(Instant::now());
+    let senses = f.senses.clone();
+    let FlyState { brain, mood, out, activity, .. } = &mut *f;
+    let Some(b) = brain.as_mut() else { return };
+    b.run(ms, &senses);
+    *out = b.read(ms);
+    *activity = b.take_total() as f32 / (ms / 1000.0);
+    mood.update(ms / 1000.0, &senses, out);
+    let body = json!({
+        "t": now_secs(),
+        "o": out.iter().map(|(k, v)| (k.clone(), json!(v))).collect::<serde_json::Map<_, _>>(),
+        "a": activity.round(),
+    });
+    drop(f);
+    let tmp = d.join("fly.json.tmp");
+    if std::fs::write(&tmp, body.to_string()).is_ok() {
+        let _ = std::fs::rename(&tmp, d.join("fly.json"));
+    }
+}
+
+/// "stress 0.6, fled" per la riga di stato (vuoto se calma o spento).
+fn instinct(app: &AppHandle, cfg: &crate::config::GmodLinkConfig) -> String {
+    if !cfg.fly.enabled || !cfg.fly.mood {
+        return String::new();
+    }
+    fly_lock(app).mood.line()
 }
 
 /// Id dei comandi: crescenti anche dopo un riavvio dell'app (l'addon ignora quelli già visti).
@@ -322,6 +424,12 @@ fn write_cmds(app: &AppHandle, dir: &Path) {
                 "auto_join": cfg.auto_join,
                 "tasks": cfg.tasks,
                 "body": cfg.body,
+                "fly": {
+                    "on": cfg.fly.enabled,
+                    "reflexes": cfg.fly.reflexes,
+                    "hud": cfg.fly.hud,
+                    "senses": if cfg.fly.enabled { fly_senses(&cfg.fly) } else { Vec::new() },
+                },
             },
         })
     };
@@ -339,7 +447,12 @@ pub fn spawn(app: AppHandle) {
     let _ = std::thread::Builder::new().name("gmodlink".into()).spawn(move || {
         let mut next_check = Instant::now();
         loop {
-            std::thread::sleep(Duration::from_millis(250));
+            let fly_on = {
+                let g = cfg_of(&app).gmodlink;
+                g.enabled && g.fly.enabled
+            };
+            // col cervello di moscerino acceso: 10 giri al secondo (riflessi pronti)
+            std::thread::sleep(Duration::from_millis(if fly_on && active(&app) { 100 } else { 250 }));
             let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).gmodlink.clone();
             if !cfg.enabled {
                 std::thread::sleep(Duration::from_millis(750));
@@ -372,6 +485,9 @@ pub fn spawn(app: AppHandle) {
                 }
             }
             let Some(dir) = lock(&app).dir.clone() else { continue };
+            if cfg.fly.enabled && active(&app) {
+                fly_tick(&app, &dir, &cfg.fly);
+            }
             // comandi + battito
             let write = {
                 let i = lock(&app);
@@ -503,6 +619,8 @@ fn on_event(app: &AppHandle, e: Value) {
         }
         "hurt" => comment(app, &format!("[event] {} hit you ({} damage)", s("by"), e["dmg"]), false),
         "died" => comment(app, &format!("[event] you were killed by {}; you'll respawn in a moment", s("by")), false),
+        // riflesso del cervello di moscerino
+        "ate" => comment(app, &format!("[event] by instinct you just ate a {} (your fly brain tasted something sweet)", s("what")), false),
         "player_died" => comment(app, &format!("[event] {} died ({})", s("who"), s("by")), false),
         // scelti nel menu del gioco (C → Alter Ego): si salvano nelle impostazioni
         "model" => {
@@ -595,8 +713,14 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
     let link = app.state::<Link>();
     let _guard = link.busy.lock().await;
     let (state_line, history, overheard) = {
+        let i = lock(app);
+        let mut st = i.state.as_ref().map(prompt::state_line).unwrap_or_else(|| "[state] unknown".into());
+        drop(i);
+        let inst = instinct(app, &cfg.gmodlink);
+        if !inst.is_empty() {
+            st.push_str(&format!(" | instinct: {inst}"));
+        }
         let mut i = lock(app);
-        let st = i.state.as_ref().map(prompt::state_line).unwrap_or_else(|| "[state] unknown".into());
         let h: Vec<(String, String)> = i.history.iter().cloned().collect();
         let o: Vec<String> = i.overheard.drain(..).collect();
         (st, h, o)
@@ -640,7 +764,8 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
     let mut ai = cfg.ai.clone();
     ai.thinking = "off".into();
     ai.max_tokens = 700;
-    let system = prompt::system(crate::providers::prompt::language_rule(&cfg), cfg.user_name.trim(), cfg.gmodlink.tasks);
+    let fly_mood = cfg.gmodlink.fly.enabled && cfg.gmodlink.fly.mood;
+    let system = prompt::system(crate::providers::prompt::language_rule(&cfg), cfg.user_name.trim(), cfg.gmodlink.tasks, fly_mood);
     let ch = tauri::ipc::Channel::new(|_| Ok(()));
     let res = crate::providers::chat(&link.ai, ai, system, merged, None, ch).await?;
     let r = prompt::parse(&res.text);
@@ -683,6 +808,17 @@ pub struct Status {
     pub lambda: Option<bool>,
     /// Corpo in uso ("citizen" / "lambda").
     pub body: Option<String>,
+    /// Cervello di moscerino: dimensioni e uscite adesso.
+    pub fly: FlyStatus,
+}
+
+#[derive(Serialize)]
+pub struct FlyStatus {
+    pub neurons: usize,
+    pub synapses: usize,
+    pub out: Vec<(String, f32)>,
+    pub stress: f32,
+    pub activity: f32,
 }
 
 #[tauri::command]
@@ -699,6 +835,18 @@ pub async fn gmodlink_status(app: AppHandle) -> Status {
         in_game: fresh && i.state.as_ref().is_some_and(|s| s.bot.is_some()),
         lambda: i.state.as_ref().map(|s| s.lambda),
         body: i.state.as_ref().and_then(|s| s.bot.as_ref()).and_then(|b| b.body.clone()),
+        fly: {
+            let (neurons, synapses) = fly::size();
+            let f = fly_lock(&app);
+            let live = fresh && f.last_tick.is_some_and(|t| t.elapsed() < Duration::from_secs(2));
+            FlyStatus {
+                neurons,
+                synapses,
+                out: if live { f.out.clone() } else { Vec::new() },
+                stress: f.mood.stress,
+                activity: if live { f.activity } else { 0.0 },
+            }
+        },
     }
 }
 
