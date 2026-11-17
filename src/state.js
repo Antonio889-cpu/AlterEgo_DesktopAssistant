@@ -43,6 +43,7 @@ const State = (() => {
     settle(force = false) {
       if (!force && (mode === "listening" || mode === "thinking")) return;
       mode = "idle";
+      document.dispatchEvent(new CustomEvent("ae-mode", { detail: "idle" }));
       render();
       clearTimeout(holdTimer);
       holdTimer = setTimeout(() => { if (mode === "idle") { emotion = "idle"; render(); } }, EMOTION_HOLD_MS);

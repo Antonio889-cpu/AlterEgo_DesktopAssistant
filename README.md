@@ -514,6 +514,26 @@ To regenerate the included sprites from the sheet (e.g. after editing it), with 
 python tools/process_sprites.py
 ```
 
+## Garry's Mod: play together
+
+With the **Alter Ego Link** addon (written for this app, installed by it into `garrysmod/addons/alterego_link`)
+Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Settings → Voice & audio → Garry's Mod: play with me*.
+
+- She **follows** you, waits, comes where you look, jumps, waves, dances, **spawns** props (melon, crate, barrel, chair…),
+  **picks them up and throws** them with a physgun-like beam, takes a weapon and **fights** by your side.
+- **Talk to her** with push-to-talk or in the **game chat**; she also answers other players when they call her by name.
+  She speaks with her voice on the PC and her lines appear in the chat.
+- **Long jobs become small Lua scripts** she writes herself ("when you see chickens around, shoot them",
+  "bring me that vehicle"): they run inside the game with no more tokens. They live in a sandbox: only her actions
+  (find, go, grab, attack, say…), no files, network or console, a CPU limit between waits, max 3 at a time, 30 minutes each.
+- **Few tokens**: following and looking around run in the game; simple commands ("follow me", "stop", "come here", "jump")
+  are keywords with no AI call; otherwise a short fixed prompt (cached) plus the game state in one line (~100 tokens),
+  only when someone talks to her or something important happens. Requests for the PC (music, web, files) still go to the usual Alter Ego.
+- The app and the game talk through two files in `garrysmod/data/alterego/`: no launch options, no binary modules.
+  Single player and servers you host (the addon has to run on the server).
+- Use the **borderless window** video mode: an exclusive full-screen game hides every other window.
+- Character model: an NPC model works best (playermodels often stay in a T-pose); by default she's a Half-Life 2 citizen.
+
 ## Pet
 
 When nothing is happening, Alter Ego goes out to explore: the TV switches off and she jumps out
@@ -712,6 +732,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **VB-CABLE** by VB-Audio Software: donationware, not bundled; download it from the official website.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 - Extra-content office backgrounds (`src/assets/extras/`): made by the project author with a Garry's Mod map.
+- **Alter Ego Link** (`src-tauri/gmod_addon/`): written for this project; some ideas (NPC body, mouth movement, event log) come from [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) by SonnyTaylor (MIT).
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),
   adapted for the app (background removed, green CRT tint). Thank you, Ayari! 💚

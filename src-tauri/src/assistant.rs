@@ -75,6 +75,11 @@ pub async fn chat(
             tool_calls: vec![],
         });
     }
+    // in Garry's Mod: risponde il "cervello del gioco" (prompt corto, azioni nel gioco)
+    if crate::gmodlink::wants(&app, &text) {
+        let r = crate::gmodlink::handle(&app, "", &text, None).await?;
+        return Ok(providers::ChatResult { text: r, provider: "gmod".into(), model: "gmod".into(), tool_calls: vec![] });
+    }
     // comandi dell'app (apri music venue, chiudi il lettore…): subito, senza modello
     if cfg.permissions.app_control {
         if let Some(r) = crate::appctl::quick(&app, &text).await {
@@ -520,7 +525,9 @@ pub fn ptt(app: &AppHandle, pressed: bool) {
         return;
     }
     if pressed {
-        crate::window::show_main(app); // si fa vedere subito, prima che parta il microfono
+        // si fa vedere subito, prima che parta il microfono, e sopra il gioco (senza togliergli il focus)
+        crate::window::show_main(app);
+        crate::window::raise_overlay(app);
     }
     let conv = app.state::<Conversation>();
     let provider = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).stt.provider.clone();

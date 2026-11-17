@@ -729,6 +729,44 @@ impl Default for ExtrasConfig {
     }
 }
 
+/// Garry's Mod sandbox: Alter Ego entra nel gioco con l'addon Alter Ego Link (vedi gmodlink/).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct GmodLinkConfig {
+    pub enabled: bool,
+    /// Entra da sola quando carichi una mappa (con l'app aperta).
+    pub auto_join: bool,
+    /// Commenti spontanei sugli eventi: "off", "low", "normal", "often".
+    pub chatter: String,
+    /// Può scrivere piccoli script Lua per i compiti lunghi.
+    pub tasks: bool,
+    /// Modello del personaggio (vuoto = cittadina di Half-Life 2).
+    pub model: String,
+    /// Nome sopra la testa e in chat.
+    pub name: String,
+    /// Cartella di Garry's Mod (vuota = trovata da sola).
+    pub dir: String,
+}
+
+impl Default for GmodLinkConfig {
+    fn default() -> Self {
+        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new() }
+    }
+}
+
+impl GmodLinkConfig {
+    pub fn normalize(&mut self) {
+        if !["off", "low", "normal", "often"].contains(&self.chatter.as_str()) {
+            self.chatter = "low".into();
+        }
+        self.name = self.name.trim().chars().take(32).collect();
+        if self.name.is_empty() {
+            self.name = "Alter Ego".into();
+        }
+        self.model = self.model.trim().replace('\\', "/").chars().take(200).collect();
+    }
+}
+
 /// Pet: Alter Ego esce dalla TV e gira per il desktop nei momenti di calma (vedi pet/).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
@@ -825,6 +863,7 @@ pub struct Config {
     pub sql: SqlConfig,
     pub local: LocalConfig,
     pub pet: PetConfig,
+    pub gmodlink: GmodLinkConfig,
     pub extras: ExtrasConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
@@ -869,6 +908,7 @@ impl Default for Config {
             sql: SqlConfig::default(),
             local: LocalConfig::default(),
             pet: PetConfig::default(),
+            gmodlink: GmodLinkConfig::default(),
             extras: ExtrasConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
@@ -947,6 +987,7 @@ pub fn load(path: &Path) -> Config {
             cfg.ai.normalize();
             cfg.normalize_voice();
             cfg.pet.normalize();
+            cfg.gmodlink.normalize();
             cfg.auto_advance_secs = cfg.auto_advance_secs.clamp(0.5, 30.0);
             cfg.music.player_width = cfg.music.player_width.clamp(crate::music::PLAYER_MIN_W, crate::music::PLAYER_MAX_W);
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {

@@ -13,6 +13,7 @@ mod costs;
 mod extras;
 mod form;
 mod gmod;
+mod gmodlink;
 mod graphify;
 mod hermes;
 mod hotkeys;
@@ -114,6 +115,7 @@ pub struct FrontConfig {
     gmod_off: Vec<String>,
     hermes_brain: bool,
     pet: config::PetConfig,
+    gmodlink: config::GmodLinkConfig,
     extras: config::ExtrasConfig,
 }
 
@@ -160,6 +162,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         gmod_off: cfg.gmod_off.clone(),
         hermes_brain: cfg.hermes_brain,
         pet: cfg.pet.clone(),
+        gmodlink: cfg.gmodlink.clone(),
         extras: cfg.extras.clone(),
     }
 }
@@ -257,6 +260,13 @@ async fn open_settings(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn reveal_main(app: AppHandle) {
     window::show_main(&app);
+    window::raise_overlay(&app);
+}
+
+/// Fine della risposta: la finestra non resta sopra al gioco (se "sempre in primo piano" è spento).
+#[tauri::command]
+fn overlay_release(app: AppHandle) {
+    window::release_overlay(&app);
 }
 
 /// Dà il focus alla finestra principale (serve per scrivere nell'input di testo).
@@ -497,6 +507,7 @@ fn main() {
             app.manage(sql::Sql::default());
             app.manage(pet::PetRt::default());
             app.manage(extras::Extras::default());
+            app.manage(gmodlink::Link::default());
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
@@ -536,7 +547,8 @@ fn main() {
             });
             *app.state::<AppState>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
             *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
-            *app.state::<extras::Extras>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
+            *app.state::<extras::Extras>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
+            *app.state::<gmodlink::Link>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             voicestudio::autostart(&handle);
@@ -561,6 +573,7 @@ fn main() {
             actions::spawn_reminder_loop(handle.clone());
             music::spawn_analyzer(handle.clone());
             gmod::spawn(handle.clone());
+            gmodlink::spawn(handle.clone());
             pet::spawn(handle.clone());
             extras::spawn(handle.clone());
             window::spawn_handle_poller(handle);
@@ -597,6 +610,7 @@ fn main() {
             open_settings,
             focus_main,
             reveal_main,
+            overlay_release,
             extras::extras_status,
             extras::extras_install,
             extras::extras_asked,
@@ -664,6 +678,10 @@ fn main() {
             spotify::spotify_settings,
             spotify::spotify_status,
             gmod::gmod_settings,
+            gmodlink::gmodlink_status,
+            gmodlink::gmodlink_install,
+            gmodlink::gmodlink_settings,
+            gmodlink::gmodlink_join,
             rizzo::rizzo_set_dir,
             localai::local_catalog_open,
             hermes::hermes_status,

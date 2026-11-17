@@ -703,6 +703,23 @@ const I18N = (() => {
     "Fine con sconfitta": "Losing ending", "Evento: blackout": "Event: blackout", "Evento: travestimenti": "Event: disguises",
     "Evento: teletrasporto": "Event: teleport", "Diventi l'assassino": "You become the killer", "Colpito": "Hit",
     "Morte": "Death", "Sonno basso": "Low sleep",
+    "Garry's Mod: gioca con me (Sandbox)": "Garry's Mod: play with me (Sandbox)",
+    "Alter Ego entra nel gioco come personaggio e gioca con te: ti segue, parla in chat e con la sua voce, crea e lancia oggetti, combatte al tuo fianco. Le parli con il push-to-talk o scrivendo nella chat del gioco (anche gli altri giocatori). Per i compiti lunghi («quando vedi una gallina sparale») scrive un piccolo script che gira nel gioco senza consumare altri token. Funziona in single player e nei server che ospiti tu; usa la modalità video «finestra senza bordi» per vedere Alter Ego sopra il gioco.":
+      "Alter Ego joins the game as a character and plays with you: she follows you, talks in chat and with her voice, spawns and throws things, fights by your side. Talk to her with push-to-talk or in the game chat (other players can too). For long jobs (“when you see a chicken, shoot it”) she writes a small script that runs in the game without using more tokens. Works in single player and on servers you host; use the “borderless window” video mode to see Alter Ego over the game.",
+    "Attiva (installa l'addon Alter Ego Link nella cartella di Garry's Mod)": "Turn on (installs the Alter Ego Link addon in the Garry's Mod folder)",
+    "Installa / aggiorna addon": "Install / update addon", "Entra nel gioco": "Join the game", "Esci dal gioco": "Leave the game",
+    "Entra da sola quando carichi una mappa": "Join by herself when you load a map",
+    "Può scrivere script Lua per i compiti lunghi (girano in una sandbox: solo le sue azioni, niente file né console)":
+      "Can write Lua scripts for long jobs (they run in a sandbox: only her actions, no files or console)",
+    "Commenti spontanei": "Spontaneous comments", "Mai": "Never", "Pochi": "Few", "Normali": "Normal", "Tanti": "Many",
+    "Nome nel gioco": "In-game name", "Modello del personaggio": "Character model",
+    "Serve un modello NPC (con le animazioni da NPC): molti modelli «playermodel» restano fermi in posa a T.":
+      "It needs an NPC model (with NPC animations): many “playermodels” stay frozen in a T-pose.",
+    "Cartella di Garry's Mod": "Garry's Mod folder", "trovata da sola (gioco aperto o libreria Steam)": "found automatically (open game or Steam library)",
+    "Garry's Mod non trovato: indica la cartella qui sotto": "Garry's Mod not found: enter the folder below",
+    "Alter Ego è nel gioco ✓": "Alter Ego is in the game ✓", "Gioco collegato ✓ (lei non è ancora entrata)": "Game linked ✓ (she hasn't joined yet)",
+    "Addon installato: ricarica la mappa per attivarlo": "Addon installed: reload the map to activate it", "Addon installato ✓": "Addon installed ✓",
+    "Addon non installato": "Addon not installed", "Addon installato in {d}: carica (o ricarica) una mappa": "Addon installed in {d}: load (or reload) a map",
   };
 
   let lang = "it";

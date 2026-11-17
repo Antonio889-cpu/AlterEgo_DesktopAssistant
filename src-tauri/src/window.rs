@@ -380,6 +380,44 @@ pub fn show_main(app: &AppHandle) {
     }
 }
 
+/// Porta la finestra sopra tutto (anche sopra un gioco a schermo intero in finestra) senza
+/// rubare il focus: il gioco continua a ricevere mouse e tastiera. Vedi `release_overlay`.
+static RAISED: AtomicBool = AtomicBool::new(false);
+
+pub fn raise_overlay(app: &AppHandle) {
+    let Some(win) = app.get_webview_window(MAIN) else { return };
+    let on_top = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).always_on_top;
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW};
+        if let Ok(h) = win.hwnd() {
+            // SWP_NOACTIVATE: sopra il gioco, ma il focus (mouse e tastiera) resta al gioco
+            unsafe { SetWindowPos(h.0 as _, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW) };
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = win.set_always_on_top(true);
+    RAISED.store(!on_top, Ordering::SeqCst);
+}
+
+/// Fine dell'interazione: se "sempre in primo piano" è spento, la finestra torna normale.
+pub fn release_overlay(app: &AppHandle) {
+    if !RAISED.swap(false, Ordering::SeqCst) || TAKEOVER.load(Ordering::SeqCst) {
+        return;
+    }
+    let on_top = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).always_on_top;
+    let Some(win) = app.get_webview_window(MAIN) else { return };
+    #[cfg(windows)]
+    if !on_top {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_NOTOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+        if let Ok(h) = win.hwnd() {
+            unsafe { SetWindowPos(h.0 as _, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) };
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = win.set_always_on_top(on_top);
+}
+
 /// Nasconde la finestra (o esce dall'app) dopo l'animazione di spegnimento.
 pub fn hide_main(app: &AppHandle, quit: bool) {
     let anim = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).tv_animation;

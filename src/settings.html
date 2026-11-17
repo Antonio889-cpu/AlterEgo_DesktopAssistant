@@ -341,6 +341,20 @@
     </section>
 
     <section data-tab="voice">
+      <h2>Garry's Mod: gioca con me (Sandbox)</h2>
+      <p class="note">Alter Ego entra nel gioco come personaggio e gioca con te: ti segue, parla in chat e con la sua voce, crea e lancia oggetti, combatte al tuo fianco. Le parli con il push-to-talk o scrivendo nella chat del gioco (anche gli altri giocatori). Per i compiti lunghi («quando vedi una gallina sparale») scrive un piccolo script che gira nel gioco senza consumare altri token. Funziona in single player e nei server che ospiti tu; usa la modalità video «finestra senza bordi» per vedere Alter Ego sopra il gioco.</p>
+      <label class="inline"><input type="checkbox" id="gl-enabled" /> Attiva (installa l'addon Alter Ego Link nella cartella di Garry's Mod)</label>
+      <div class="actions"><button id="gl-install">Installa / aggiorna addon</button> <button id="gl-join">Entra nel gioco</button> <button id="gl-leave">Esci dal gioco</button> <span id="gl-status" class="result"></span></div>
+      <label class="inline"><input type="checkbox" id="gl-auto" /> Entra da sola quando carichi una mappa</label>
+      <label class="inline"><input type="checkbox" id="gl-tasks" /> Può scrivere script Lua per i compiti lunghi (girano in una sandbox: solo le sue azioni, niente file né console)</label>
+      <label>Commenti spontanei <select id="gl-chatter"><option value="off">Mai</option><option value="low">Pochi</option><option value="normal">Normali</option><option value="often">Tanti</option></select></label>
+      <label>Nome nel gioco <input id="gl-name" maxlength="32" placeholder="Alter Ego" /></label>
+      <label>Modello del personaggio <input id="gl-model" placeholder="models/humans/group01/female_01.mdl" /></label>
+      <p class="note sub">Serve un modello NPC (con le animazioni da NPC): molti modelli «playermodel» restano fermi in posa a T.</p>
+      <label>Cartella di Garry's Mod <input id="gl-dir" placeholder="trovata da sola (gioco aperto o libreria Steam)" /></label>
+    </section>
+
+    <section data-tab="voice">
       <h2>Riconoscimento vocale (push-to-talk)</h2>
       <p class="note">Tieni premuto il tasto push-to-talk (scheda <b>Tasti</b>) mentre parli, poi rilascia. L'audio va solo al servizio scelto qui.</p>
       <label>Servizio
@@ -598,7 +612,7 @@
       <table id="cost-by" class="grid"><thead><tr><th>Servizio</th><th>Modello</th><th>Richieste</th><th>Input</th><th>Cache</th><th>Output</th><th>Costo</th></tr></thead><tbody></tbody></table>
       <h3>Richieste</h3>
       <div class="actions">
-        <select id="cost-filter"><option value="">Tutte</option><option value="chat">Chat</option><option value="riassunto">Riassunti</option><option value="ricerca web">Ricerche web</option><option value="pagina web">Pagine web</option><option value="trascrizione">Trascrizioni</option></select>
+        <select id="cost-filter"><option value="">Tutte</option><option value="chat">Chat</option><option value="riassunto">Riassunti</option><option value="ricerca web">Ricerche web</option><option value="pagina web">Pagine web</option><option value="trascrizione">Trascrizioni</option><option value="gmod">Garry's Mod</option></select>
         <button id="cost-refresh">Aggiorna</button> <button id="cost-export">Esporta CSV</button> <button id="cost-clear" class="danger">Svuota</button>
         <span id="cost-result" class="result"></span>
       </div>
