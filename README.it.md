@@ -533,6 +533,7 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
 - L'app e il gioco si parlano con due file in `garrysmod/data/alterego/`: niente opzioni di avvio né moduli binari.
   Single player e server che ospiti tu (l'addon deve girare sul server).
 - Usa la modalità video **finestra senza bordi**: un gioco a schermo intero esclusivo copre ogni altra finestra.
+- **Corpo**: con [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (addon del Workshop di StarFrost, non incluso: iscriviti da Steam) è un Lambda Player e si muove come un giocatore vero (corsa, salto, armi da giocatore, physgun vera); le sue decisioni, la sua chat e la sua voce sono spente, comanda Alter Ego. Senza, è un NPC cittadino. *Automatico* sceglie Lambda quando è installato; si sceglie nelle impostazioni o nel menu C.
 - Modello del personaggio: nel gioco tieni premuto **C** → **Alter Ego** e scegli uno dei playermodel installati (con anteprima), oppure «come il mio». Il playermodel viene incollato (bonemerge) su un corpo NPC invisibile, così si anima bene; vanno bene anche i modelli NPC. Di base è una cittadina di Half-Life 2.
 
 ## Pet
@@ -732,6 +733,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - **VB-CABLE** di VB-Audio Software: donationware, non incluso; si scarica dal sito ufficiale.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 - Sfondi degli uffici dei contenuti aggiuntivi (`src/assets/extras/`): fatti dall'autore del progetto con una mappa di Garry's Mod.
+- **Lambda Players** di StarFrost: facoltativo, non incluso; Alter Ego Link usa solo i suoi hook e le sue funzioni pubbliche.
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): scritto per questo progetto; alcune idee (corpo da NPC, movimento della bocca, diario degli eventi) vengono da [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) di SonnyTaylor (MIT).
 - Foglio sprite del **pet Chihiro**: di **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),

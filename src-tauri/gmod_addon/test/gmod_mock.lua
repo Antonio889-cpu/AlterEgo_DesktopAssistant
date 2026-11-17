@@ -183,3 +183,76 @@ function MOCK.advance(secs, dt)
     MOCK.run("Think")
   end
 end
+
+-- ---------- finto Lambda Players (solo se MOCK.has_lambda = true prima di caricare l'addon) ----------
+scripted_ents = { GetStored = function(c) return (MOCK.has_lambda and c == "npc_lambdaplayer") and {} or nil end }
+ACT_GMOD_GESTURE_WAVE, ACT_SIGNAL_FORWARD, ACT_GMOD_GESTURE_DISAGREE, ACT_GMOD_GESTURE_AGREE = 101, 102, 103, 104
+ACT_GMOD_GESTURE_BOW, ACT_GMOD_TAUNT_CHEER, ACT_GMOD_TAUNT_LAUGH, ACT_GMOD_TAUNT_SALUTE = 105, 106, 107, 108
+ACT_GMOD_TAUNT_DANCE, ACT_GMOD_TAUNT_ROBOT, ACT_GMOD_TAUNT_MUSCLE = 109, 110, 111
+local function lambdaHook(name, ...)
+  local f = MOCK.hooks[name]
+  if f then return f(...) end
+end
+local LM = {}
+function LM:SetCreator(p) self.creator = p end
+function LM:PreventDefaultComs(b) self.nocoms = b end
+function LM:SetLambdaName(n) self.lname = n end
+function LM:SetNW2String(k, v) self.nw2 = self.nw2 or {} self.nw2[k] = v end
+function LM:GetNW2String(k, d) return (self.nw2 or {})[k] or d end
+function LM:GetIsDead() return self.dead == true end
+function LM:SetState(st)
+  st = st or "Idle"
+  if lambdaHook("LambdaOnChangeState", self, self:GetNW2String("lambda_state", "Idle"), st) == true then return end
+  self:SetNW2String("lambda_state", st)
+end
+function LM:MoveToPos(target, opts)
+  local p = isvector(target) and target or target:GetPos()
+  self.moves = (self.moves or 0) + 1
+  if opts and opts.callback and opts.callback(self) == false then return "callback" end
+  self.pos = p + Vector(40, 0, 0)
+  return "ok"
+end
+function LM:LookTo(what) self.lookedAt = what end
+function LM:CancelMovement() self.cancelled = (self.cancelled or 0) + 1 end
+function LM:LambdaJump() self.jumped = true end
+function LM:SelectWeightedSequence(act) return act end
+function LM:AddGestureSequence(seq) self.gesture = seq end
+function LM:SwitchWeapon(w) self.l_Weapon = w end
+function LM:AttackTarget(e)
+  if lambdaHook("LambdaOnAttackTarget", self, e) == true then return end
+  self.enemy = e
+  self:SetState("Combat")
+end
+function LM:Combat() if not IsValid(self.enemy) or self.enemy.hp <= 0 then return true end end
+function LM:Idle() self.wandered = true self.pos = self.pos + Vector(500, 500, 0) end
+local create = ents.Create
+ents.Create = function(c)
+  local e = create(c)
+  if c == "npc_lambdaplayer" then
+    for k, v in pairs(LM) do e[k] = v end
+    e.l_Weapon = "none"
+    e.Spawn = function(self) self.spawned = true self:SetNW2String("lambda_state", "Idle") end
+  end
+  return e
+end
+-- il "RunBehaviour" del Lambda: a ogni tick chiama la funzione del suo stato
+local think = MOCK.advance
+function MOCK.advance(secs, dt)
+  local h = MOCK.hooks.Think
+  MOCK.hooks.Think = function(...)
+    if h then h(...) end
+    for _, e in pairs(MOCK.ents) do
+      if e.alive and e.class == "npc_lambdaplayer" and not e.dead then
+        local st = e:GetNW2String("lambda_state", "Idle")
+        local f = e[st]
+        if f then
+          local r = f(e)
+          if r and e:GetNW2String("lambda_state", "Idle") == st then e:SetState(type(r) == "string" and r or nil) end
+        end
+        lambdaHook("LambdaOnThink", e)
+      end
+    end
+  end
+  think(secs, dt)
+  MOCK.hooks.Think = h
+end

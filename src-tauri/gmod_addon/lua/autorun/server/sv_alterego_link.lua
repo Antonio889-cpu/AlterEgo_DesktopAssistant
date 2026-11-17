@@ -32,6 +32,8 @@ L.model = ""                         -- vuoto = cittadina di Half-Life 2
 L.name = "Alter Ego"
 L.autoJoin = true
 L.allowTasks = true
+L.body = "auto"                      -- auto | citizen | lambda (Lambda Players, se installato)
+L.kind = L.kind or "citizen"         -- corpo in uso adesso
 L.spawned = L.spawned or {}          -- oggetti creati da lei (massimo MAX_SPAWNED)
 L.speakUntil = 0
 L.deadAt = nil
@@ -59,7 +61,12 @@ L.ITEMS = {
 L.WEAPONS = { pistol = "weapon_pistol", smg = "weapon_smg1", shotgun = "weapon_shotgun", crowbar = "weapon_crowbar", ar2 = "weapon_ar2", crossbow = "weapon_crossbow" }
 
 local function valid(e) return IsValid(e) end
-local function botOk() return IsValid(L.bot) and L.bot:Health() > 0 end
+local function botOk()
+  if not IsValid(L.bot) then return false end
+  if L.kind == "lambda" then return not (L.bot.GetIsDead and L.bot:GetIsDead()) end
+  return L.bot:Health() > 0
+end
+local function isLambda() return L.kind == "lambda" and IsValid(L.bot) end
 
 -- ---------- eventi per l'app ----------
 function L.event(kind, data)
@@ -190,6 +197,9 @@ function L.applyModel(bot, model)
   bot.AESkin = skin
   bot:SetNWEntity("AESkinEnt", skin)
 end
+local LB = include("alterego/body_lambda.lua")
+L.LB = LB
+
 local function relate(bot)
   for _, p in ipairs(player.GetAll()) do
     pcall(bot.AddEntityRelationship, bot, p, D_LI, 99)
@@ -205,22 +215,34 @@ function L.join(model, name)
   if name and name ~= "" then L.name = name end
   local tr = util.TraceLine({ start = h:EyePos(), endpos = h:EyePos() + h:GetForward() * 120, filter = h })
   local pos = tr.HitPos - h:GetForward() * 20
-  local bot = ents.Create("npc_citizen")
-  if not IsValid(bot) then return end
-  bot:SetPos(pos + Vector(0, 0, 8))
-  bot:SetAngles(Angle(0, (h:GetPos() - pos):Angle().y, 0))
-  bot:SetKeyValue("citizentype", "4")
-  -- non comandabile dal giocatore (+use), non lascia cadere le armi
-  bot:SetKeyValue("spawnflags", tostring(1048576 + 8192))
-  bot:Spawn()
-  bot:Activate()
-  L.applyModel(bot, L.model)
+  local ang = Angle(0, (h:GetPos() - pos):Angle().y, 0)
+  local useLambda = L.body ~= "citizen" and LB.available()
+  local bot
+  if useLambda then
+    bot = LB.spawn(pos + Vector(0, 0, 8), ang, h)
+    L.kind = "lambda"
+  end
+  if not IsValid(bot) then
+    L.kind = "citizen"
+    bot = ents.Create("npc_citizen")
+    if not IsValid(bot) then return end
+    bot:SetPos(pos + Vector(0, 0, 8))
+    bot:SetAngles(ang)
+    bot:SetKeyValue("citizentype", "4")
+    -- non comandabile dal giocatore (+use), non lascia cadere le armi
+    bot:SetKeyValue("spawnflags", tostring(1048576 + 8192))
+    bot:Spawn()
+    bot:Activate()
+    L.applyModel(bot, L.model)
+  end
   bot:SetName("alterego")
   bot:SetNWString("AEName", L.name)
   bot:SetNWBool("AELink", true)
-  bot:SetMaxHealth(100)
-  bot:SetHealth(100)
-  relate(bot)
+  if L.kind == "citizen" then
+    bot:SetMaxHealth(100)
+    bot:SetHealth(100)
+    relate(bot)
+  end
   L.bot = bot
   L.mode = "follow"
   L.target = h
@@ -246,23 +268,28 @@ function L.leave()
 end
 
 local function stand()
-  if botOk() then pcall(L.bot.SetSchedule, L.bot, SCHED_IDLE_STAND) end
+  if not botOk() then return end
+  if isLambda() then return LB.stand(L.bot) end
+  pcall(L.bot.SetSchedule, L.bot, SCHED_IDLE_STAND)
 end
 
 local function goTo(pos, run)
   if not botOk() then return end
+  if isLambda() then return LB.goTo(L.bot, pos) end
   L.bot:SetLastPosition(pos)
   L.bot:SetSchedule(run and SCHED_FORCED_GO_RUN or SCHED_FORCED_GO)
 end
 
 local function face(pos)
   if not botOk() then return end
+  if isLambda() then return LB.look(L.bot, pos) end
   local y = (pos - L.bot:GetPos()):Angle().y
   pcall(L.bot.SetIdealYawAndUpdate, L.bot, y)
 end
 
 function L.look(e)
   if botOk() and IsValid(e) then
+    if isLambda() then return LB.look(L.bot, e) end
     local p = e:IsPlayer() and e:EyePos() or e:WorldSpaceCenter()
     pcall(L.bot.SetEyeTarget, L.bot, p)
     face(p)
@@ -270,6 +297,7 @@ function L.look(e)
 end
 
 function L.jump()
+  if isLambda() and botOk() then return LB.jump(L.bot) end
   if botOk() then
     L.bot:SetVelocity(Vector(0, 0, 260))
     L.bot:EmitSound("player/pl_jump" .. math.random(1, 2) .. ".wav", 60, 120)
@@ -286,6 +314,7 @@ local GESTURES = {
 }
 function L.gesture(name)
   if not botOk() then return end
+  if isLambda() then return LB.gesture(L.bot, name) end
   for _, s in ipairs(GESTURES[name] or { name }) do
     local id = L.bot:LookupSequence(s)
     if id and id >= 0 then
@@ -298,6 +327,7 @@ end
 
 function L.dance()
   if not botOk() then return end
+  if isLambda() then return LB.gesture(L.bot, "dance") end
   local bot, n = L.bot, 0
   timer.Create("AELinkDance", 0.35, 12, function()
     if not IsValid(bot) then return end
@@ -309,6 +339,7 @@ end
 
 function L.give(w)
   if not botOk() then return end
+  if isLambda() then return LB.give(L.bot, w) end
   local cls = L.WEAPONS[w] or (tostring(w):match("^weapon_") and w) or "weapon_pistol"
   local cur = L.bot:GetActiveWeapon()
   if IsValid(cur) then cur:Remove() end
@@ -317,6 +348,7 @@ end
 
 function L.attack(e)
   if not botOk() or not IsValid(e) or e == L.bot then return false end
+  if isLambda() then LB.attack(L.bot, e) return true end
   if not IsValid(L.bot:GetActiveWeapon()) then L.bot:Give("weapon_pistol") end
   pcall(L.bot.AddEntityRelationship, L.bot, e, D_HT, 99)
   L.bot:SetEnemy(e)
@@ -334,6 +366,8 @@ function L.grab(e)
   if not IsValid(ph) or not ph:IsMoveable() then return false end
   L.held = e
   L.bot:SetNWEntity("AEHeld", e)
+  -- con il corpo Lambda ha in mano la physgun vera
+  if isLambda() then LB.give(L.bot, "physgun") end
   ph:Wake()
   L.bot:EmitSound("weapons/physcannon/physcannon_pickup.wav", 55, 120)
   return true
@@ -496,11 +530,13 @@ L.api = {
   go = function(target, near, timeout)
     near = tonumber(near) or 90
     L.mode = "goto"
+    L.goal = nil
     local ok = Sandbox.until_(function()
       local p = topos(target)
       if not p or not botOk() then return true end
       if p:Distance(botPos()) <= near then return true end
-      if not L.bot:IsCurrentSchedule(SCHED_FORCED_GO_RUN) or (L.goal and L.goal:Distance(p) > 60) then
+      local moving = isLambda() and L.mode == "goto" or (not isLambda() and L.bot:IsCurrentSchedule(SCHED_FORCED_GO_RUN))
+      if not moving or not isvector(L.goal) or L.goal:Distance(p) > 60 then
         L.goal = p
         goTo(p, true)
       end
@@ -621,6 +657,11 @@ OPS.config = function(c)
   if c.name and c.name ~= "" then L.name = c.name end
   if c.auto_join ~= nil then L.autoJoin = c.auto_join end
   if c.tasks ~= nil then L.allowTasks = c.tasks end
+  if c.body and c.body ~= "" and c.body ~= L.body and not L.menuBody then
+    L.body = c.body
+  elseif L.menuBody and c.body == L.menuBody then
+    L.menuBody = nil
+  end
 end
 
 local function readCommands(initial)
@@ -660,12 +701,19 @@ local function dirOf(from, e)
 end
 
 local function snapshot()
-  local s = { v = L.VERSION, t = os.time(), map = game.GetMap(), seq = L.seq, events = L.events, tasks = Sandbox.list() }
+  local s = { v = L.VERSION, t = os.time(), map = game.GetMap(), seq = L.seq, events = L.events, tasks = Sandbox.list(),
+    body = IsValid(L.bot) and L.kind or nil, lambda = LB.available() }
   local h = host()
   if botOk() then
     local b = L.bot
-    local w = b:GetActiveWeapon()
-    s.bot = { hp = b:Health(), mode = L.mode, weapon = IsValid(w) and w:GetClass():gsub("^weapon_", "") or nil,
+    local weapon
+    if L.kind == "lambda" then
+      weapon = b.l_Weapon ~= "none" and b.l_Weapon or nil
+    else
+      local w = b:GetActiveWeapon()
+      weapon = IsValid(w) and w:GetClass():gsub("^weapon_", "") or nil
+    end
+    s.bot = { hp = b:Health(), mode = L.mode, weapon = weapon, body = L.kind,
       held = IsValid(L.held) and (friendly(L.held) .. "#" .. L.held:EntIndex()) or nil,
       following = IsValid(L.target) and L.target:IsPlayer() and L.target:Nick() or nil }
     local players = {}
@@ -726,6 +774,15 @@ local function brain()
   end
   if now < nextBrain then return end
   nextBrain = now + 0.5
+  if isLambda() then
+    if L.mode == "attack" and (not IsValid(L.goal) or (L.goal.Health and L.goal:Health() <= 0)) then
+      L.mode = "follow"
+      L.goal = nil
+    elseif L.mode == "goto" and #Sandbox.list() == 0 and isvector(L.goal) and L.goal:Distance(L.bot:GetPos()) < 90 then
+      L.mode = "stay"
+    end
+    return
+  end
   if #Sandbox.list() > 0 and L.mode == "goto" then return end -- un task la sta muovendo
   if L.mode == "follow" then
     local t = L.target
@@ -763,8 +820,9 @@ hook.Add("Think", "AELink", function()
   brain()
   Sandbox.tick()
   -- rientra da sola dopo una morte, se l'app è collegata
-  if L.deadAt and CurTime() - L.deadAt > 6 and L.linked() then
+  if L.deadAt and CurTime() - L.deadAt > (L.kind == "lambda" and 8 or 6) and L.linked() then
     L.deadAt = nil
+    if L.kind == "lambda" and IsValid(L.bot) then L.bot:Remove() L.bot = nil end
     L.join()
   end
 end)
@@ -786,7 +844,7 @@ hook.Add("EntityTakeDamage", "AELink", function(target, dmg)
 end)
 
 hook.Add("OnNPCKilled", "AELink", function(npc, attacker)
-  if npc == L.bot then
+  if npc == L.bot and L.kind ~= "lambda" then
     L.drop()
     L.bot = nil
     L.deadAt = CurTime()
@@ -861,6 +919,22 @@ net.Receive("alterego_menu", function(_, ply)
       L.name = arg
       if IsValid(L.bot) then L.bot:SetNWString("AEName", arg) end
       L.event("name", { name = arg })
+    end
+  elseif what == "body" then
+    if arg == "auto" or arg == "citizen" or arg == "lambda" then
+      L.body = arg
+      L.menuBody = arg
+      L.event("body", { body = arg })
+      -- si cambia corpo subito se è già nel gioco
+      if IsValid(L.bot) then
+        local want = (arg ~= "citizen" and LB.available()) and "lambda" or "citizen"
+        if want ~= L.kind then
+          L.drop()
+          L.bot:Remove()
+          L.bot = nil
+          L.join()
+        end
+      end
     end
   elseif what == "join" then L.join()
   elseif what == "leave" then L.leave()

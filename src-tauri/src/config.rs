@@ -746,16 +746,21 @@ pub struct GmodLinkConfig {
     pub name: String,
     /// Cartella di Garry's Mod (vuota = trovata da sola).
     pub dir: String,
+    /// Corpo nel gioco: "auto" (Lambda Player se Lambda Players è installato), "citizen", "lambda".
+    pub body: String,
 }
 
 impl Default for GmodLinkConfig {
     fn default() -> Self {
-        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new() }
+        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new(), body: "auto".into() }
     }
 }
 
 impl GmodLinkConfig {
     pub fn normalize(&mut self) {
+        if !["auto", "citizen", "lambda"].contains(&self.body.as_str()) {
+            self.body = "auto".into();
+        }
         if !["off", "low", "normal", "often"].contains(&self.chatter.as_str()) {
             self.chatter = "low".into();
         }

@@ -348,6 +348,8 @@
       <label class="inline"><input type="checkbox" id="gl-auto" /> Entra da sola quando carichi una mappa</label>
       <label class="inline"><input type="checkbox" id="gl-tasks" /> Può scrivere script Lua per i compiti lunghi (girano in una sandbox: solo le sue azioni, niente file né console)</label>
       <label>Commenti spontanei <select id="gl-chatter"><option value="off">Mai</option><option value="low">Pochi</option><option value="normal">Normali</option><option value="often">Tanti</option></select></label>
+      <label>Corpo <select id="gl-body"><option value="auto">Automatico (Lambda Player se installato)</option><option value="citizen">NPC cittadino (sempre disponibile)</option><option value="lambda">Lambda Player</option></select></label>
+      <p class="note sub" id="gl-lambda-note">Con <a href="#" id="gl-lambda-link">Lambda Players</a> (addon del Workshop di StarFrost) Alter Ego si muove come un giocatore vero: corsa, salto, armi e physgun da giocatore. Senza, usa un NPC cittadino con il suo modello sopra. <span id="gl-lambda-state"></span></p>
       <label>Nome nel gioco <input id="gl-name" maxlength="32" placeholder="Alter Ego" /></label>
       <label>Modello del personaggio <input id="gl-model" placeholder="models/humans/group01/female_01.mdl" /></label>
       <p class="note sub">Più comodo dal gioco: tieni premuto C → icona «Alter Ego» e scegli tra i playermodel installati (con anteprima). Vanno bene sia i playermodel sia i modelli NPC.</p>
