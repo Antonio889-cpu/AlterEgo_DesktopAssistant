@@ -95,6 +95,8 @@ function E:IsVehicle() return self.class:find("^prop_vehicle") ~= nil end
 function E:IsWeapon() return self.class:find("^weapon_") ~= nil end
 function E:GetMoveType() return self.class == "prop_physics" and MOVETYPE_VPHYSICS or 0 end
 function E:BoundingRadius() return 20 end
+function E:OBBMins() return Vector(-20, -20, -20) end
+function E:OBBMaxs() return Vector(20, 20, 20) end
 function E:GetVelocity() return self.vel or Vector() end
 function E:GetRight() local r = math.rad(self.ang.y) return Vector(math.sin(r), -math.cos(r), 0) end
 function E:WaterLevel() return self.water or 0 end
@@ -125,7 +127,8 @@ function E:GetPhysicsObject()
   if e.class ~= "prop_physics" and not e:IsVehicle() then return NULL end
   e.phys = e.phys or {
     IsValid = function() return true end, IsMoveable = function() return true end, Wake = function() end,
-    SetVelocity = function(_, v) e.physvel = v end, AddAngleVelocity = function() end, GetAngleVelocity = function() return Vector() end,
+    SetVelocity = function(_, v) e.physvel = v end, EnableMotion = function(_, on) e.frozen = not on end,
+    SetAngles = function(_, a) e.ang = a end, AddAngleVelocity = function() end, GetAngleVelocity = function() return Vector() end,
   }
   return e.phys
 end
@@ -139,6 +142,7 @@ function E:GetEyeTrace() return { HitPos = self.pos + Vector(300, 0, 0), Entity 
 -- ---------- librerie ----------
 MOCK.cslua = {}
 function AddCSLuaFile(p) MOCK.cslua[#MOCK.cslua + 1] = p end
+function LerpAngle(t, a, b) return Angle(a.p + (b.p - a.p) * t, a.y + (b.y - a.y) * t, a.r + (b.r - a.r) * t) end
 function VectorRand() return Vector(1, 0, 0) end
 SCHED_NPC_FREEZE = 5
 MOCK.lists = { Vehicles = {

@@ -360,6 +360,15 @@
       <label class="inline"><input type="checkbox" id="gl-idle" /> Quando non succede niente gioca da sola (costruisce, tira ai barili, emote)</label>
       <label class="inline"><input type="checkbox" id="gl-memory" /> Ricorda le partite (archivio separato, consultato solo quando serve)</label>
       <div class="actions"><button id="gl-forget">Dimentica le partite</button> <span id="gl-games" class="result"></span></div>
+      <label>Resistenza agli urti <select id="gl-tough"><option value="normal">Normale</option><option value="high">Alta (gli oggetti lanciati fanno poco male)</option><option value="tough">Altissima</option></select></label>
+      <label class="inline"><input type="checkbox" id="gl-goals" /> Obiettivi lunghi: ragiona passo passo finché non ha finito (esplorare, riempire la mappa, costruire pile…)</label>
+      <p class="note sub" id="gl-goal-now"></p>
+      <h3>Personalità</h3>
+      <label class="inline"><input type="checkbox" id="gl-grow" /> La personalità cresce: si inventa scherzi e giochi, si affeziona a quelli che vi fanno ridere e lascia perdere quelli che vi annoiano</label>
+      <label>Imprevedibilità <input type="range" id="gl-chaos" min="0" max="100" step="5" /> <span id="gl-chaos-val"></span></label>
+      <p class="note sub">Bassa: rifà le sue preferite (zero token) e reagisce in modo coerente. Alta: inventa spesso cose nuove e sorprende. Le reazioni dei giocatori le giudica Rizzo Flow se è il router scelto.</p>
+      <div id="gl-persona" class="persona"></div>
+      <div class="actions"><button id="gl-persona-forget">Azzera la personalità</button></div>
       <h3>Cervello di moscerino</h3>
       <label class="inline"><input type="checkbox" id="gl-fly" /> Riflessi e istinto da un vero cervello di moscerino</label>
       <p class="note sub">Un pezzo del cervello reale di Drosophila, mappato neurone per neurone dal progetto FlyWire, simulato sul PC in tempo reale. Sente dolore, oggetti che le arrivano addosso, il dolce e il tocco, e reagisce d'istinto come una giocatrice: schiva, salta via, sobbalza, e si abitua se le fai sempre lo stesso scherzo. Non consuma token.</p>
@@ -376,6 +385,8 @@
         <label class="inline"><input type="checkbox" data-sense="wind" /> Vento: quando la lanci o vola</label>
       </div>
       <div id="gl-fly-live" class="fly-live"></div>
+      <div class="actions"><button id="gl-monitor">Apri FruitFly Monitor</button></div>
+      <label class="inline"><input type="checkbox" id="gl-monitor-auto" /> Apri il monitor quando entra in partita</label>
     </section>
 
     <section data-tab="voice">

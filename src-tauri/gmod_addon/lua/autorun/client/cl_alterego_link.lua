@@ -172,6 +172,11 @@ local function buildMenu(window)
     leave:SetWide(115)
     leave:SetText(T("Esci", "Leave"))
     leave.DoClick = function() send("leave") end
+    local mon = right:Add("DButton")
+    mon:Dock(BOTTOM)
+    mon:SetTall(26)
+    mon:SetText(T("FruitFly Monitor (sul PC)", "FruitFly Monitor (on the PC)"))
+    mon.DoClick = function() send("monitor") end
 
     -- corpo: automatico (Lambda se c'è), cittadino, Lambda Players
     local body = right:Add("DComboBox")
@@ -266,6 +271,7 @@ hook.Add("PopulateMenuBar", "AELink", function(menubar)
   m:AddOption(T("Modello, corpo e nome…", "Model, body and name…"), openMenu):SetIcon("icon16/user_female.png")
   m:AddOption(T("Entra", "Join"), function() send("join") end):SetIcon("icon16/user_add.png")
   m:AddOption(T("Esci", "Leave"), function() send("leave") end):SetIcon("icon16/user_delete.png")
+  m:AddOption("FruitFly Monitor", function() send("monitor") end):SetIcon("icon16/monitor.png")
 end)
 
 -- 4. tasto destro su di lei (menu C) → Alter Ego…

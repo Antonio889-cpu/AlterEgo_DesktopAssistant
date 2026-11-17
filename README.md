@@ -543,6 +543,15 @@ Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Se
 - **Game memory**: each match becomes one line in a separate archive (`gmod_memory.json`, not in her main memory), written without AI.
   It's only looked up when needed: one line about the last game with the same friends at the start, and the full memories
   when you ask ("do you remember…", "last time…"; for doubtful cases Rizzo Flow decides, if it's your router).
+- **A personality that grows**: the pranks and games she invents become *habits* (the Lua script or the actions are kept, so she can redo them
+  without tokens). After each one she watches your chat for 25 s: if you laugh it becomes a favorite, if you get annoyed she drops it
+  (Rizzo Flow judges the reaction if it's your router, otherwise keywords). Her traits (curious, mischievous, bold, warm) shift slowly with
+  experience. *Unpredictability* (0-100) sets how often she invents something new instead of repeating her favorites. Separate archive
+  `gmod_persona.json`; *Reset personality* in the settings.
+- **Long goals**: "explore the map and find a car", "fill the map with watermelons", "build a tower of couches" — she sets herself a goal
+  and works on it step by step (spawns the props, then places them with the physgun), asking herself for the next step each time the
+  previous one finishes, until it's done (max 40 steps / 90 min; "stop" ends it). If Rizzo Flow is your router it checks, without tokens, whether the goal is already reached.
+- **Impact resistance**: props and cars flying at her hurt less (*High* by default, or *Normal* / *Very high*).
 - Menu in game: hold **C** → **Alter Ego** in the top bar or the *Alter Ego* icon, right-click on her → *Alter Ego…*, or the console command `alterego_menu`.
 - Character model: from that menu pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default she's a Half-Life 2 citizen.
 
@@ -559,6 +568,9 @@ simulated on your PC in real time with the leaky integrate-and-fire model of Shi
   and **gets used to it** (the tenth barrel gets a dirty look, not a jump). Sweetness makes her want to play with the watermelon.
 - **Adrenaline**: hits and dodges build up adrenaline that fades in about 40 s and reaches the AI in one short line, together with her "rivals".
   You can turn off the reflexes, the adrenaline, or show the neuron activity above her head.
+- **FruitFly Monitor**: a green CRT window with her mood (curious, calm, anxious, playful, resting), a wireframe brain whose regions light up
+  when they fire (eyes, antennae, mushroom bodies, central brain, taste, nerve cord), her current goal and favorite habit.
+  Open it from the settings, from the in-game menu (C → Alter Ego → FruitFly Monitor) or automatically when she joins.
 - How the circuit was extracted: [`tools/flybrain/`](tools/flybrain/).
 
 ## Pet

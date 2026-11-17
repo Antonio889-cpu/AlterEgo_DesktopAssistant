@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale, Music Venue, modulo, finestra SQL, pet)",
+  "description": "Permessi delle finestre (principale, impostazioni, lettore musicale, Music Venue, modulo, finestra SQL, pet, FruitFly Monitor)",
   "windows": [
     "main",
     "settings",
@@ -10,12 +10,15 @@
     "form",
     "sqlview",
     "models",
-    "pet"
+    "pet",
+    "flymonitor"
   ],
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize"
   ]
 }

@@ -12,6 +12,8 @@
 
 pub mod fly;
 pub mod memory;
+mod mind;
+pub mod persona;
 pub mod prompt;
 pub mod quick;
 
@@ -149,6 +151,8 @@ pub struct Link {
     pub ai: crate::providers::Ai,
     /// Una richiesta al modello alla volta.
     busy: tokio::sync::Mutex<()>,
+    /// Personalità, scherzi in prova, obiettivo lungo.
+    mind: Mutex<mind::Mind>,
 }
 
 #[derive(Default)]
@@ -182,6 +186,7 @@ impl Default for Link {
             fly: Mutex::new(FlyState::default()),
             ai: crate::providers::Ai::with_kind("gmod"),
             busy: tokio::sync::Mutex::new(()),
+            mind: Mutex::new(mind::Mind::default()),
         }
     }
 }
@@ -470,6 +475,8 @@ fn write_cmds(app: &AppHandle, dir: &Path) {
                     "mischief": cfg.mischief,
                     "idle": cfg.idle_play,
                     "lang": lang,
+                    "chaos": cfg.unpredictability as f64 / 100.0,
+                    "tough": cfg.toughness,
                 },
                 "fly": {
                     "on": cfg.fly.enabled,
@@ -605,6 +612,9 @@ pub fn spawn(app: AppHandle) {
             for e in events {
                 on_event(&app, e);
             }
+            if cfg.goals {
+                mind::goal_tick(&app);
+            }
         }
     });
 }
@@ -648,6 +658,7 @@ fn addressed(app: &AppHandle, from: &str, is_host: bool, text: &str) -> bool {
 }
 
 fn on_event(app: &AppHandle, e: Value) {
+    mind::on_event(app, &e);
     let kind = e["kind"].as_str().unwrap_or("");
     let s = |k: &str| e[k].as_str().unwrap_or("").to_string();
     match kind {
@@ -695,27 +706,15 @@ fn on_event(app: &AppHandle, e: Value) {
             let who = if by.is_empty() { "something came flying".to_string() } else { format!("{by} threw a {} at you", s("what")) };
             remember(app, &format!("[{who}; {how}]"), "");
         }
-        // annoiata: si inventa qualcosa da fare (se la chiacchiera lo permette)
-        "idea" => comment(
-            app,
-            "[event] nothing is happening and you're bored: invent something fun to do right now (build something silly, a mini-game, \
-a harmless prank on a friend…), with [act] lines or a short Lua [task]. Say one line about it.",
-            false,
-        ),
-        // voglia di vendicarsi: lo scherzo lo inventa lei (azione pronta o script Lua suo)
-        "prank_idea" => {
-            let recent = s("recent");
-            comment(
-                app,
-                &format!(
-                    "[event] {} keeps messing with you ({}). Get them back with a prank YOU invent: be creative and surprising, \
-not always the same thing{}. Use [act] lines or write a short Lua [task] (spawn_at, push, freeze, boom…). Say one playful line.",
-                    s("who"),
-                    s("why"),
-                    if recent.is_empty() { String::new() } else { format!(" (you already did: {recent})") }
-                ),
-                true,
-            );
+        // annoiata o in cerca di vendetta: rifà una delle sue abitudini o se ne inventa una (personalità)
+        "idea" => mind::want(app, "play", "", "", ""),
+        "prank_idea" => mind::want(app, "prank", &s("who"), &s("why"), &s("recent")),
+        // dal menu del gioco
+        "monitor" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = gmodlink_monitor_open(app).await;
+            });
         }
         "notify" => comment(app, &format!("[your task {} says] {}", s("task"), s("text")), true),
         "task" => {
@@ -763,6 +762,12 @@ not always the same thing{}. Use [act] lines or write a short Lua [task] (spawn_
         }
         "joined" | "left" => {
             let _ = app.emit("gmod-link", kind);
+            if kind == "joined" && cfg_of(app).gmodlink.monitor_auto {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = gmodlink_monitor_open(app).await;
+                });
+            }
         }
         _ => {}
     }
@@ -846,6 +851,8 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
     if event.is_none() {
         let in_game = lock(app).state.as_ref().is_some_and(|s| s.bot.is_some());
         if let Some(q) = quick::find(text, &from, cfg.gmodlink.name.trim(), in_game, en) {
+            // "basta"/"stop" ferma anche l'obiettivo lungo
+            mind::goal_line(app, None, &q.ops);
             send(app, q.ops);
             send(app, vec![json!({ "op": "say", "text": q.reply })]);
             remember(app, &format!("{from}: {text}"), &q.reply);
@@ -919,7 +926,10 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
     let r = prompt::parse(&res.text);
     crate::applog::info("gmodlink", &format!("risposta: {} azioni, {} caratteri", r.ops.len(), r.text.chars().count()));
     // niente script se disattivati nelle impostazioni
-    let ops: Vec<Value> = r.ops.into_iter().filter(|o| cfg.gmodlink.tasks || o["op"] != "task").collect();
+    let mut ops: Vec<Value> = r.ops.into_iter().filter(|o| cfg.gmodlink.tasks || o["op"] != "task").collect();
+    // invenzioni (scherzi/attività) e obiettivi lunghi
+    mind::after_reply(app, event.is_some(), &mut ops);
+    mind::goal_line(app, r.goal.as_deref(), &ops);
     send(app, ops.clone());
     if !r.text.is_empty() {
         send(app, vec![json!({ "op": "say", "text": r.text })]);
@@ -960,6 +970,8 @@ pub struct Status {
     pub fly: FlyStatus,
     /// Partite ricordate nella memoria delle partite.
     pub games: usize,
+    /// Personalità (tratti, abitudini preferite) e obiettivo lungo in corso.
+    pub persona: Value,
 }
 
 #[derive(Serialize)]
@@ -975,9 +987,11 @@ pub struct FlyStatus {
 pub async fn gmodlink_status(app: AppHandle) -> Status {
     let custom = cfg_of(&app).gmodlink.dir.clone();
     let dir = tauri::async_runtime::spawn_blocking(move || find_game_dir(&custom)).await.ok().flatten();
+    let persona = mind::view(&app);
     let i = lock(&app);
     let fresh = i.state_at.is_some_and(|t| t.elapsed() < Duration::from_secs(6));
     Status {
+        persona,
         installed: dir.as_deref().is_some_and(installed),
         dir: dir.map(|d| d.display().to_string()),
         game_running: i.game_running,
@@ -999,6 +1013,68 @@ pub async fn gmodlink_status(app: AppHandle) -> Status {
             }
         },
     }
+}
+
+/// Dati per il FruitFly Monitor (leggero: si chiede 5 volte al secondo).
+#[tauri::command]
+pub fn gmodlink_fly_view(app: AppHandle) -> Value {
+    let cfg = cfg_of(&app).gmodlink;
+    let persona = mind::view(&app);
+    let (fresh, in_game, name) = {
+        let i = lock(&app);
+        let fresh = i.state_at.is_some_and(|t| t.elapsed() < Duration::from_secs(6));
+        (fresh, fresh && i.state.as_ref().is_some_and(|s| s.bot.is_some()), cfg.name.clone())
+    };
+    let (neurons, synapses) = fly::size();
+    let f = fly_lock(&app);
+    let live = in_game && cfg.fly.enabled && f.last_tick.is_some_and(|t| t.elapsed() < Duration::from_secs(2));
+    let empty = std::collections::HashMap::new();
+    let senses = if live { &f.senses } else { &empty };
+    let out: Vec<(String, f32)> = if live { f.out.clone() } else { Vec::new() };
+    let tr = &persona["traits"];
+    let view = fly::monitor(
+        senses,
+        &out,
+        if live { f.mood.stress } else { 0.0 },
+        if live { f.activity } else { 0.0 },
+        tr["curiosity"].as_f64().unwrap_or(0.5) as f32,
+        tr["mischief"].as_f64().unwrap_or(0.5) as f32,
+    );
+    json!({
+        "name": name,
+        "status": if live { "active" } else if in_game { "brain_off" } else if fresh { "waiting" } else { "offline" },
+        "neurons": neurons,
+        "synapses": synapses,
+        "mood": view,
+        "out": out,
+        "instinct": f.mood.line(),
+        "persona": persona,
+    })
+}
+
+/// Apre (o porta davanti) il FruitFly Monitor.
+#[tauri::command]
+pub async fn gmodlink_monitor_open(app: AppHandle) -> Result<(), String> {
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
+    if let Some(w) = app.get_webview_window("flymonitor") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        return w.set_focus().map_err(|e| e.to_string());
+    }
+    WebviewWindowBuilder::new(&app, "flymonitor", WebviewUrl::App("flymonitor.html".into()))
+        .title("FruitFly Monitor")
+        .inner_size(760.0, 430.0)
+        .min_inner_size(520.0, 320.0)
+        .decorations(false)
+        .always_on_top(true)
+        .build()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn gmodlink_persona_forget(app: AppHandle) {
+    mind::forget(&app);
 }
 
 #[tauri::command]

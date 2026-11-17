@@ -42,7 +42,8 @@ L.spawned = L.spawned or {}          -- oggetti creati da lei (massimo MAX_SPAWN
 L.speakUntil = 0
 L.deadAt = nil
 
-local MAX_SPAWNED = 25
+local MAX_SPAWNED = 80
+L.MAX_SPAWNED = MAX_SPAWNED
 local MAX_EVENTS = 40
 
 -- Oggetti che può creare (nome → modello): niente modelli arbitrari dal modello AI.
@@ -426,7 +427,11 @@ local function holdTick()
   local ph = e:GetPhysicsObject()
   if not IsValid(ph) then return L.drop() end
   local size = e:BoundingRadius()
-  local want = L.eye() + L.bot:GetForward() * (60 + size) - Vector(0, 0, 6)
+  local want = L.holdAt or (L.eye() + L.bot:GetForward() * (60 + size) - Vector(0, 0, 6))
+  if L.holdAt and L.holdYaw then
+    local a = e:GetAngles()
+    ph:SetAngles(LerpAngle(0.25, a, Angle(0, L.holdYaw, 0)))
+  end
   local d = want - e:WorldSpaceCenter()
   ph:Wake()
   ph:SetVelocity(d * 8)
@@ -578,6 +583,48 @@ local function find(what, r)
   return w
 end
 
+-- posti già visti (per esplorare la mappa senza tornare sempre negli stessi)
+L.visited = L.visited or {}
+function L.markVisited()
+  if not botOk() then return end
+  local p = L.bot:GetPos()
+  local last = L.visited[#L.visited]
+  if last and last:Distance(p) < 300 then return end
+  L.visited[#L.visited + 1] = p
+  while #L.visited > 200 do table.remove(L.visited, 1) end
+end
+local function novelty(p)
+  local best = math.huge
+  for _, v in ipairs(L.visited) do best = math.min(best, v:Distance(p)) end
+  return best
+end
+--- Un punto raggiungibile lontano dai posti già visti (navmesh se c'è, altrimenti tracce a caso).
+function L.explorePoint(r)
+  if not botOk() then return nil end
+  local me = L.bot:GetPos()
+  local best, bs
+  local areas = navmesh and navmesh.Find and navmesh.Find(me, math.Clamp(r, 300, 20000), 200, 200) or {}
+  for i = 1, math.min(#areas, 40) do
+    local a = areas[math.random(#areas)]
+    local p = a.GetRandomPoint and a:GetRandomPoint() or a:GetCenter()
+    local sc = math.min(novelty(p), 3000) + math.random() * 200
+    if not bs or sc > bs then best, bs = p, sc end
+  end
+  if best then return best end
+  for _ = 1, 12 do
+    local ang = math.random() * math.pi * 2
+    local d = r * (0.4 + math.random() * 0.6)
+    local to = me + Vector(math.cos(ang) * d, math.sin(ang) * d, 40)
+    local tr = util.TraceLine({ start = me + Vector(0, 0, 40), endpos = to, mask = MASK_SOLID_BRUSHONLY })
+    local p = tr.HitPos - (to - me):GetNormalized() * 40
+    local down = util.TraceLine({ start = p, endpos = p - Vector(0, 0, 400), mask = MASK_SOLID_BRUSHONLY })
+    local q = down.HitPos
+    local sc = math.min(novelty(q), 3000) + q:Distance(me) * 0.2
+    if not bs or sc > bs then best, bs = q, sc end
+  end
+  return best
+end
+
 local function spawnCount()
   local n = 0
   for _, e in ipairs(L.spawned) do if IsValid(e) then n = n + 1 end end
@@ -712,6 +759,52 @@ L.api = {
     e:SetModelScale(math.Clamp(tonumber(k) or 1, 0.2, 3), 0.3)
     return true
   end,
+  -- ---- per costruire e per gli obiettivi lunghi ----
+  height = function(h)
+    local e = unwrap(h)
+    if not IsValid(e) then return 0 end
+    local mn, mx = e:OBBMins(), e:OBBMaxs()
+    return mx.z - mn.z
+  end,
+  top = function(h)
+    local e = unwrap(h)
+    if not IsValid(e) then return nil end
+    local c = e:WorldSpaceCenter()
+    return Vector(c.x, c.y, e:GetPos().z + e:OBBMaxs().z)
+  end,
+  place = function(h, at, yaw)
+    local e = unwrap(h)
+    local p = topos(at)
+    if not IsValid(e) or not p or e:IsPlayer() or e == L.bot or not botOk() then return false end
+    if e:GetPos():Distance(botPos()) > 260 then L.api.go(h, 160, 25) end
+    if not IsValid(e) or not L.grab(e) then return false end
+    if p:Distance(botPos()) > 300 then L.api.go(p, 200, 30) end
+    if not IsValid(e) then return false end
+    local mn, mx = e:OBBMins(), e:OBBMaxs()
+    -- con la physgun: il centro va sopra il punto, poi si appoggia preciso e si blocca
+    L.holdAt = p + Vector(0, 0, (mx.z - mn.z) / 2 + 4)
+    L.holdYaw = tonumber(yaw)
+    Sandbox.until_(function() return not IsValid(e) or L.held ~= e or e:WorldSpaceCenter():Distance(L.holdAt) < 12 end, 4, 0.1)
+    L.holdAt, L.holdYaw = nil, nil
+    if not IsValid(e) then return false end
+    L.drop()
+    e:SetAngles(Angle(0, tonumber(yaw) or e:GetAngles().y, 0))
+    e:SetPos(p - Vector(0, 0, mn.z))
+    local ph = e:GetPhysicsObject()
+    if IsValid(ph) then ph:EnableMotion(false) end
+    return true
+  end,
+  count = function(what, r)
+    if not botOk() then return 0 end
+    local n = 0
+    for _, e in ipairs(ents.FindInSphere(botPos(), math.Clamp(tonumber(r) or 8000, 50, 30000))) do
+      if e ~= L.bot and not e:IsWeapon() and matches(e, what) then n = n + 1 end
+    end
+    return n
+  end,
+  explore = function(r)
+    return L.explorePoint(tonumber(r) or 2500)
+  end,
   boom = function(at)
     local p = topos(at)
     if not p or not botOk() or L.play.mischief ~= "full" then return false end
@@ -774,7 +867,13 @@ OPS.give = function(c) L.give(c.weapon) end
 OPS.attack = function(c) L.attack(resolve(c.what)) end
 OPS.task = function(c)
   if not L.allowTasks then return L.event("task", { name = c.name, status = "error", error = "scripts disabled" }) end
-  local ok, err = Sandbox.start(c.name, c.code, L.api, taskEnded)
+  local api = L.api
+  if c.target and c.target ~= "" then
+    -- scherzi/giochi inventati: `target` è la vittima di adesso
+    api = table.Copy(L.api)
+    api.target = wrap(findPlayer(c.target) or resolve(c.target))
+  end
+  local ok, err = Sandbox.start(c.name, c.code, api, taskEnded)
   if not ok then
     L.event("task", { name = c.name, status = "error", error = tostring(err):sub(1, 200) })
   else
@@ -976,7 +1075,10 @@ hook.Add("Think", "AELink", function()
   brain()
   Fly.tick(botOk())
   Sit.tick()
-  if botOk() then Play.tick() end
+  if botOk() then
+    Play.tick()
+    if CurTime() > (L.nextVisit or 0) then L.nextVisit = CurTime() + 2 L.markVisited() end
+  end
   Sandbox.tick()
   -- rientra da sola dopo una morte, se l'app è collegata
   if L.deadAt and CurTime() - L.deadAt > (L.kind == "lambda" and 8 or 6) and L.linked() then
@@ -993,8 +1095,23 @@ hook.Add("PlayerSay", "AELink", function(ply, text)
   L.event("chat", { from = ply:Nick(), host = ply == host(), text = tostring(text):sub(1, 300), d = d })
 end)
 
+-- resistenza agli urti: gli oggetti che le volano addosso fanno meno male (impostazione "tough")
+L.tough = L.tough or "high"
+local SOFT = { normal = { 1, 1000 }, high = { 0.3, 20 }, tough = { 0.1, 8 } }
+function L.soften(dmg)
+  local k = SOFT[L.tough] or SOFT.high
+  if k[1] >= 1 then return end
+  local inf = dmg.GetInflictor and dmg:GetInflictor()
+  local typed = dmg.IsDamageType and (dmg:IsDamageType(DMG_CRUSH or 1) or dmg:IsDamageType(DMG_VEHICLE or 16))
+  local phys = typed
+    or (IsValid(inf) and (inf:GetClass():find("^prop_") ~= nil or inf:IsVehicle()))
+  if not phys or (dmg.IsExplosionDamage and dmg:IsExplosionDamage()) then return end
+  dmg:SetDamage(math.min(dmg:GetDamage() * k[1], k[2]))
+end
+
 hook.Add("EntityTakeDamage", "AELink", function(target, dmg)
   if target ~= L.bot or not IsValid(target) then return end
+  L.soften(dmg)
   Fly.onDamage(dmg)
   Play.onHurt(dmg:GetAttacker(), dmg.GetInflictor and dmg:GetInflictor(), dmg:GetDamage())
   local a = dmg:GetAttacker()
@@ -1102,6 +1219,7 @@ net.Receive("alterego_menu", function(_, ply)
     end
   elseif what == "join" then L.join()
   elseif what == "leave" then L.leave()
+  elseif what == "monitor" then L.event("monitor", {})
   end
 end)
 

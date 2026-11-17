@@ -39,10 +39,16 @@ Only use ids/names from the state. Do what you're asked if it's possible, then s
 Task API (calls block until done): wait(s) host() player(name) find(what,r) nearest(what,r) aim(player) pos(h) dist(h) hp(h) alive(h) \
 name(h) go(h_or_pos,near,timeout) follow(h) stay() look(h) attack(h,timeout) grab(h) drop() throw(h) bring(h,to) spawn(item) say(text) \
 notify(text) gesture(g) jump() vec(x,y,z) time(). Pranks: spawn_at(item,pos) push(h,vec) (velocity, also players) freeze(h,bool) \
-color(h,r,g,b,a) scale(h,0.2-3) (props) boom(pos) (small explosion, not too close to you). what = part of a class/model/name, or player|npc|vehicle|prop. Every loop must call wait(). \
+color(h,r,g,b,a) scale(h,0.2-3) (props) boom(pos) (small explosion, not too close to you). Building: place(h,pos,yaw) (carry a prop with the \
+physgun, set its bottom at pos, freeze it) top(h) (point on top of a prop) height(h) count(what,r) explore(r) (an unvisited spot to go to). \
+In pranks/games you invent, `target` is the victim's handle (don't hardcode names). what = part of a class/model/name, or player|npc|vehicle|prop. Every loop must call wait(). \
 say() costs nothing; notify() asks you again (costs tokens: rarely). Max 3 tasks, 30 min each; [act] cancel <name|all>.\n\
+For big things that take many steps (explore the map looking for X, fill the map with Y, build a tower of couches…) set a long goal \
+with a line [goal <what to achieve>]: you'll be asked for the next step again and again until you write [goal done] (or [goal drop]).\n\
+Stack example: [task stack]\nlocal base = me().pos + vec(120, 0, 0) local prev = nil\n\
+for i = 1, 5 do local c = spawn_at(\"crate\", base + vec(0, 0, 60 * i)) place(c, prev and top(prev) or base, 0) prev = c end\n[/task]\n\
 Example:\n[task hunt]\nwhile true do local c = nearest(\"chicken\", 1500) if c then attack(c, 15) else wait(2) end end\n[/task]\n\
-Prank example (a ring of cones around Kyoko, then a pop):\n[task cones]\nlocal k = player(\"Kyoko\") local p = pos(k)\n\
+Prank example (a ring of cones around the target, then a pop):\n[task cone_ring]\nlocal k = target local p = pos(k)\n\
 for i = 1, 8 do local a = i * 0.785 spawn_at(\"cone\", p + vec(math.cos(a) * 90, math.sin(a) * 90, 10)) wait(0.2) end\n\
 wait(2) push(k, vec(0, 0, 450))\n[/task]\n",
         );
@@ -116,6 +122,8 @@ pub struct Reply {
     pub text: String,
     /// Comandi per l'addon (op + argomenti).
     pub ops: Vec<Value>,
+    /// Obiettivo lungo: testo nuovo, "done" (raggiunto) o "drop" (lasciato perdere).
+    pub goal: Option<String>,
 }
 
 /// Divide la risposta: emozione, testo, righe [act] e blocchi [task].
@@ -141,6 +149,19 @@ pub fn parse(raw: &str) -> Reply {
         if lower.starts_with("[task") {
             let name: String = t[5..].trim_end_matches(']').trim().chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '-').take(24).collect();
             task = Some((if name.is_empty() { "task".into() } else { name }, Vec::new()));
+            continue;
+        }
+        if lower.starts_with("[goal") && t.ends_with(']') {
+            let g = t[5..t.len() - 1].trim();
+            let gl = g.to_ascii_lowercase();
+            r.goal = Some(match gl.as_str() {
+                "done" | "complete" | "completed" | "achieved" => "done".into(),
+                "drop" | "abandon" | "cancel" | "stop" => "drop".into(),
+                _ => g.chars().take(200).collect(),
+            });
+            if r.goal.as_deref() == Some("") {
+                r.goal = None;
+            }
             continue;
         }
         if lower.starts_with("[act]") {
@@ -242,6 +263,16 @@ mod tests {
     }
 
     #[test]
+    fn goal_lines() {
+        let r = parse("[happy]\nCi provo!\n[goal riempire la mappa di angurie]\n[act] spawn melon 3");
+        assert_eq!(r.goal.as_deref(), Some("riempire la mappa di angurie"));
+        assert_eq!(r.ops.len(), 1);
+        assert_eq!(parse("[goal done]").goal.as_deref(), Some("done"));
+        assert_eq!(parse("[goal drop]").goal.as_deref(), Some("drop"));
+        assert_eq!(parse("[goal]").goal, None);
+    }
+
+    #[test]
     fn compact_state_and_short_prompt() {
         let s: GState = serde_json::from_value(json!({
             "seq": 3, "tasks": ["hunt"], "rivals": { "Kyoko": 2.6 },
@@ -253,7 +284,7 @@ mod tests {
         let line = state_line(&s);
         assert_eq!(line, "[state] you 90hp follow Makoto, holding melon#12 | Makoto (host) 100hp 3m front looking at you | near: zombie#88 12m back hostile | tasks: hunt | rivals: Kyoko 3");
         let p = system("\n## Language\nAlways reply in Italian.\n", "Makoto", true, true);
-        assert!(p.contains("[task short_name]") && p.contains("Makoto") && p.contains("fruit-fly") && p.len() < 3600, "{}", p.len());
+        assert!(p.contains("[task short_name]") && p.contains("Makoto") && p.contains("fruit-fly") && p.len() < 4400, "{}", p.len());
         assert!(!system("", "", false, false).contains("[task"));
         assert!(!system("", "", false, false).contains("fruit-fly"));
     }

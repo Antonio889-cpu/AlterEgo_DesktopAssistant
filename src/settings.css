@@ -158,3 +158,6 @@ button.small { padding: 2px 8px; font-size: 12px; }
 .fly-row { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 8px; font-size: 12px; }
 .fly-row b { display: block; height: 6px; border-radius: 3px; background: rgba(127, 127, 127, 0.25); overflow: hidden; }
 .fly-row i { display: block; height: 100%; background: #6fdc8c; transition: width 0.4s; }
+.persona { margin: 6px 0 4px; display: grid; gap: 3px; max-width: 420px; }
+.persona .fly-head { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+.persona .habit { font-size: 12px; overflow-wrap: anywhere; }

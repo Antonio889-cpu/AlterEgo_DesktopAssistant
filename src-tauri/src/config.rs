@@ -756,6 +756,16 @@ pub struct GmodLinkConfig {
     pub idle_play: bool,
     /// Ricorda le partite (archivio separato, consultato solo quando serve).
     pub memory: bool,
+    /// Resistenza agli oggetti che le volano addosso: "normal", "high", "tough".
+    pub toughness: String,
+    /// Imprevedibilità della personalità (0-100): inventa di più, sceglie più a caso.
+    pub unpredictability: u32,
+    /// La personalità cresce: abitudini con preferenze, tratti che cambiano.
+    pub grow: bool,
+    /// Obiettivi lunghi ragionati passo passo ([goal]).
+    pub goals: bool,
+    /// Apre il FruitFly Monitor quando entra in partita.
+    pub monitor_auto: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -780,7 +790,7 @@ impl Default for FlyConfig {
 
 impl Default for GmodLinkConfig {
     fn default() -> Self {
-        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new(), body: "auto".into(), fly: FlyConfig::default(), mischief: "full".into(), idle_play: true, memory: true }
+        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new(), body: "auto".into(), fly: FlyConfig::default(), mischief: "full".into(), idle_play: true, memory: true, toughness: "high".into(), unpredictability: 50, grow: true, goals: true, monitor_auto: false }
     }
 }
 
@@ -795,6 +805,10 @@ impl GmodLinkConfig {
         if !["off", "low", "normal", "often"].contains(&self.chatter.as_str()) {
             self.chatter = "low".into();
         }
+        if !["normal", "high", "tough"].contains(&self.toughness.as_str()) {
+            self.toughness = "high".into();
+        }
+        self.unpredictability = self.unpredictability.min(100);
         self.name = self.name.trim().chars().take(32).collect();
         if self.name.is_empty() {
             self.name = "Alter Ego".into();
