@@ -293,7 +293,7 @@ mod tests {
     /// Richiede tools/mock_openai.py in esecuzione.
     #[tokio::test]
     async fn transcribe_local_mock() {
-        let cfg = SttConfig { provider: "local".into(), base_url: "http://127.0.0.1:18080/ok/v1/".into(), ..Default::default() };
+        let cfg = SttConfig { provider: "local".into(), base_url: "http://127.0.0.1:18080/ok/v1/".into(), language: "it".into(), ..Default::default() };
         let wav = to_wav(&vec![0.0; 8000]).unwrap();
         let text = transcribe(&reqwest::Client::new(), &cfg, wav, vec![]).await.unwrap();
         assert_eq!(text, "Ciao Alter Ego");

@@ -472,8 +472,8 @@ pub async fn test(ai: &Ai, cfg: &AiConfig, id: &str) -> Result<String, String> {
         p.enabled = true;
     }
     let ch = Channel::new(|_| Ok(()));
-    let msg = ChatMessage::new("user", "Rispondi solo con la parola: ok");
-    chat(ai, one, "Sei un test di connessione.".into(), vec![msg], None, ch)
+    let msg = ChatMessage::new("user", "Reply with just the word: ok");
+    chat(ai, one, "You are a connection test.".into(), vec![msg], None, ch)
         .await
         .map(|r| crate::tr!("{} risponde ({}): {}", "{} answers ({}): {}", r.provider, r.model, r.text.trim()))
 }

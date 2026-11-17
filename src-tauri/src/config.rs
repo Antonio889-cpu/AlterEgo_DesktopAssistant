@@ -199,7 +199,11 @@ pub struct SttConfig {
     pub model: String,
     /// Server Whisper locale compatibile OpenAI (solo provider "local").
     pub base_url: String,
+    /// Lingua parlata ("it", "en"…); vuota = come la lingua delle risposte.
     pub language: String,
+    /// true dopo il passaggio al nuovo predefinito (lingua automatica). Manca nei file vecchi → false.
+    #[serde(default)]
+    pub auto_lang: bool,
     /// Se il primo fallisce: "none", "groq", "gemini" o "local".
     pub fallback: String,
     /// Modello Gemini per la trascrizione (chiavi Gemini).
@@ -212,7 +216,8 @@ impl Default for SttConfig {
             provider: "groq".into(),
             model: "whisper-large-v3-turbo".into(),
             base_url: "http://localhost:8000/v1".into(),
-            language: "it".into(),
+            language: String::new(),
+            auto_lang: true,
             fallback: "gemini".into(),
             gemini_model: "gemini-2.5-flash".into(),
         }
@@ -812,6 +817,8 @@ pub struct Config {
     pub spotify: SpotifyConfig,
     /// Reagisce ai suoni di Garry's Mod (Shinri Trial) ascoltando l'audio del PC (spento di default).
     pub gmod: bool,
+    /// Suoni di Shinri Trial a cui NON reagire (es. "hurt"): vuoto = tutti.
+    pub gmod_off: Vec<String>,
     pub rizzo: RizzoConfig,
     /// Hermes Agent come "cervello": ogni messaggio va a Hermes (spento di default).
     pub hermes_brain: bool,
@@ -856,6 +863,7 @@ impl Default for Config {
             saving: SavingConfig::default(),
             spotify: SpotifyConfig::default(),
             gmod: false,
+            gmod_off: Vec::new(),
             rizzo: RizzoConfig::default(),
             hermes_brain: false,
             sql: SqlConfig::default(),
@@ -872,6 +880,13 @@ impl Default for Config {
 
 impl Config {
     pub fn normalize_voice(&mut self) {
+        // 1.10: la trascrizione segue la lingua delle risposte (il vecchio "it" fisso era solo il predefinito)
+        if !self.stt.auto_lang {
+            if self.stt.language.trim() == "it" {
+                self.stt.language.clear();
+            }
+            self.stt.auto_lang = true;
+        }
         if !["auto", "it", "it_en", "en"].contains(&self.language.as_str()) {
             self.language = "it".into();
         }

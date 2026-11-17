@@ -573,7 +573,7 @@ fn open_output(name: &str, sh: Arc<Shared>, link: bool) -> Result<(String, cpal:
             &config.into(), move |d: &mut [i16], _: &_| fill(d, channels, &mut buf, &mut n, |v| (v * 32767.0) as i16), err_fn, None),
         cpal::SampleFormat::U16 => device.build_output_stream(
             &config.into(), move |d: &mut [u16], _: &_| fill(d, channels, &mut buf, &mut n, |v| ((v + 1.0) * 32767.5) as u16), err_fn, None),
-        other => return Err(format!("{dev_name}: formato non supportato ({other:?})")),
+        other => return Err(crate::tr!("{dev_name}: formato non supportato ({other:?})", "{dev_name}: unsupported format ({other:?})")),
     }
     .map_err(|e| format!("{dev_name}: {e}"))?;
     stream.play().map_err(|e| format!("{dev_name}: {e}"))?;
@@ -663,7 +663,7 @@ fn open_mic(name: &str, link_rate: u32, sh: Arc<Shared>) -> Result<(String, cpal
             &config.into(), move |d: &[i16], _: &_| on_data(&mut d.iter().map(|s| *s as f32 / 32768.0)), err_fn, None),
         cpal::SampleFormat::U16 => device.build_input_stream(
             &config.into(), move |d: &[u16], _: &_| on_data(&mut d.iter().map(|s| (*s as f32 - 32768.0) / 32768.0)), err_fn, None),
-        other => return Err(format!("{dev_name}: formato non supportato ({other:?})")),
+        other => return Err(crate::tr!("{dev_name}: formato non supportato ({other:?})", "{dev_name}: unsupported format ({other:?})")),
     }
     .map_err(|e| format!("{dev_name}: {e}"))?;
     stream.play().map_err(|e| format!("{dev_name}: {e}"))?;

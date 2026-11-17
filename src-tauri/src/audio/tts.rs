@@ -57,7 +57,7 @@ pub fn decode_wav(b: &[u8]) -> Result<Pcm, String> {
                 }
             };
             if !matches!(format, 1 | 3) || ![8, 16, 24, 32].contains(&bits) {
-                return Err(format!("formato WAV non supportato ({format}, {bits} bit)"));
+                return Err(crate::tr!("formato WAV non supportato ({format}, {bits} bit)", "unsupported WAV format ({format}, {bits} bit)"));
             }
             let samples = data
                 .chunks_exact(bytes * ch)
@@ -320,7 +320,7 @@ fn windows_synth(text: &str, voice: &str, lang: &str, rate: f64) -> Result<Vec<u
     child.stdin.take().ok_or("stdin")?.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
     let out = child.wait_with_output().map_err(|e| e.to_string())?;
     if out.stdout.len() < 44 {
-        return Err("espeak-ng non ha prodotto audio".into());
+        return Err(crate::i18n::tr("espeak-ng non ha prodotto audio", "espeak-ng produced no audio").into());
     }
     Ok(out.stdout)
 }

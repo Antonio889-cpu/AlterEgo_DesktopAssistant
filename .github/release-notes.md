@@ -1,3 +1,13 @@
+## Alter Ego 1.10.0
+
+- Full English: voice, speech recognition and the remaining settings follow the chosen language.
+- Fewer tokens per message: the instructions for the AI model are now in English (she still replies in your language).
+- Music starts while it downloads, and songs already played stay on the PC and start instantly.
+- Shinri Trial: choose which game sounds Alter Ego reacts to (Settings → Voice & audio).
+- Small fixes.
+
+`AlterEgo_1.10.0_setup.exe` / `AlterEgo_1.10.0_portable.zip` Windows · `AlterEgo_1.10.0_amd64.AppImage` / `AlterEgo_1.10.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.9.1
 
 - Fix: the pet walked backwards.

@@ -281,10 +281,10 @@ in *Windows Settings → System → Sound* (Alter Ego's settings warn you about 
 Turn on **Music** in *Settings → Permissions*, then ask Alter Ego "play *A Cruel Angel's Thesis*" (by voice or text).
 You can also say "add … to the queue", "pause", "next", "previous", "volume to 40", "stop the music".
 
-- Alter Ego searches the track on YouTube with [yt-dlp](https://github.com/yt-dlp/yt-dlp), downloads only the audio (m4a) and plays it.
+- Alter Ego searches the track on YouTube with [yt-dlp](https://github.com/yt-dlp/yt-dlp), downloads only the audio (m4a) and starts playing while it's still downloading.
   On first use it downloads `yt-dlp.exe` and [Deno](https://deno.com) (the JavaScript engine yt-dlp uses for YouTube) from GitHub
   into `%APPDATA%\AlterEgo\tools`. If YouTube changes and the download fails, it updates yt-dlp by itself and tries again.
-- Tracks stay in `%APPDATA%\AlterEgo\music_cache` (the last 30): replaying them is instant.
+- Tracks stay in `%APPDATA%\AlterEgo\music_cache` (the last 300): asking again for a song already played starts it instantly, without YouTube.
 - **Synced lyrics** from several sources, in order: LRCLIB (exact match, then several versions of the title), NetEase Cloud Music
   (lots of Japanese and anime songs), the subtitles uploaded to the YouTube video and, if nothing else exists, plain lyrics with estimated timing.
   Hover the lyrics to see where they come from.
@@ -572,7 +572,7 @@ On Linux she only uses the bottom of the screen and the taskbar: windows are rea
 | `%APPDATA%\AlterEgo\sprites\` | imported sprites (optional) |
 | `%APPDATA%\AlterEgo\pets\` | imported pets (optional) |
 | `%APPDATA%\AlterEgo\costs.jsonl` | cost log |
-| `%APPDATA%\AlterEgo\tools\`, `music_cache\` | yt-dlp and Deno; downloaded tracks (last 30) |
+| `%APPDATA%\AlterEgo\tools\`, `music_cache\` | yt-dlp and Deno; downloaded tracks (last 300) |
 | `%APPDATA%\AlterEgo\kokoro\` | Kokoro: Python environment, server, `server.log` (the model is in the Hugging Face cache, `%USERPROFILE%\.cache\huggingface`) |
 | Credential Manager → `AlterEgo` | API keys |
 

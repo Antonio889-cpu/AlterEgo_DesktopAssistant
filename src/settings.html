@@ -336,6 +336,8 @@
       <h2>Garry's Mod (Shinri Trial)</h2>
       <p class="note">Mentre Garry's Mod è aperto, Alter Ego ascolta l'audio del PC e riconosce i suoni del gioco per reagire. Non tocca il gioco e non manda niente a nessuno: i suoni di riferimento vengono dall'addon Sounds @ ST del Workshop.</p>
       <label class="inline"><input type="checkbox" id="gmod-enabled" /> Reagisci ai suoni di Shinri Trial (corpo scoperto, indagine, processo…)</label>
+      <p class="note sub">Suoni a cui reagire:</p>
+      <div id="gmod-events" class="checks"></div>
     </section>
 
     <section data-tab="voice">
@@ -360,7 +362,7 @@
       <label id="stt-gemini-row">Modello Gemini <input id="stt-gemini-model" placeholder="gemini-2.5-flash" /></label>
       <label>Modello <input id="stt-model" placeholder="whisper-large-v3-turbo" /></label>
       <label id="stt-url-row">URL server locale <input id="stt-url" placeholder="http://localhost:8000/v1" /></label>
-      <label>Lingua <input id="stt-language" maxlength="5" placeholder="it" style="max-width:80px;min-width:0" /></label>
+      <label title="Vuota = come la lingua delle risposte">Lingua <input id="stt-language" maxlength="5" placeholder="auto" style="max-width:80px;min-width:0" /></label>
       <div class="actions"><button id="stt-test">Prova microfono (4 secondi)</button> <span id="stt-result" class="result"></span></div>
     </section>
 

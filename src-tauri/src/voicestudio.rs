@@ -67,7 +67,7 @@ pub async fn voicestudio_setup(app: AppHandle) -> Result<String, String> {
             "Install VoiceStudio?\nI'll use the official script (voicestudio.sh): it downloads the installer from the GitHub releases and runs it. VoiceStudio downloads the voice models (a few GB) when you ask.",
         );
         if !crate::actions::confirm_always(&app, q.into()).await {
-            return Err("l'utente ha negato il permesso".into());
+            return Err("the user denied permission".into());
         }
         let log = std::env::temp_dir().join("alterego-voicestudio-install.log");
         let mut cmd;

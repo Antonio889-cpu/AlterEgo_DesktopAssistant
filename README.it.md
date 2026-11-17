@@ -282,10 +282,10 @@ in *Impostazioni di Windows → Sistema → Audio* (le impostazioni di Alter Ego
 Attiva **Musica** in *Impostazioni → Permessi*, poi chiedi ad Alter Ego "metti *A Cruel Angel's Thesis*" (a voce o per iscritto).
 Puoi anche dire "metti in coda…", "pausa", "avanti", "indietro", "volume al 40", "ferma la musica".
 
-- Alter Ego cerca il brano su YouTube con [yt-dlp](https://github.com/yt-dlp/yt-dlp), scarica solo l'audio (m4a) e lo suona.
+- Alter Ego cerca il brano su YouTube con [yt-dlp](https://github.com/yt-dlp/yt-dlp), scarica solo l'audio (m4a) e lo fa partire mentre si sta ancora scaricando.
   Al primo uso scarica da GitHub `yt-dlp.exe` e [Deno](https://deno.com) (il motore JavaScript che yt-dlp usa per YouTube)
   in `%APPDATA%\AlterEgo\tools`. Se YouTube cambia e il download fallisce, aggiorna yt-dlp da solo e riprova.
-- I brani restano in `%APPDATA%\AlterEgo\music_cache` (gli ultimi 30): risentirli è immediato.
+- I brani restano in `%APPDATA%\AlterEgo\music_cache` (gli ultimi 300): richiedere un brano già sentito lo fa partire subito, senza YouTube.
 - **Testi sincronizzati** con più fonti in ordine: LRCLIB (ricerca esatta, poi varie versioni del titolo), NetEase Cloud Music
   (molti brani giapponesi e anime), i sottotitoli caricati sul video YouTube e, se non c'è altro, il testo semplice con tempi stimati.
   Passando col mouse sul testo vedi da dove arriva.
@@ -573,7 +573,7 @@ Su Linux usa solo il fondo dello schermo e la barra: le finestre si leggono solo
 | `%APPDATA%\AlterEgo\sprites\` | sprite importati (facoltativi) |
 | `%APPDATA%\AlterEgo\pets\` | pet importati (facoltativi) |
 | `%APPDATA%\AlterEgo\costs.jsonl` | registro dei costi |
-| `%APPDATA%\AlterEgo\tools\`, `music_cache\` | yt-dlp e Deno; brani scaricati (ultimi 30) |
+| `%APPDATA%\AlterEgo\tools\`, `music_cache\` | yt-dlp e Deno; brani scaricati (ultimi 300) |
 | `%APPDATA%\AlterEgo\kokoro\` | Kokoro: ambiente Python, server, `server.log` (il modello è nella cache di Hugging Face, `%USERPROFILE%\.cache\huggingface`) |
 | Gestore credenziali → `AlterEgo` | chiavi API |
 

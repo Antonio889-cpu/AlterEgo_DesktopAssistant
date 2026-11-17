@@ -393,6 +393,19 @@ fn seed() -> u64 {
 
 static LAST_LINE: Mutex<String> = Mutex::new(String::new());
 
+/// Volumi dell'evento rispetto alla voce di Alter Ego (le Line del gioco sono registrate molto forti).
+const LINE_GAIN: f32 = 0.42;
+const SFX_GAIN: f32 = 0.3;
+/// La musica segue la scala del lettore musicale: volume del pacchetto × questo.
+const MUSIC_SCALE: f32 = 0.32;
+
+fn scaled(s: &[f32], g: f32) -> Vec<f32> {
+    // picco normalizzato prima del volume: tutte le Line arrivano alla stessa altezza
+    let peak = s.iter().fold(0.0f32, |m, x| m.max(x.abs())).max(0.05);
+    let k = g * (0.9 / peak).min(1.6);
+    s.iter().map(|x| x * k).collect()
+}
+
 /// Suona una Line dell'umore `mood` (o "intro"/"outro"). Restituisce i secondi.
 #[tauri::command]
 pub async fn extras_line(app: AppHandle, mood: String) -> f32 {
@@ -404,7 +417,7 @@ pub async fn extras_line(app: AppHandle, mood: String) -> f32 {
     let Ok(Some((s, r))) = tauri::async_runtime::spawn_blocking(move || clip(&dir, &line.file)).await else { return 0.0 };
     let engine = app.state::<AudioEngine>();
     engine.stop(); // una Line alla volta, come nel gioco
-    engine.play(&s, r, Kind::Voice)
+    engine.play(&scaled(&s, LINE_GAIN), r, Kind::Voice)
 }
 
 /// Effetto del pacchetto ("intro", "outro").
@@ -413,7 +426,7 @@ pub async fn extras_sfx(app: AppHandle, name: String) {
     let dir = pack_dir(&app);
     let Some(rel) = load(&dir).and_then(|p| p.sfx.get(&name).cloned()) else { return };
     if let Ok(Some((s, r))) = tauri::async_runtime::spawn_blocking(move || clip(&dir, &rel)).await {
-        app.state::<AudioEngine>().play(&s, r, Kind::Fx);
+        app.state::<AudioEngine>().play(&scaled(&s, SFX_GAIN), r, Kind::Fx);
     }
 }
 
@@ -448,14 +461,14 @@ pub fn extras_music(app: AppHandle, on: bool) {
     let Some(path) = inside(&dir, &m.file) else { return };
     let (tx, rx) = mpsc::channel();
     *MUSIC_TX.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(tx);
-    let vol = if m.volume > 0.0 { m.volume.min(1.0) as f32 } else { 0.55 };
+    let vol = MUSIC_SCALE * if m.volume > 0.0 { m.volume.min(1.0) as f32 } else { 0.55 };
     *GAIN.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = vol;
     thread::spawn(move || {
         let engine = app.state::<AudioEngine>();
         engine.set_music_paused(false);
         engine.set_music_gain(vol);
         while MUSIC_GEN.load(Ordering::SeqCst) == gen {
-            match crate::music::decode::play(&engine, &path, 0.0, &rx, &|_| {}) {
+            match crate::music::decode::play_file(&engine, &path, 0.0, &rx, &|_| {}) {
                 Ok(crate::music::decode::End::Finished) => continue,
                 _ => break,
             }
@@ -497,7 +510,8 @@ pub struct Page {
 pub async fn extras_prepare(app: AppHandle, game: Option<String>) -> Vec<Page> {
     let Some(pack) = installed(&app) else { return prompt::fallback(&[], crate::i18n::en()) };
     let moods = pack.moods();
-    let en = crate::i18n::en();
+    // stessa lingua delle risposte di Alter Ego
+    let en = crate::providers::prompt::reply_lang(&app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner)) == "en";
     let game = game.or_else(|| games::detect().map(|g| g.to_string()));
     match ask(&app, &pack, game.as_deref(), en).await {
         Ok(p) if !p.is_empty() => p,
@@ -524,12 +538,36 @@ async fn ask(app: &AppHandle, pack: &Pack, game: Option<&str>, en: bool) -> Resu
         None
     };
     let moods = pack.moods();
-    let mut msg = crate::providers::ChatMessage::new("user", &prompt::user(game, image.is_some()));
+    let dir = pack_dir(app);
+    let recent = recent_load(&dir);
+    let (angle, tone) = prompt::twist(seed());
+    let mut msg = crate::providers::ChatMessage::new("user", &prompt::user(game, image.is_some(), angle, tone, &recent));
     msg.image = image;
     let ai = &app.state::<Extras>().ai;
     let ch = tauri::ipc::Channel::new(|_| Ok(()));
     let res = crate::providers::chat(ai, cfg, prompt::system(&moods, en), vec![msg], None, ch).await?;
-    Ok(prompt::parse(&res.text, &moods))
+    let pages = prompt::parse(&res.text, &moods);
+    if let Some(p) = pages.iter().max_by_key(|p| p.text.len()) {
+        recent_add(&dir, &p.text);
+    }
+    Ok(pages)
+}
+
+/// Le frasi principali degli ultimi eventi (per non ripetersi tra un evento e l'altro).
+const RECENT: &str = "recent.json";
+
+fn recent_load(dir: &Path) -> Vec<String> {
+    std::fs::read_to_string(dir.join(RECENT)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+fn recent_add(dir: &Path, text: &str) {
+    let mut r = recent_load(dir);
+    r.push(text.chars().take(140).collect());
+    let n = r.len();
+    let r: Vec<String> = r.into_iter().skip(n.saturating_sub(4)).collect();
+    if let Ok(s) = serde_json::to_string(&r) {
+        let _ = std::fs::write(dir.join(RECENT), s);
+    }
 }
 
 // ---------- quando succede ----------

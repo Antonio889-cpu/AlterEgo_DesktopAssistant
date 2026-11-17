@@ -676,6 +676,33 @@ const I18N = (() => {
     ") e": ") and",
     "Eliminare il pet importato?": "Delete the imported pet?",
     "eliminato": "deleted",
+    // 1.10: frasi mancanti
+    "I tag": "The",
+    "e le chiamate a strumenti scritte come testo (es. DeepSeek «DSML») non compaiono più nel dialogo: le chiamate valide vengono eseguite normalmente (passando dai Permessi).":
+      "tags and tool calls written as text (e.g. DeepSeek “DSML”) no longer show up in the dialogue: valid calls are run normally (through Permissions).",
+    "(Rizzo AI Academy, Apache-2.0) è un modello locale che dà risposte tipizzate senza generare token (~50 ms): Alter Ego gli chiede «serve un'azione?» e «è una domanda semplice?». Se non risponde si usano le parole chiave.":
+      "(Rizzo AI Academy, Apache-2.0) is a local model that gives typed answers without generating tokens (~50 ms): Alter Ego asks it “is an action needed?” and “is it a simple question?”. If it doesn't answer, keywords are used.",
+    "Con Spotify Premium, «metti": "With Spotify Premium, “play",
+    "» può suonare sul tuo Spotify (app del PC, telefono o web) invece che su YouTube. Una volta sola: crea un'app gratuita su":
+      "” can play on your Spotify (PC app, phone or web) instead of YouTube. Just once: create a free app on",
+    "→ Dashboard → Create app, come": "→ Dashboard → Create app, set",
+    "metti": "to",
+    ", spunta": ", tick",
+    ", salva e copia il": ", save and copy the",
+    "qui.": "here.",
+    "es. gemini-2.5-flash-lite": "e.g. gemini-2.5-flash-lite",
+    "es. 10.3.0": "e.g. 10.3.0",
+    "es. alloy, if_sara": "e.g. alloy, if_sara",
+    "es. 3f2a…": "e.g. 3f2a…",
+    "Separa": "Detach",
+    "Vuota = come la lingua delle risposte": "Empty = same as the answer language",
+    "Suoni a cui reagire:": "Sounds to react to:",
+    "Inizio partita": "Game start", "Corpo scoperto": "Body discovered", "Esame del corpo": "Body examination",
+    "Inizio indagine": "Investigation start", "Processo di classe": "Class trial", "Votazione": "Voting",
+    "Verdetto giusto": "Right verdict", "Verdetto sbagliato": "Wrong verdict", "Fine senza vittime": "Peaceful ending",
+    "Fine con sconfitta": "Losing ending", "Evento: blackout": "Event: blackout", "Evento: travestimenti": "Event: disguises",
+    "Evento: teletrasporto": "Event: teleport", "Diventi l'assassino": "You become the killer", "Colpito": "Hit",
+    "Morte": "Death", "Sonno basso": "Low sleep",
   };
 
   let lang = "it";

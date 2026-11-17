@@ -21,8 +21,8 @@ use std::time::Duration;
 pub const NEED_TOOLS: &str = "[[TOOLS]]";
 
 /// Riga aggiunta in fondo al prompt quando gli strumenti non vengono inviati.
-pub const NO_TOOLS_NOTE: &str = "\n\n## Strumenti\nIn questo messaggio gli strumenti non sono stati inviati. Se per rispondere ti serve \
-un'azione (PC, app, web, musica, file, schermo, promemoria, mouse o tastiera) rispondi SOLO con [[TOOLS]] e nient'altro.";
+pub const NO_TOOLS_NOTE: &str = "\n\n## Tools\nTools were not sent with this message. If answering needs \
+an action (PC, app, web, music, files, screen, reminders, mouse or keyboard) reply ONLY with [[TOOLS]] and nothing else.";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Route {
@@ -185,7 +185,7 @@ pub fn compact_tool_results(history: &mut [ChatMessage], from: usize, to: usize,
         if n > 1200 {
             let head: String = m.content.chars().take(700).collect();
             let tail: String = m.content.chars().skip(n - 300).collect();
-            m.content = format!("{head}\n[… {} caratteri tolti: risultato già usato nei passaggi precedenti …]\n{tail}", n - 1000);
+            m.content = format!("{head}\n[… {} characters removed: result already used in previous steps …]\n{tail}", n - 1000);
         }
     }
     true
@@ -273,7 +273,7 @@ mod tests {
         ];
         assert!(!compact_tool_results(&mut h, 1, 2, 12_000)); // sotto la soglia
         assert!(compact_tool_results(&mut h, 1, 3, 12_000));
-        assert!(h[1].content.len() < 1200 && h[1].content.contains("caratteri tolti"));
+        assert!(h[1].content.len() < 1200 && h[1].content.contains("characters removed"));
         assert_eq!(h[3].content.len(), 9000); // l'ultimo passaggio resta intero
     }
 

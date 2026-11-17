@@ -52,13 +52,13 @@ static OS: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 /// Descrizione dello strumento con sistema, shell e cartella attuale.
 pub fn description(autonomous: bool, timeout: u64) -> String {
     let os = OS.get_or_init(os_name);
-    let shells = shells().join(" o ");
+    let shells = shells().join(" or ");
     format!(
-        "Esegue un comando non interattivo in {shells} su questo PC ({os}) e restituisce output e codice di uscita (timeout {timeout} s). \
-La cartella di lavoro resta tra un comando e l'altro (ora: {}). Usalo con sicurezza per qualsiasi compito di sistema che l'utente chiede \
-(informazioni, file, programmi, processi, rete, installazioni): esegui tu i comandi invece di spiegarli. {}",
+        "Runs a non-interactive command in {shells} on this PC ({os}) and returns output and exit code (timeout {timeout} s). \
+The working folder is kept between commands (now: {}). Use it confidently for any system task the user asks \
+(info, files, programs, processes, network, installs): run the commands yourself instead of explaining them. {}",
         cwd().display(),
-        if autonomous { "I comandi distruttivi chiedono comunque conferma." } else { "Ogni comando chiede conferma all'utente." }
+        if autonomous { "Destructive commands still ask for confirmation." } else { "Every command asks the user for confirmation." }
     )
 }
 
@@ -70,7 +70,7 @@ pub fn head_tail(text: &str, max: usize) -> String {
     }
     let head: String = text.chars().take(max * 3 / 10).collect();
     let tail: String = text.chars().skip(n - max * 7 / 10).collect();
-    format!("{head}\n[… {} caratteri tagliati …]\n{tail}", n - head.chars().count() - tail.chars().count())
+    format!("{head}\n[… {} characters cut …]\n{tail}", n - head.chars().count() - tail.chars().count())
 }
 
 /// Esegue il comando. `shell` deve essere una di `shells()` (altrimenti la predefinita).
@@ -186,7 +186,7 @@ mod tests {
     fn long_output() {
         let s = "a".repeat(100) + &"z".repeat(100);
         let t = head_tail(&s, 50);
-        assert!(t.starts_with("aaaaaaaaaaaaaaa") && t.ends_with("zzzzz") && t.contains("tagliati"));
+        assert!(t.starts_with("aaaaaaaaaaaaaaa") && t.ends_with("zzzzz") && t.contains("characters cut"));
         assert_eq!(head_tail("corto", 50), "corto");
     }
 
