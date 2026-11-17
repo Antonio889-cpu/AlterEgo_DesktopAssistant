@@ -750,6 +750,12 @@ pub struct GmodLinkConfig {
     pub body: String,
     /// Cervello di moscerino (connettoma FlyWire): riflessi e istinto.
     pub fly: FlyConfig,
+    /// Dispetti: "off", "light" (lanci, angurie, casse), "full" (anche spari ed esplosioni).
+    pub mischief: String,
+    /// Gioca da sola quando non succede niente (costruisce, tira ai barili, emote).
+    pub idle_play: bool,
+    /// Ricorda le partite (archivio separato, consultato solo quando serve).
+    pub memory: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -774,7 +780,7 @@ impl Default for FlyConfig {
 
 impl Default for GmodLinkConfig {
     fn default() -> Self {
-        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new(), body: "auto".into(), fly: FlyConfig::default() }
+        Self { enabled: false, auto_join: true, chatter: "low".into(), tasks: true, model: String::new(), name: "Alter Ego".into(), dir: String::new(), body: "auto".into(), fly: FlyConfig::default(), mischief: "full".into(), idle_play: true, memory: true }
     }
 }
 
@@ -782,6 +788,9 @@ impl GmodLinkConfig {
     pub fn normalize(&mut self) {
         if !["auto", "citizen", "lambda"].contains(&self.body.as_str()) {
             self.body = "auto".into();
+        }
+        if !["off", "light", "full"].contains(&self.mischief.as_str()) {
+            self.mischief = "full".into();
         }
         if !["off", "low", "normal", "often"].contains(&self.chatter.as_str()) {
             self.chatter = "low".into();

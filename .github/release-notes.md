@@ -1,3 +1,12 @@
+## Alter Ego 1.12.0
+
+- Garry's Mod: Alter Ego plays like a friend in the match, not like an insect: she dodges, gets used to things, banters and gets even with pranks (adjustable).
+- Garry's Mod: vehicles and sitting; she rides with you when you drive.
+- Garry's Mod: she remembers your games in a separate archive, looked up only when needed.
+- Garry's Mod fixes: physgun beam from her hand, smoother Lambda movement, Alter Ego menu also in the C menu top bar and on right-click.
+
+`AlterEgo_1.12.0_setup.exe` / `AlterEgo_1.12.0_portable.zip` Windows · `AlterEgo_1.12.0_amd64.AppImage` / `AlterEgo_1.12.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.11.0
 
 - Garry's Mod: Alter Ego now has the reflexes of a real fruit-fly brain (FlyWire connectome, simulated on your PC): she flees from things flying at her, flinches when hurt and eats watermelons by instinct. Extra senses and an in-game neuron view in the settings.

@@ -62,6 +62,7 @@ function F.sense()
   -- qualcosa che arriva addosso (looming): tempo all'impatto sotto 1,5 s
   local ll, lr = 0, 0
   F.threat = nil
+  F.threatEnt = nil
   local bestT = 0
   local food, foodD = nil, 1e9
   local smellFood, danger, heat = 0, 0, 0
@@ -80,7 +81,7 @@ function F.sense()
             local size = math.Clamp((e.BoundingRadius and e:BoundingRadius() or 20) / 40, 0.4, 1)
             local val = clamp01((1.5 - ttc) / 1.1) * size
             if sideOf(bot, ep) == "l" then ll = math.max(ll, val) else lr = math.max(lr, val) end
-            if val > bestT then bestT = val F.threat = ep end
+            if val > bestT then bestT = val F.threat = ep F.threatEnt = e end
           end
         end
       end
@@ -177,48 +178,22 @@ local function awayFrom(bot, from, dist, o)
   return bot:GetPos() + dir * dist
 end
 
+F.override = override
+F.awayFrom = awayFrom
+
+--- Le uscite del cervello diventano spinte: le esprime lo strato "giocatrice" (play.lua).
 function F.react()
   local bot = L.bot
-  local o = F.out
   local now = CurTime()
   if F.restore and now >= F.restore.at then
-    L.mode, L.goal, L.target = F.restore.mode, F.restore.goal, F.restore.target
-    F.restore = nil
-    if L.mode == "goto" and isvector(L.goal) then L.goTo(L.goal, true) end
-  end
-  if not F.reflexes then return end
-  local from = F.threat or (bot:GetPos() - bot:GetForward() * 100)
-  if (o.escape or 0) >= 0.5 and ready("escape", 2.5) then
-    L.jump()
-    override(awayFrom(bot, from, 340, o), 1.8, true)
-    return
-  end
-  if (o.backward or 0) >= 0.5 and ready("backward", 2) then
-    override(awayFrom(bot, from, 130, o), 0.9, false)
-    return
-  end
-  if (o.feed or 0) >= 0.5 and IsValid(F.food) and ready("feed", 1) then
-    local d = F.food:GetPos():Distance(bot:GetPos())
-    if d < 95 then
-      local what = "melon"
-      F.food:Remove()
-      F.food = nil
-      bot:SetHealth(math.min((bot.GetMaxHealth and bot:GetMaxHealth() or 100), bot:Health() + 15))
-      bot:EmitSound("npc/barnacle/barnacle_crunch" .. math.random(2, 3) .. ".wav", 65, 130)
-      L.event("ate", { what = what })
-      F.cool.feed = now + 6
-    else
-      override(F.food:GetPos(), 2.5, false)
+    if L.mode == "goto" then
+      L.mode, L.goal, L.target = F.restore.mode, F.restore.goal, F.restore.target
+      if L.mode == "goto" and isvector(L.goal) then L.goTo(L.goal, true) end
     end
-    return
+    F.restore = nil
   end
-  if (o.groom or 0) >= 0.5 and ready("groom", 4) then L.gesture("shrug") end
-  if (o.drink or 0) >= 0.5 and ready("drink", 6) then L.gesture("nod") end
-  if (o.listen or 0) >= 0.5 and F.soundPos and ready("listen", 3) then L.face(F.soundPos) end
-  if (o.squint or 0) >= 0.5 and F.lightPos and ready("squint", 3) then
-    L.face(bot:GetPos() * 2 - F.lightPos)
-  end
-  if (o.brace or 0) >= 0.5 and ready("brace", 4) then L.gesture("cheer") end
+  if not F.reflexes or not IsValid(bot) then return end
+  if L.play then L.play.react(F.out, F) end
 end
 
 -- ---------- attività sopra la testa ----------
@@ -305,7 +280,7 @@ function F.onSound(data)
   if d > 1500 then return end
   F.pulse("sound", clamp01((lvl - 70) / 40) * (1 - d / 2000), 0.5)
   F.soundPos = pos
-  if lvl >= 120 and d < 1000 then F.pulse("blast", 1, 2) end
+  if lvl >= 120 and d < 1000 then F.pulse("blast", 1, 2) F.blastPos = pos end
 end
 
 return F

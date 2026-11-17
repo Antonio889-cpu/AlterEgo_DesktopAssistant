@@ -62,6 +62,14 @@ pub fn find(text: &str, who: &str, name: &str, in_game: bool, en: bool) -> Optio
         (vec![json!({ "op": "drop" })], "idle", &[("Fatto.", "Done."), ("Ok, lo lascio.", "Okay, letting go.")])
     } else if is(&["lancia", "lancialo", "lanciala", "throw", "throw it"]) {
         (vec![json!({ "op": "throw" })], "happy", &[("Via!", "There it goes!"), ("Hop, lanciato!", "Thrown!")])
+    } else if is(&["siediti", "seduta", "sit", "sit down", "siediti qui"]) {
+        (vec![json!({ "op": "sit", "what": "" })], "happy", &[("Mi siedo un attimo!", "Taking a seat!"), ("Ahh, che comodo.", "Ahh, comfy.")])
+    } else if is(&["siediti per terra", "siediti a terra", "sit on the floor", "sit on the ground"]) {
+        (vec![json!({ "op": "sit", "what": "ground" })], "happy", &[("Picnic!", "Picnic!"), ("Ok, per terra.", "Okay, on the floor.")])
+    } else if is(&["alzati", "in piedi", "stand up", "get up", "stand"]) {
+        (vec![json!({ "op": "stand" })], "idle", &[("Eccomi in piedi.", "Up I get."), ("Ok!", "Okay!")])
+    } else if is(&["spawna una jeep", "una jeep", "jeep", "spawn a jeep", "macchina", "spawna una macchina"]) {
+        (vec![json!({ "op": "spawn", "what": "jeep", "n": 1 })], "happy", &[("Ecco una jeep! Guidi tu?", "Here's a jeep! You drive?"), ("Jeep pronta!", "Jeep ready!")])
     } else if is(&["basta", "stop", "smettila", "fermati tutto", "stop everything"]) {
         (vec![json!({ "op": "stop" })], "idle", &[("Ok, mi fermo.", "Okay, stopping."), ("Fermo tutto!", "Stopping everything!")])
     } else if is(&["esci", "vattene", "esci dal gioco", "leave", "go away", "ciao ciao esci"]) {
@@ -88,5 +96,8 @@ mod tests {
         // fuori dal gioco solo "entra"
         assert!(find("seguimi", "M", "Alter Ego", false, false).is_none());
         assert!(find("vieni a giocare!", "M", "Alter Ego", false, false).is_some_and(|q| q.ops[0]["op"] == "join"));
+        assert!(find("siediti", "M", "Alter Ego", true, false).is_some_and(|q| q.ops[0]["op"] == "sit"));
+        assert!(find("alzati!", "M", "Alter Ego", true, false).is_some_and(|q| q.ops[0]["op"] == "stand"));
+        assert!(find("spawna una jeep", "M", "Alter Ego", true, false).is_some_and(|q| q.ops[0]["what"] == "jeep"));
     }
 }

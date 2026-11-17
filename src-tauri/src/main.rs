@@ -682,6 +682,7 @@ fn main() {
             gmodlink::gmodlink_install,
             gmodlink::gmodlink_settings,
             gmodlink::gmodlink_join,
+            gmodlink::gmodlink_forget,
             rizzo::rizzo_set_dir,
             localai::local_catalog_open,
             hermes::hermes_status,

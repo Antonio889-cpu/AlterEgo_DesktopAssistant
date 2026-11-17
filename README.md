@@ -533,7 +533,17 @@ Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Se
   Single player and servers you host (the addon has to run on the server).
 - Use the **borderless window** video mode: an exclusive full-screen game hides every other window.
 - **Body**: with [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (Workshop addon by StarFrost, not included: subscribe to it on Steam) she is a Lambda Player and moves like a real player (running, jumping, player weapons, a real physgun); its own decisions, chat and voice are switched off, Alter Ego is in charge. Without it she's a citizen NPC. *Automatic* picks Lambda when it's installed; you can choose in the settings or in the C menu.
-- Character model: in the game hold **C** → **Alter Ego** and pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default she's a Half-Life 2 citizen.
+- **She plays like a friend in the match**: she dodges, laughs, banters ("gg", "you'll pay for that!"), remembers who keeps bullying her
+  and sooner or later gets even with a prank: she throws the prop back, drops a watermelon on your head, blocks you with a crate,
+  shoots you for a moment or blows up an explosive barrel next to you (*Pranks*: all, light, none). When nothing is happening
+  she plays on her own (stacks props, target practice on barrels, emotes). Quick one-liners are instant and cost no tokens.
+- **Vehicles and sitting**: she spawns a jeep, an airboat or a seat; she sits on chairs, couches, seats or on the floor ("sit", "stand up");
+  if you get into a car while she's following you, she hops in as a passenger and gets out with you.
+- **Game memory**: each match becomes one line in a separate archive (`gmod_memory.json`, not in her main memory), written without AI.
+  It's only looked up when needed: one line about the last game with the same friends at the start, and the full memories
+  when you ask ("do you remember…", "last time…"; for doubtful cases Rizzo Flow decides, if it's your router).
+- Menu in game: hold **C** → **Alter Ego** in the top bar or the *Alter Ego* icon, right-click on her → *Alter Ego…*, or the console command `alterego_menu`.
+- Character model: from that menu pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default she's a Half-Life 2 citizen.
 
 ### Fruit-fly brain (reflexes)
 
@@ -541,13 +551,13 @@ Her body also runs a **real fruit-fly brain**: part of the *Drosophila melanogas
 by [FlyWire](https://flywire.ai) (~9,500 neurons and ~690,000 synapses, the ones that respond to the senses used in the game),
 simulated on your PC in real time with the leaky integrate-and-fire model of Shiu et al. (Nature 2024). On by default; no tokens.
 
-- **Senses** (always on): pain (hits, fire), *looming* objects (a prop or a car flying at her, left or right), sweetness (a watermelon within reach), touch (physgun, *use*).
+- **Senses** (always on): pain (hits, fire), *looming* objects (a prop or a car flying at her, left or right), sweetness (a watermelon nearby), touch (physgun, *use*).
   Extra senses in the settings: smell (food, smoke, explosions), temperature and water, hearing (gunshots, loud noises), light (a flashlight in her face), wind (when you throw her).
-- **Reflexes**: they come from the real descending neurons. Something flying at her fires the **Giant Fiber** and she jumps away
-  (the turning neurons pick the side), the *moonwalker* neurons make her back off, the bristle neurons make her brush herself off,
-  sweetness drives the proboscis motor neurons and she goes and **eats the watermelon** (+15 HP).
-- **Instinct**: pain and escapes build up a "stress" that fades in about 40 s and reaches the AI in one short line,
-  so she can be shaken after you shoot her. You can turn off the reflexes, the stress, or show the neuron activity above her head.
+- **Reflexes**: they come from the real descending neurons (something flying at her fires the **Giant Fiber**, the turning neurons pick the side),
+  but they're expressed **like a player, not like an insect**: she side-steps, flees only from explosive barrels and cars,
+  and **gets used to it** (the tenth barrel gets a dirty look, not a jump). Sweetness makes her want to play with the watermelon.
+- **Adrenaline**: hits and dodges build up adrenaline that fades in about 40 s and reaches the AI in one short line, together with her "rivals".
+  You can turn off the reflexes, the adrenaline, or show the neuron activity above her head.
 - How the circuit was extracted: [`tools/flybrain/`](tools/flybrain/).
 
 ## Pet

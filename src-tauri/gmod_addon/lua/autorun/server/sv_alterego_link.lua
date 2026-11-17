@@ -14,7 +14,11 @@ local L = AELink
 L.VERSION = "1"
 L.DIR = "alterego"
 
+-- file per i giocatori (menu, nome sopra la testa, raggio): vanno mandati esplicitamente
+AddCSLuaFile("autorun/client/cl_alterego_link.lua")
+
 local Sandbox = include("alterego/sandbox.lua")
+L.sandbox = Sandbox
 util.AddNetworkString("alterego_chat")
 util.AddNetworkString("alterego_menu")
 
@@ -67,6 +71,19 @@ local function botOk()
   return L.bot:Health() > 0
 end
 local function isLambda() return L.kind == "lambda" and IsValid(L.bot) end
+
+--- Occhi del corpo. I NextBot (Lambda) restituiscono i piedi da EyePos: si usa l'attacco "eyes".
+function L.eye(bot)
+  bot = bot or L.bot
+  if not IsValid(bot) then return Vector() end
+  if bot.GetAttachmentPoint then
+    local a = bot:GetAttachmentPoint("eyes")
+    if a and a.Pos then return a.Pos end
+  end
+  local e = bot:EyePos()
+  if e.z - bot:GetPos().z < 20 then e = bot:GetPos() + Vector(0, 0, 62) end
+  return e
+end
 
 -- ---------- eventi per l'app ----------
 function L.event(kind, data)
@@ -200,6 +217,8 @@ end
 local LB = include("alterego/body_lambda.lua")
 L.LB = LB
 local Fly = include("alterego/fly.lua")
+local Sit = include("alterego/sit.lua")
+local Play = include("alterego/play.lua")
 
 local function relate(bot)
   for _, p in ipairs(player.GetAll()) do
@@ -248,6 +267,7 @@ function L.join(model, name)
   L.mode = "follow"
   L.target = h
   L.deadAt = nil
+  Play.nextIdle = CurTime() + 30
   local fx = EffectData()
   fx:SetOrigin(bot:GetPos())
   util.Effect("propspawn", fx)
@@ -406,16 +426,64 @@ local function holdTick()
   local ph = e:GetPhysicsObject()
   if not IsValid(ph) then return L.drop() end
   local size = e:BoundingRadius()
-  local want = L.bot:EyePos() + L.bot:GetForward() * (60 + size) + Vector(0, 0, 10)
+  local want = L.eye() + L.bot:GetForward() * (60 + size) - Vector(0, 0, 6)
   local d = want - e:WorldSpaceCenter()
   ph:Wake()
   ph:SetVelocity(d * 8)
   ph:AddAngleVelocity(-ph:GetAngleVelocity() * 0.5)
 end
 
+-- veicoli e sedili: dalla lista di Garry's Mod (stessi che trovi nel menu Veicoli)
+L.VEHICLES = { jeep = { "Jeep" }, airboat = { "Airboat" }, seat = { "Chair_Office2", "Pod", "Seat_Jeep" }, pod = { "Pod" } }
+
+function L.spawnVehicle(what)
+  local h = host()
+  local all = list and list.Get and list.Get("Vehicles") or {}
+  local v, key
+  for _, k in ipairs(L.VEHICLES[what] or {}) do
+    if all[k] then v, key = all[k], k break end
+  end
+  if not v or not botOk() then return nil end
+  while #L.spawned >= MAX_SPAWNED do
+    local old = table.remove(L.spawned, 1)
+    if IsValid(old) then old:Remove() end
+  end
+  local e = ents.Create(v.Class)
+  if not IsValid(e) then return nil end
+  e:SetModel(v.Model)
+  for k, val in pairs(v.KeyValues or {}) do e:SetKeyValue(k, val) end
+  local fwd = L.bot:GetForward()
+  fwd.z = 0
+  e:SetPos(L.bot:GetPos() + fwd:GetNormalized() * (what == "seat" and 70 or 180) + Vector(0, 0, 12))
+  e:SetAngles(Angle(0, L.bot:GetAngles().y + 90, 0))
+  e:Spawn()
+  e:Activate()
+  e.VehicleName = key
+  e.VehicleTable = v
+  if e.SetVehicleClass then e:SetVehicleClass(key) end
+  if IsValid(h) then
+    undo.Create("vehicle")
+    undo.AddEntity(e)
+    undo.SetPlayer(h)
+    undo.SetCustomUndoText("Undone Alter Ego's " .. what)
+    undo.Finish()
+    cleanup.Add(h, "vehicles", e)
+  end
+  L.spawned[#L.spawned + 1] = e
+  local fx = EffectData()
+  fx:SetOrigin(e:GetPos())
+  util.Effect("propspawn", fx)
+  return e
+end
+
 function L.spawn(what, n)
   local h = host()
-  local mdl = L.ITEMS[tostring(what or ""):lower()]
+  what = tostring(what or ""):lower()
+  if L.VEHICLES[what] then
+    local e = L.spawnVehicle(what)
+    return e and { e } or {}
+  end
+  local mdl = L.ITEMS[what]
   if not mdl or not botOk() then return {} end
   local out = {}
   for i = 1, math.Clamp(tonumber(n) or 1, 1, 5) do
@@ -426,7 +494,7 @@ function L.spawn(what, n)
     local p = ents.Create("prop_physics")
     if IsValid(p) then
       p:SetModel(mdl)
-      p:SetPos(L.bot:EyePos() + L.bot:GetForward() * 70 + Vector(0, 0, 25 * i))
+      p:SetPos(L.eye() + L.bot:GetForward() * 70 + Vector(0, 0, 25 * i))
       p:Spawn()
       p:Activate()
       if IsValid(h) then
@@ -646,6 +714,16 @@ OPS.task = function(c)
     L.event("task", { name = c.name, status = "running" })
   end
 end
+OPS.sit = function(c)
+  local w = tostring(c.what or "")
+  if w == "ground" or w == "floor" then return Sit.sit("ground") end
+  Sit.sit(w ~= "" and resolve(w) or nil)
+end
+OPS.stand = function() Sit.stand() end
+OPS.prank = function(c)
+  local p = findPlayer(c.who) or host()
+  if IsValid(p) then Play.prank(p, c.kind) end
+end
 OPS.cancel = function(c)
   if c.name and c.name ~= "" and c.name ~= "all" then Sandbox.cancel(c.name, "cancelled") else Sandbox.cancel_all("cancelled") end
 end
@@ -661,12 +739,15 @@ OPS.config = function(c)
   if c.auto_join ~= nil then L.autoJoin = c.auto_join end
   if c.tasks ~= nil then L.allowTasks = c.tasks end
   if c.fly then L.fly.config(c.fly) end
+  if c.play then Play.config(c.play) end
   if c.body and c.body ~= "" and c.body ~= L.body and not L.menuBody then
     L.body = c.body
   elseif L.menuBody and c.body == L.menuBody then
     L.menuBody = nil
   end
 end
+
+local STAND_FOR = { follow = true, come = true, goto_aim = true, attack = true, jump = true, dance = true, stop = true, leave = true, grab = true, prank = true }
 
 local function readCommands(initial)
   local raw = file.Read(L.DIR .. "/cmd.json", "DATA")
@@ -687,6 +768,8 @@ local function readCommands(initial)
     if id > L.lastCmd then
       L.lastCmd = id
       local f = OPS[c.op]
+      -- un ordine di movimento la fa alzare
+      if Sit.on and STAND_FOR[c.op] then Sit.stand(true) end
       if f then
         local ok, err = pcall(f, c)
         if not ok then print("[Alter Ego Link] " .. tostring(c.op) .. ": " .. tostring(err)) end
@@ -717,7 +800,9 @@ local function snapshot()
       local w = b:GetActiveWeapon()
       weapon = IsValid(w) and w:GetClass():gsub("^weapon_", "") or nil
     end
-    s.bot = { hp = b:Health(), mode = L.mode, weapon = weapon, body = L.kind,
+    local sitting = Sit.on and (Sit.on == "ground" and "ground" or (IsValid(Sit.on) and friendly(Sit.on))) or nil
+    s.rivals = Play.rivals()
+    s.bot = { hp = b:Health(), mode = L.mode, weapon = weapon, body = L.kind, sitting = sitting,
       held = IsValid(L.held) and (friendly(L.held) .. "#" .. L.held:EntIndex()) or nil,
       following = IsValid(L.target) and L.target:IsPlayer() and L.target:Nick() or nil }
     local players = {}
@@ -823,6 +908,8 @@ hook.Add("Think", "AELink", function()
   bridge()
   brain()
   Fly.tick(botOk())
+  Sit.tick()
+  if botOk() then Play.tick() end
   Sandbox.tick()
   -- rientra da sola dopo una morte, se l'app è collegata
   if L.deadAt and CurTime() - L.deadAt > (L.kind == "lambda" and 8 or 6) and L.linked() then
@@ -842,6 +929,7 @@ end)
 hook.Add("EntityTakeDamage", "AELink", function(target, dmg)
   if target ~= L.bot or not IsValid(target) then return end
   Fly.onDamage(dmg)
+  Play.onHurt(dmg:GetAttacker(), dmg.GetInflictor and dmg:GetInflictor(), dmg:GetDamage())
   local a = dmg:GetAttacker()
   local now = CurTime()
   if (L.lastHurt or 0) + 4 > now then return end
@@ -851,6 +939,8 @@ end)
 
 hook.Add("OnNPCKilled", "AELink", function(npc, attacker)
   if npc == L.bot and L.kind ~= "lambda" then
+    Sit.stand(true)
+    Play.onDied(attacker)
     L.drop()
     L.bot = nil
     L.deadAt = CurTime()
