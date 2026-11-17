@@ -257,6 +257,7 @@ fn fly_tick(app: &AppHandle, dir: &Path, cfg: &crate::config::FlyConfig) {
     let Some(b) = brain.as_mut() else { return };
     b.run(ms, &senses);
     *out = b.read(ms);
+    fly::gate(out, &senses);
     *activity = b.take_total() as f32 / (ms / 1000.0);
     mood.update(ms / 1000.0, &senses, out);
     let body = json!({
@@ -679,6 +680,43 @@ fn on_event(app: &AppHandle, e: Value) {
             speak(app, emo, &s("text"));
         }
         "prank" => remember(app, &format!("[you pranked {} ({})]", s("who"), s("kind")), ""),
+        // qualcuno le ha lanciato qualcosa: lo sa e se lo ricorda (niente modello: la battuta l'ha già fatta il gioco)
+        "thrown" => {
+            let by = s("by");
+            let how = match s("how").as_str() {
+                "caught" => "you caught it with the physgun",
+                "returned" => "you caught it and threw it back",
+                "jumped" => "you jumped out of the way",
+                "fled" => "you ran from it",
+                "hit" => "it hit you",
+                "ignored" => "you didn't even flinch",
+                _ => "you dodged it",
+            };
+            let who = if by.is_empty() { "something came flying".to_string() } else { format!("{by} threw a {} at you", s("what")) };
+            remember(app, &format!("[{who}; {how}]"), "");
+        }
+        // annoiata: si inventa qualcosa da fare (se la chiacchiera lo permette)
+        "idea" => comment(
+            app,
+            "[event] nothing is happening and you're bored: invent something fun to do right now (build something silly, a mini-game, \
+a harmless prank on a friend…), with [act] lines or a short Lua [task]. Say one line about it.",
+            false,
+        ),
+        // voglia di vendicarsi: lo scherzo lo inventa lei (azione pronta o script Lua suo)
+        "prank_idea" => {
+            let recent = s("recent");
+            comment(
+                app,
+                &format!(
+                    "[event] {} keeps messing with you ({}). Get them back with a prank YOU invent: be creative and surprising, \
+not always the same thing{}. Use [act] lines or write a short Lua [task] (spawn_at, push, freeze, boom…). Say one playful line.",
+                    s("who"),
+                    s("why"),
+                    if recent.is_empty() { String::new() } else { format!(" (you already did: {recent})") }
+                ),
+                true,
+            );
+        }
         "notify" => comment(app, &format!("[your task {} says] {}", s("task"), s("text")), true),
         "task" => {
             let status = s("status");

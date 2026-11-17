@@ -1,3 +1,11 @@
+## Alter Ego 1.12.1
+
+- Garry's Mod: she reacts like a person when something is thrown at her (dodges, jumps or catches it with the physgun) and remembers who did it; walking up to her no longer startles her.
+- Garry's Mod: she invents her own pranks and games, also with Lua scripts.
+- Garry's Mod: riding as a passenger fixed.
+
+`AlterEgo_1.12.1_setup.exe` / `AlterEgo_1.12.1_portable.zip` Windows · `AlterEgo_1.12.1_amd64.AppImage` / `AlterEgo_1.12.1_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.12.0
 
 - Garry's Mod: Alter Ego plays like a friend in the match, not like an insect: she dodges, gets used to things, banters and gets even with pranks (adjustable).

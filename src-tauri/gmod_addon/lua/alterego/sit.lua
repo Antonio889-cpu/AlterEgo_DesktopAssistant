@@ -76,7 +76,10 @@ function S.sit(e)
   S.stand(true)
   if e then
     local pos = S.place(e)
-    if pos:Distance(bot:GetPos()) > 90 then
+    local d = pos:Distance(bot:GetPos())
+    -- in macchina si sale "con un salto": il posto è dentro la carrozzeria, a piedi non ci si arriva
+    if e.IsVehicle and e:IsVehicle() and d < 700 then return S.attach(e) end
+    if d > 90 then
       -- prima ci va a piedi
       S.pending = e
       L.mode = "goto"
@@ -107,8 +110,27 @@ function S.attach(e)
   end
   bot:SetPos(pos)
   bot:SetAngles(ang)
+  if kind == "vehicle" then
+    -- attaccata al veicolo: si muove con lui senza scatti e non sbatte contro la carrozzeria
+    S.oldGroup = bot.GetCollisionGroup and bot:GetCollisionGroup() or nil
+    if bot.SetCollisionGroup then bot:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE or 10) end
+    if bot.SetNotSolid then bot:SetNotSolid(true) end
+    S.localPos = e:WorldToLocal(pos)
+    S.localAng = e.WorldToLocalAngles and e:WorldToLocalAngles(ang) or Angle(0, 90, 0)
+    bot:SetParent(e)
+    if bot.SetLocalPos then bot:SetLocalPos(S.localPos) bot:SetLocalAngles(S.localAng) end
+    S.parented = true
+  end
   pose(bot, kind)
   if kind == "vehicle" then L.event("ride", { what = L.friendly(e) }) end
+end
+
+local function unparent(bot)
+  if not S.parented then return end
+  S.parented = nil
+  bot:SetParent(nil)
+  if bot.SetNotSolid then bot:SetNotSolid(false) end
+  if bot.SetCollisionGroup then bot:SetCollisionGroup(S.oldGroup or COLLISION_GROUP_NPC or 9) end
 end
 
 --- Si alza (quiet: senza tornare a seguire).
@@ -124,10 +146,13 @@ function S.stand(quiet)
   else
     pcall(bot.SetSchedule, bot, SCHED_IDLE_STAND)
   end
-  -- giù dal veicolo: di lato, non dentro la carrozzeria
+  unparent(bot)
+  -- giù dal veicolo: dalla sua parte (accanto alla portiera), non dentro la carrozzeria
   if IsValid(was) and was ~= "ground" and was.IsVehicle and was:IsVehicle() then
-    bot:SetPos(was:GetPos() + was:GetForward() * 90 + Vector(0, 0, 10))
+    local side = (S.localPos and S.localPos.x or 1) >= 0 and 1 or -1
+    bot:SetPos(was:LocalToWorld(Vector(side * 95, 0, 12)))
   end
+  S.localPos, S.localAng = nil, nil
   bot:SetAngles(Angle(0, bot:GetAngles().y, 0))
   if not quiet then
     L.mode = "follow"
@@ -151,23 +176,31 @@ function S.tick()
   local pos, ang
   if S.on == "ground" then
     pos, ang = S.groundPos, S.groundAng
-  elseif IsValid(S.on) then
-    pos, ang = S.place(S.on)
-  else
+  elseif not IsValid(S.on) then
     return S.stand()
+  elseif S.parented and bot.SetLocalPos then
+    bot:SetLocalPos(S.localPos)
+    bot:SetLocalAngles(S.localAng)
+  else
+    pos, ang = S.place(S.on)
   end
-  bot:SetPos(pos)
-  bot:SetAngles(ang)
+  if pos then
+    bot:SetPos(pos)
+    bot:SetAngles(ang)
+  end
   if bot.loco and bot.loco.SetVelocity then bot.loco:SetVelocity(Vector()) end
   pose(bot, S.kind)
 end
 
 -- passeggera: se sali su un veicolo mentre ti segue, sale con te; se scendi, scende
+local FREE = { follow = true, stay = true, idle = true }
 hook.Add("PlayerEnteredVehicle", "AELinkSit", function(ply, veh)
-  if ply ~= L.host() or not IsValid(L.bot) or L.mode ~= "follow" then return end
+  if ply ~= L.host() or not IsValid(L.bot) or not FREE[L.mode] then return end
   if veh:GetClass() == "prop_vehicle_prisoner_pod" and not IsValid(veh:GetParent()) then return end -- una sedia: resta in piedi
-  timer.Simple(0.3, function()
-    if IsValid(veh) and IsValid(L.bot) and L.mode == "follow" then
+  if L.sandbox and #L.sandbox.list() > 0 then return end -- sta facendo qualcosa per conto suo
+  if veh:GetPos():Distance(L.bot:GetPos()) > 1200 then return end
+  timer.Simple(0.5, function()
+    if IsValid(veh) and IsValid(L.bot) and FREE[L.mode] then
       S.sit(veh)
       if L.play and L.play.quip then L.play.quip("ride") end
     end
@@ -175,6 +208,16 @@ hook.Add("PlayerEnteredVehicle", "AELinkSit", function(ply, veh)
 end)
 hook.Add("PlayerLeaveVehicle", "AELinkSit", function(ply, veh)
   if ply == L.host() and S.on == veh then S.stand() end
+end)
+-- il veicolo sparisce (undo, cleanup) mentre è seduta: giù subito, senza restare attaccata al nulla
+hook.Add("EntityRemoved", "AELinkSit", function(e)
+  if S.on == e and IsValid(L.bot) then
+    unparent(L.bot)
+    S.on = nil
+    if L.kind == "lambda" then L.bot.l_UpdateAnimations = true end
+    L.mode = "follow"
+    L.target = L.host()
+  end
 end)
 
 return S

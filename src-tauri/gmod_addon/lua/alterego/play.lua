@@ -29,7 +29,9 @@ local Q = {
     hit = { "Ahia!", "Ehi! Fa male!", "Ma dai!", "Ahi!" },
     died = { "Nooo!", "gg…", "Me la paghi!", "Respawno subito!" },
     prank = { "Ehehe, vendetta!", "Te lo meritavi!", "Ops… è scivolato!", "Pareggio!" },
-    melon = { "Anguria in arrivo!", "Prendi!", "Al volo!" },
+    melon = { "In arrivo!", "Prendi!", "Al volo!" },
+    catch = { "Presa!", "Al volo!", "Grazie, è mia adesso.", "Troppo facile!" },
+    back = { "Te la rimando!", "Rispedita al mittente!", "Tieni, è tua!" },
     juggle = { "Guarda!", "Hop!" },
     build = { "Guarda cosa costruisco!", "Torre!", "Ta-dan!" },
     target = { "Tiro al bersaglio!", "Vediamo se lo prendo…" },
@@ -45,7 +47,9 @@ local Q = {
     hit = { "Ow!", "Hey! That hurts!", "Come on!", "Ouch!" },
     died = { "Nooo!", "gg…", "You'll pay for that!", "Respawning!" },
     prank = { "Hehe, revenge!", "You had it coming!", "Oops… it slipped!", "Now we're even!" },
-    melon = { "Incoming watermelon!", "Catch!", "Heads up!" },
+    melon = { "Incoming!", "Catch!", "Heads up!" },
+    catch = { "Got it!", "Caught it!", "Thanks, it's mine now.", "Too easy!" },
+    back = { "Return to sender!", "Here, have it back!", "Catch this!" },
     juggle = { "Look!", "Hop!" },
     build = { "Look what I'm building!", "Tower!", "Ta-da!" },
     target = { "Target practice!", "Let's see if I hit it…" },
@@ -56,7 +60,8 @@ local Q = {
   },
 }
 local EMO = { dodge = "surprised", flee = "worried", annoyed = "embarrassed", hit = "surprised", died = "sad", prank = "happy",
-  melon = "happy", juggle = "happy", build = "happy", target = "happy", light = "surprised", wheee = "happy", ride = "happy", boom = "surprised" }
+  melon = "happy", juggle = "happy", build = "happy", target = "happy", light = "surprised", wheee = "happy", ride = "happy", boom = "surprised",
+  catch = "happy", back = "happy" }
 
 --- Battuta breve (voce e chat). prob: probabilità; gap minimo 6 s tra una e l'altra.
 function P.quip(kind, prob)
@@ -120,11 +125,41 @@ local function dangerous(e)
   return m:find("explosive", 1, true) ~= nil or (e.BoundingRadius and e:BoundingRadius() > 70)
 end
 
+--- Si può prendere al volo: un oggetto fisico non troppo grande, e lei ha le mani libere.
+function P.canCatch(e)
+  if not IsValid(e) or IsValid(L.held) or L.mode == "sit" or dangerous(e) then return false end
+  if e:GetClass():find("^prop_physics") == nil then return false end
+  if (e.BoundingRadius and e:BoundingRadius() or 99) > 60 then return false end
+  local ph = e:GetPhysicsObject()
+  return IsValid(ph) and ph:IsMoveable()
+end
+
+--- La prende con la physgun; a volte la rimanda a chi l'ha lanciata. Ritorna "caught" o "returned".
+function P.catch(e, culprit)
+  if not L.grab(e) then return "dodged" end
+  local ph = e:GetPhysicsObject()
+  if IsValid(ph) then ph:SetVelocity(Vector()) end
+  if IsValid(culprit) then L.look(culprit) end
+  local back = IsValid(culprit) and P.mischief ~= "off" and math.random() < 0.6
+  timer.Simple(back and 0.9 or 2.5, function()
+    if L.held ~= e or not IsValid(e) then return end
+    if back and IsValid(culprit) then
+      L.throw(culprit)
+      P.quip("back", 0.8)
+    else
+      L.drop()
+    end
+  end)
+  if not back then P.quip("catch", 0.7) end
+  return back and "returned" or "caught"
+end
+
 -- ---------- rivalità ----------
-function P.offend(ply, amount)
+function P.offend(ply, amount, why)
   if not IsValid(ply) or not ply:IsPlayer() then return end
   local r = P.rival[ply:Nick()] or { score = 0 }
   r.score = math.min(6, r.score + amount)
+  r.why = why or r.why
   r.ply = ply
   P.rival[ply:Nick()] = r
 end
@@ -154,18 +189,23 @@ function P.react(o, F)
     return
   end
   local esc = o.escape or 0
-  if esc >= 0.5 and ready("escape", 1.5) then
+  if esc >= 0.5 and ready("escape", 1.2) then
     P.lastAction = now
     local g = gain("escape")
     local culprit = thrower(threat)
-    if culprit then P.offend(culprit, 0.7) end
+    if culprit then P.offend(culprit, 0.7, "keeps throwing things at you") end
     -- a un barile esplosivo o a una macchina non ci si abitua
     local danger = dangerous(threat)
     local strength = danger and esc or esc * g
-    if strength >= 0.8 and danger then
+    local how
+    if danger and strength >= 0.5 then
       L.jump()
       F.override(F.awayFrom(b, from, 340, o), 1.6, true)
       P.quip("flee", 0.8)
+      how = "fled"
+    elseif P.canCatch(threat) and math.random() < 0.35 + (1 - g) * 0.45 then
+      -- da persona: la prende al volo con la physgun (più ci si abitua, più è tranquilla)
+      how = P.catch(threat, culprit)
     elseif strength >= 0.35 then
       -- schivata: un passo di lato (i neuroni di svolta scelgono la parte), a volte un salto
       local away = (b:GetPos() - from)
@@ -173,7 +213,8 @@ function P.react(o, F)
       away = away:GetNormalized()
       local side = Vector(-away.y, away.x, 0)
       if (o.turn_r or 0) > (o.turn_l or 0) then side = -side end
-      if math.random() < 0.35 then L.jump() end
+      how = "dodged"
+      if math.random() < 0.35 then L.jump() how = "jumped" end
       F.override(b:GetPos() + side * 110 + away * 40, 0.7, true)
       local who = culprit or threat
       timer.Simple(0.8, function() if IsValid(who) and IsValid(L.bot) then L.look(who) end end)
@@ -182,6 +223,11 @@ function P.react(o, F)
       -- ci è abituata: uno sguardo storto
       if IsValid(culprit) then L.look(culprit) elseif IsValid(threat) then L.look(threat) end
       if culprit then P.quip("annoyed", 0.5) end
+      how = "ignored"
+    end
+    -- se lo ricorda (l'app lo mette nel contesto e nella memoria della partita)
+    if culprit and ready("thrownev", 3) then
+      L.event("thrown", { by = culprit:Nick(), what = L.friendly(threat), how = how })
     end
     return
   end
@@ -218,14 +264,14 @@ end
 -- ---------- eventi ----------
 function P.onHurt(attacker, inflictor, dmg)
   local culprit = (IsValid(attacker) and attacker:IsPlayer()) and attacker or thrower(inflictor) or thrower(attacker)
-  if culprit then P.offend(culprit, 0.5 + math.min(dmg or 0, 60) / 30) end
+  if culprit then P.offend(culprit, 0.5 + math.min(dmg or 0, 60) / 30, "hurt you") end
   P.lastAction = CurTime()
   P.quip("hit", 0.6)
 end
 
 function P.onDied(attacker)
   local culprit = (IsValid(attacker) and attacker:IsPlayer()) and attacker or thrower(attacker)
-  if culprit then P.offend(culprit, 1.5) end
+  if culprit then P.offend(culprit, 1.5, "killed you") end
   P.quip("died", 1)
 end
 
@@ -299,6 +345,26 @@ local function ceasefire(ply)
 end
 
 -- ---------- scherzi ----------
+P.recent = P.recent or {}
+function P.remember(kind)
+  table.insert(P.recent, 1, kind)
+  while #P.recent > 4 do table.remove(P.recent) end
+end
+
+--- Può chiedere all'app di inventarsi qualcosa (app collegata e script permessi).
+function P.inventive()
+  return L.allowTasks ~= false and L.linked ~= nil and L.linked()
+end
+
+--- Vendetta inventata da lei (il modello sceglie: azione pronta o script Lua suo).
+function P.askPrank(ply)
+  local r = P.rival[ply:Nick()]
+  L.event("prank_idea", { who = ply:Nick(), why = r and r.why or "messing with you", recent = table.concat(P.recent, ", ") })
+  P.remember("invented")
+  if r then r.score = math.max(0, r.score - 1.5) end
+  P.lastAction = CurTime()
+end
+
 P.PRANKS = {
   light = { "throw", "melon", "crate" },
   full = { "throw", "melon", "crate", "shoot", "boom" },
@@ -359,6 +425,7 @@ function P.prank(ply, kind)
   P.lastAction = CurTime()
   local r = P.rival[ply:Nick()]
   if r then r.score = math.max(0, r.score - 1.5) end
+  P.remember(kind)
   L.event("prank", { who = ply:Nick(), kind = kind })
   P.quip(kind == "boom" and "boom" or "prank", 0.9)
   return kind
@@ -420,7 +487,8 @@ function P.tick()
   if P.mischief ~= "off" and P.free() and now - P.lastAction > 4 then
     local rival = P.topRival(1400, 2)
     if rival and ready("prank", P.mischief == "full" and 20 or 40) then
-      P.prank(rival)
+      -- di solito se lo inventa; a volte (o senza app) uno scherzo pronto
+      if P.inventive() and math.random() < 0.65 then P.askPrank(rival) else P.prank(rival) end
       return
     end
   end
@@ -428,7 +496,14 @@ function P.tick()
   if P.idle and P.free() and now >= P.nextIdle and now - P.lastAction > 20 then
     P.nextIdle = now + math.random(30, 60)
     local h = L.host()
-    if IsValid(h) and h:GetPos():Distance(b:GetPos()) < 1500 then P.idleAct() end
+    if IsValid(h) and h:GetPos():Distance(b:GetPos()) < 1500 then
+      if P.inventive() and math.random() < 0.25 and ready("idea", 240) then
+        L.event("idea", {})
+        P.lastAction = now
+      else
+        P.idleAct()
+      end
+    end
   end
 end
 

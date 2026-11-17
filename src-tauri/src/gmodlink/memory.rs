@@ -41,6 +41,7 @@ pub struct PlayerNote {
     pub hit_you: u32,
     pub killed_you: u32,
     pub pranked: u32,
+    pub threw_at_you: u32,
 }
 
 pub fn path(data_dir: &Path) -> PathBuf {
@@ -74,6 +75,9 @@ pub struct Log {
     killed_by: BTreeMap<String, u32>,
     deaths: u32,
     pranked: BTreeMap<String, u32>,
+    /// Chi le ha lanciato roba addosso (e quante volte l'ha presa al volo).
+    threw: BTreeMap<String, u32>,
+    caught: u32,
     spawned: BTreeMap<String, u32>,
     tasks: Vec<String>,
     said: Vec<String>,
@@ -105,6 +109,15 @@ impl Log {
                 }
             }
             "prank" => bump(&mut self.pranked, s("who")),
+            "thrown" => {
+                let by = s("by");
+                if self.players.contains(&by) {
+                    bump(&mut self.threw, by);
+                }
+                if s("how") == "caught" {
+                    self.caught += 1;
+                }
+            }
             "spawned" if s("who").is_empty() => {}
             "task" if s("status") == "running" => {
                 let n = s("name");
@@ -129,7 +142,7 @@ impl Log {
     }
 
     fn has_content(&self) -> bool {
-        self.deaths > 0 || !self.hurt_by.is_empty() || !self.pranked.is_empty() || !self.spawned.is_empty() || !self.tasks.is_empty() || !self.said.is_empty() || self.rides > 0
+        self.deaths > 0 || !self.hurt_by.is_empty() || !self.threw.is_empty() || !self.pranked.is_empty() || !self.spawned.is_empty() || !self.tasks.is_empty() || !self.said.is_empty() || self.rides > 0
     }
 
     /// Riassunto in una riga (inglese: è per il modello).
@@ -144,6 +157,12 @@ impl Log {
         )];
         for (p, n) in &self.hurt_by {
             parts.push(format!("{p} hit you {n}x"));
+        }
+        for (p, n) in &self.threw {
+            parts.push(format!("{p} threw stuff at you {n}x"));
+        }
+        if self.caught > 0 {
+            parts.push(format!("you caught {}x with the physgun", self.caught));
         }
         if self.deaths > 0 {
             let by: Vec<String> = self.killed_by.iter().map(|(p, n)| format!("{p} {n}x")).collect();
@@ -183,6 +202,7 @@ impl Log {
             n.hit_you += self.hurt_by.get(p).copied().unwrap_or(0);
             n.killed_you += self.killed_by.get(p).copied().unwrap_or(0);
             n.pranked += self.pranked.get(p).copied().unwrap_or(0);
+            n.threw_at_you += self.threw.get(p).copied().unwrap_or(0);
         }
         st.sessions.push(Session { start: self.start, end, map: self.map.clone(), players: self.players.iter().cloned().collect(), line: self.summary(end) });
         let n = st.sessions.len();
@@ -265,7 +285,7 @@ pub fn recall(st: &Store, present: &[String], max: usize) -> String {
     for p in present {
         if let Some(n) = st.players.get(p) {
             if n.games > 0 {
-                lines.push(format!("- {p}: {} games together, hit you {}x, killed you {}x, you pranked them {}x", n.games, n.hit_you, n.killed_you, n.pranked));
+                lines.push(format!("- {p}: {} games together, hit you {}x, threw stuff at you {}x, killed you {}x, you pranked them {}x", n.games, n.hit_you, n.threw_at_you, n.killed_you, n.pranked));
             }
         }
     }
