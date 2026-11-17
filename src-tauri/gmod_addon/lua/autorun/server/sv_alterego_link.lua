@@ -578,6 +578,12 @@ local function find(what, r)
   return w
 end
 
+local function spawnCount()
+  local n = 0
+  for _, e in ipairs(L.spawned) do if IsValid(e) then n = n + 1 end end
+  return n
+end
+
 local lastSay, lastNotify = 0, 0
 L.api = {
   vec = function(x, y, z) return Vector(tonumber(x) or 0, tonumber(y) or 0, tonumber(z) or 0) end,
@@ -661,6 +667,67 @@ L.api = {
   end,
   gesture = function(g) return L.gesture(tostring(g)) end,
   jump = function() L.jump() end,
+  -- ---- per gli scherzi che si inventa ----
+  spawn_at = function(what, at)
+    local m = L.ITEMS[tostring(what or "")]
+    local p = topos(at)
+    if not m or not p or not botOk() or p:Distance(botPos()) > 3000 then return nil end
+    if spawnCount() >= 12 then Sandbox.sleep(0.5) end
+    return wrap(L.play.spawnAt(m, p))
+  end,
+  push = function(h, v)
+    local e = unwrap(h)
+    if not IsValid(e) or not isvector(v) or e == L.bot then return false end
+    if v:Length() > 900 then v = v:GetNormalized() * 900 end
+    if e:IsPlayer() then
+      if L.play.mischief == "off" then return false end
+      e:SetVelocity(v)
+      return true
+    end
+    local ph = e:GetPhysicsObject()
+    if not IsValid(ph) then return false end
+    ph:Wake()
+    ph:SetVelocity(v)
+    return true
+  end,
+  freeze = function(h, on)
+    local e = unwrap(h)
+    if not IsValid(e) or e:IsPlayer() or e == L.bot then return false end
+    local ph = e:GetPhysicsObject()
+    if not IsValid(ph) then return false end
+    ph:EnableMotion(on == false)
+    if on == false then ph:Wake() end
+    return true
+  end,
+  color = function(h, r, g, b, a)
+    local e = unwrap(h)
+    if not IsValid(e) or e == L.bot then return false end
+    e:SetRenderMode(RENDERMODE_TRANSCOLOR)
+    e:SetColor(Color(tonumber(r) or 255, tonumber(g) or 255, tonumber(b) or 255, math.Clamp(tonumber(a) or 255, 30, 255)))
+    return true
+  end,
+  scale = function(h, k)
+    local e = unwrap(h)
+    if not IsValid(e) or e:IsPlayer() or e == L.bot or not e.SetModelScale then return false end
+    e:SetModelScale(math.Clamp(tonumber(k) or 1, 0.2, 3), 0.3)
+    return true
+  end,
+  boom = function(at)
+    local p = topos(at)
+    if not p or not botOk() or L.play.mischief ~= "full" then return false end
+    if p:Distance(botPos()) < 200 then return false end
+    if CurTime() - (L.lastBoom or 0) < 2 then Sandbox.sleep(2) end
+    L.lastBoom = CurTime()
+    local x = ents.Create("env_explosion")
+    if not IsValid(x) then return false end
+    x:SetPos(p)
+    x:SetOwner(L.bot)
+    x:SetKeyValue("iMagnitude", "60")
+    x:Spawn()
+    x:Fire("Explode", "", 0)
+    x:Fire("Kill", "", 0.5)
+    return true
+  end,
 }
 
 local function taskEnded(name, status, err)

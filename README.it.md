@@ -534,12 +534,13 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
   Single player e server che ospiti tu (l'addon deve girare sul server).
 - Usa la modalità video **finestra senza bordi**: un gioco a schermo intero esclusivo copre ogni altra finestra.
 - **Corpo**: con [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (addon del Workshop di StarFrost, non incluso: iscriviti da Steam) è un Lambda Player e si muove come un giocatore vero (corsa, salto, armi da giocatore, physgun vera); le sue decisioni, la sua chat e la sua voce sono spente, comanda Alter Ego. Senza, è un NPC cittadino. *Automatico* sceglie Lambda quando è installato; si sceglie nelle impostazioni o nel menu C.
-- **Gioca come un'amica in partita**: schiva, ride, scherza («gg», «me la paghi!»), si ricorda chi la bersaglia e prima o poi
-  si vendica con uno scherzo: ti rilancia il prop, ti fa cadere un'anguria in testa, ti blocca con una cassa, ti spara per un attimo
-  o fa esplodere un barile accanto a te (*Dispetti*: tutti, leggeri, nessuno). Quando non succede niente gioca da sola
-  (impila prop, tiro al bersaglio sui barili, emote). Le battute rapide sono immediate e non costano token.
+- **Gioca come un'amica in partita**: se le lanci qualcosa schiva, salta o lo prende al volo con la physgun (e a volte te lo rimanda),
+  e si ricorda chi è stato. Ride, scherza («gg», «me la paghi!») e prima o poi si vendica con uno scherzo che si inventa lei, con azioni
+  rapide o uno script Lua scritto al momento, oppure uno pronto: ti rilancia il prop, un'anguria in testa, una cassa davanti, qualche colpo
+  o un barile che esplode (*Dispetti*: tutti, leggeri, nessuno). Quando non succede niente gioca da sola (impila prop, tiro al bersaglio,
+  emote) o si inventa qualcosa di nuovo. Le battute rapide sono immediate e non costano token.
 - **Veicoli e sedersi**: spawna una jeep, un airboat o un sedile; si siede su sedie, divani, sedili o per terra («siediti», «alzati»);
-  se sali in macchina mentre ti segue, sale come passeggera e scende con te.
+  se sali in macchina mentre è vicina, sale come passeggera, viaggia con te e scende con te.
 - **Memoria delle partite**: ogni partita diventa una riga in un archivio separato (`gmod_memory.json`, non nella memoria principale), scritta senza AI.
   Si consulta solo quando serve: una riga sull'ultima partita con gli stessi amici all'inizio, e i ricordi completi quando glieli chiedi
   («ti ricordi…», «l'altra volta…»; nei casi dubbi decide Rizzo Flow, se è il tuo router).

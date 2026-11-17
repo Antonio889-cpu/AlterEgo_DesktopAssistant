@@ -41,6 +41,16 @@ local function isFood(e)
 end
 local function isMelon(e) return (e.GetModel and e:GetModel() or ""):lower():find("melon", 1, true) ~= nil end
 
+local PROJ = { npc_grenade_frag = true, rpg_missile = true, grenade_ar2 = true, crossbow_bolt = true, prop_combine_ball = true }
+--- Può "piombarle addosso": oggetti fisici, veicoli, proiettili. Non persone, NPC o lei stessa.
+function F.projectile(e)
+  if e:IsPlayer() or e:IsNPC() or (e.IsNextBot and e:IsNextBot()) then return false end
+  if e:IsVehicle() then return true end
+  local c = e:GetClass()
+  if PROJ[c] then return true end
+  return c:find("^prop_physics") ~= nil or c:find("^prop_ragdoll") ~= nil
+end
+
 local function onFire(e) return e.IsOnFire and e:IsOnFire() or false end
 
 --- Lato rispetto a lei: "l" o "r".
@@ -71,7 +81,8 @@ function F.sense()
       local ep = e:GetPos()
       local rel = bp - ep
       local d = rel:Length()
-      if d < 700 and e.GetVelocity then
+      -- solo cose lanciate o guidate: un giocatore (o un NPC) che le viene vicino non è una minaccia
+      if d < 700 and e.GetVelocity and F.projectile(e) then
         local v = e:GetVelocity()
         local dirv = rel:GetNormalized()
         local closing = v.x * dirv.x + v.y * dirv.y + v.z * dirv.z

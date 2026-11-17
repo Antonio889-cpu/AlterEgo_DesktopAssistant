@@ -291,6 +291,26 @@ impl Brain {
     }
 }
 
+/// Alter Ego non è una mosca: un'uscita del cervello conta solo se c'è davvero la cosa che la giustifica
+/// (un oggetto in arrivo accende anche i neuroni della proboscide, ma senza cibo vicino non vuol dire niente).
+pub fn gate(out: &mut [(String, f32)], senses: &HashMap<String, f32>) {
+    let has = |ks: &[&str]| ks.iter().any(|k| senses.get(*k).copied().unwrap_or(0.0) > 0.05);
+    for (k, v) in out.iter_mut() {
+        let need: &[&str] = match k.as_str() {
+            "feed" => &["sweet", "smell_food"],
+            "drink" => &["water", "wet"],
+            "squint" => &["light"],
+            "listen" => &["sound", "smell_danger"],
+            "brace" => &["wind", "touch", "pain"],
+            "escape" | "backward" | "turn_l" | "turn_r" => &["loom_l", "loom_r", "pain", "heat", "smell_danger", "touch"],
+            _ => continue,
+        };
+        if !has(need) {
+            *v = 0.0;
+        }
+    }
+}
+
 /// Umore che nasce dai riflessi (per il modello): stress che sale con dolore e fughe e scende piano.
 #[derive(Default, Debug, Clone)]
 pub struct Mood {
@@ -331,7 +351,7 @@ impl Mood {
             "escape" => "dodged something",
             "backward" => "stepped back",
             "groom" => "flinched",
-            "feed" => "eyed a watermelon",
+            "feed" => "noticed some food",
             "listen" => "heard a bang",
             "squint" => "dazzled by a light",
             "brace" => "got flung",
@@ -399,6 +419,26 @@ mod tests {
             assert!(el.as_millis() < 600, "troppo lento: {el:?} per 600 ms");
         }
         eprintln!("600 ms di cervello in {el:?}");
+    }
+
+    #[test]
+    fn approaching_thing_is_not_food() {
+        // qualcosa in arrivo accende anche la proboscide: senza cibo vicino non conta
+        let mut b = Brain::load().expect("flybrain.bin");
+        let senses: HashMap<String, f32> = [("loom_l".to_string(), 0.3)].into();
+        let mut feed = 0.0f32;
+        for _ in 0..10 {
+            b.run(100.0, &senses);
+            let mut out = b.read(100.0);
+            gate(&mut out, &senses);
+            feed = feed.max(out.iter().find(|(k, _)| k == "feed").map(|x| x.1).unwrap_or(0.0));
+        }
+        assert_eq!(feed, 0.0);
+        let mut m = Mood::default();
+        let mut out = vec![("feed".to_string(), 1.0), ("escape".to_string(), 0.8)];
+        gate(&mut out, &senses);
+        m.update(0.1, &senses, &out);
+        assert!(!m.line().contains("food"), "{}", m.line());
     }
 
     #[test]

@@ -533,12 +533,13 @@ Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Se
   Single player and servers you host (the addon has to run on the server).
 - Use the **borderless window** video mode: an exclusive full-screen game hides every other window.
 - **Body**: with [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (Workshop addon by StarFrost, not included: subscribe to it on Steam) she is a Lambda Player and moves like a real player (running, jumping, player weapons, a real physgun); its own decisions, chat and voice are switched off, Alter Ego is in charge. Without it she's a citizen NPC. *Automatic* picks Lambda when it's installed; you can choose in the settings or in the C menu.
-- **She plays like a friend in the match**: she dodges, laughs, banters ("gg", "you'll pay for that!"), remembers who keeps bullying her
-  and sooner or later gets even with a prank: she throws the prop back, drops a watermelon on your head, blocks you with a crate,
-  shoots you for a moment or blows up an explosive barrel next to you (*Pranks*: all, light, none). When nothing is happening
-  she plays on her own (stacks props, target practice on barrels, emotes). Quick one-liners are instant and cost no tokens.
+- **She plays like a friend in the match**: if you throw something at her she dodges, jumps or catches it with her physgun (and sometimes
+  sends it back), and she remembers who did it. She laughs, banters ("gg", "you'll pay for that!") and sooner or later gets even with a prank
+  she invents herself, with quick actions or a Lua script she writes on the spot, or a ready-made one: throwing the prop back,
+  a watermelon on your head, a crate in your way, a few shots or an exploding barrel (*Pranks*: all, light, none). When nothing is happening
+  she plays on her own (stacks props, target practice, emotes) or comes up with something new. Quick one-liners are instant and cost no tokens.
 - **Vehicles and sitting**: she spawns a jeep, an airboat or a seat; she sits on chairs, couches, seats or on the floor ("sit", "stand up");
-  if you get into a car while she's following you, she hops in as a passenger and gets out with you.
+  if you get into a car while she's nearby, she hops in as a passenger, rides along and gets out with you.
 - **Game memory**: each match becomes one line in a separate archive (`gmod_memory.json`, not in her main memory), written without AI.
   It's only looked up when needed: one line about the last game with the same friends at the start, and the full memories
   when you ask ("do you remember…", "last time…"; for doubtful cases Rizzo Flow decides, if it's your router).

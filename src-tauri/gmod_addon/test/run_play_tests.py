@@ -107,7 +107,8 @@ check(st["bot"]["mode"] == "sit" and st["bot"].get("sitting", "") != "", f"lo st
 # la jeep si muove: lei con lei
 L.execute("Entity(%d).pos = Entity(%d).pos + Vector(500, 0, 0)" % (jeep.id, jeep.id))
 L.execute("MOCK.advance(0.1)")
-check(abs(L.eval("AELink.bot.pos.x") - L.eval("Entity(%d).pos.x" % jeep.id)) < 60, "viaggia con il veicolo")
+check(abs(L.eval("AELink.bot:GetPos().x") - L.eval("Entity(%d).pos.x" % jeep.id)) < 60, "viaggia con il veicolo")
+check(L.eval("AELink.bot.parent == Entity(%d)" % jeep.id) and L.eval("AELink.bot.group") == 10, "attaccata al veicolo, niente collisioni")
 # un ordine di movimento la fa alzare
 G.MOCK.files["alterego/cmd.json"] = json.dumps({"t": int(time.time()), "cmds": [{"id": 3, "op": "follow", "who": "Makoto"}]})
 L.execute("MOCK.advance(0.3)")
@@ -119,14 +120,19 @@ check(L.eval("AELink.sit.on") == "ground" and L.eval("AELink.mode") == "sit", "s
 G.MOCK.files["alterego/cmd.json"] = json.dumps({"t": int(time.time()), "cmds": [{"id": 5, "op": "stand"}]})
 L.execute("MOCK.advance(0.3)")
 check(L.eval("AELink.mode") == "follow", "si alza")
-# passeggera: tu sali sulla jeep, lei sale con te
+# passeggera: tu sali sulla jeep (anche se lei è un po' lontana o ferma), lei sale con te
+L.execute("AELink.mode = 'stay' AELink.bot.pos = Entity(%d).pos + Vector(0, 450, 0)" % jeep.id)
+L.execute("Entity(%d).driver = Entity(%d)" % (jeep.id, host.id))
 L.execute("MOCK.run('PlayerEnteredVehicle', Entity(%d), Entity(%d))" % (host.id, jeep.id))
 L.execute("MOCK.advance(1.5)")
-check(L.eval("AELink.mode") == "sit", "sale in macchina con te")
+check(L.eval("AELink.mode") == "sit" and L.eval("AELink.bot.parent == Entity(%d)" % jeep.id), "sale in macchina con te")
+check(L.eval("AELink.bot:GetPos():Distance(Entity(%d).pos)" % jeep.id) < 120, "seduta dentro la macchina")
 check(any(e.get("quick") for e in events("say")), "battuta immediata (senza modello)")
 L.execute("MOCK.run('PlayerLeaveVehicle', Entity(%d), Entity(%d))" % (host.id, jeep.id))
 L.execute("MOCK.advance(0.2)")
 check(L.eval("AELink.mode") == "follow", "scende quando scendi")
+check(L.eval("AELink.bot.parent") is None and L.eval("AELink.bot.group") != 10, "staccata dal veicolo")
+L.execute("Entity(%d).driver = nil" % jeep.id)
 
 # rivalità: ti colpisce più volte → scherzo
 P = "AELink.play"
@@ -138,11 +144,51 @@ st_r = None
 L.execute("MOCK.advance(1.1)")
 st_r = json.loads(G.MOCK.files["alterego/state.json"]).get("rivals")
 check(isinstance(st_r, dict) and st_r.get("Makoto", 0) >= 2, f"rivali nello stato: {st_r}")
-L.execute(P + ".lastAction = 0 " + P + ".cool = {}")
+L.execute(P + ".lastAction = 0 " + P + ".cool = {} " + P + "._inv = " + P + ".inventive " + P + ".inventive = function() return false end")
 L.execute("MOCK.advance(2.2)")
 pr = events("prank")
 check(pr and pr[-1]["who"] == "Makoto", f"si vendica con uno scherzo: {pr[-1] if pr else None}")
 check(L.eval(P + '.rival["Makoto"] == nil or ' + P + '.rival["Makoto"].score < %f' % score), "la vendetta abbassa la rivalità")
+
+# scherzo inventato da lei: chiede all'app (il modello sceglie azioni o uno script Lua)
+L.execute(P + ".inventive = function() return true end")
+L.execute(P + '.offend(Entity(%d), 3, "keeps throwing things at you")' % host.id)
+L.execute(P + '.askPrank(Entity(%d))' % host.id)
+L.execute("MOCK.advance(1.1)")
+idea = events("prank_idea")
+check(idea and idea[-1]["who"] == "Makoto" and "throwing" in idea[-1]["why"] and "boom" not in idea[-1]["recent"], f"chiede uno scherzo inventato: {idea[-1] if idea else None}")
+L.execute(P + ".inventive = " + P + "._inv")
+
+# qualcuno le lancia qualcosa: reazione da persona e ricordo
+L.execute("AELink.bot.pos = Vector(0, 0, 0) AELink.bot.ang = Angle(0, 0, 0) AELink.mode = 'follow' AELink.held = nil " + P + ".habit = {} " + P + ".cool = {}")
+L.execute("AELink.fly.out = {} AELink.fly.on = true")
+box = L.eval('(function() local b = ents.Create("prop_physics") b:SetModel("models/props_junk/cardboard_box001a.mdl") b:SetPos(Vector(300, 0, 0)) b:Spawn() b.vel = Vector(-600, 0, 0) b.AEThrower = Entity(%d) b.AEThrownAt = CurTime() return b end)()' % host.id)
+L.execute("AELink.fly.sense()")
+check(L.eval("AELink.fly.threatEnt == Entity(%d)" % box.id), "vede l'oggetto in arrivo")
+L.execute("MOCK.rnd = math.random math.random = function() return 0.1 end")
+L.execute(P + ".react({ escape = 0.9 }, AELink.fly)")
+check(L.eval("AELink.held == Entity(%d)" % box.id), "lo prende al volo con la physgun")
+L.execute("MOCK.advance(1.2)")
+th = events("thrown")
+check(th and th[-1]["by"] == "Makoto" and th[-1]["how"] in ("caught", "returned"), f"si ricorda chi gliel'ha lanciato: {th[-1] if th else None}")
+L.execute("MOCK.advance(1.5)")
+check(L.eval("AELink.held") is None, "poi lo rimanda o lo lascia")
+# un giocatore che le corre incontro non è un oggetto in arrivo
+L.execute("Entity(%d).pos = Vector(300, 0, 0) Entity(%d).vel = Vector(-400, 0, 0)" % (host.id, host.id))
+L.execute("Entity(%d).vel = Vector() Entity(%d).pos = Vector(3000, 0, 0)" % (box.id, box.id))
+s1 = L.eval("AELink.fly.sense()")
+check(not s1["loom_l"] and not s1["loom_r"], "un giocatore che si avvicina non la spaventa")
+L.execute("Entity(%d).vel = Vector() math.random = MOCK.rnd" % host.id)
+
+# API dei task per gli scherzi
+L.execute("AELink.bot.pos = Vector(400, 0, 0) Entity(%d).pos = Vector(0, 0, 0)" % host.id)
+n0 = count("models/props_junk/TrafficCone001a.mdl")
+ok = L.eval('AELink.api.spawn_at("cone", Vector(50, 0, 0)) ~= nil')
+check(ok and count("models/props_junk/TrafficCone001a.mdl") == n0 + 1, "spawn_at: un cono dove vuole")
+check(L.eval('AELink.api.spawn_at("jeep", Vector(50, 0, 0))') is None, "spawn_at: niente veicoli")
+check(L.eval('AELink.api.push(AELink.api.host(), Vector(0, 0, 5000))') and L.eval("Entity(%d).vel.z" % host.id) == 900, "push: spinta limitata")
+check(L.eval('AELink.api.boom(Vector(0, 0, 0))') == True, "boom lontano da lei")
+check(L.eval('AELink.api.boom(Vector(410, 0, 0))') == False, "niente boom addosso a sé")
 
 # scherzi uno per uno
 L.execute("AELink.bot.pos = Vector(400, 0, 0) Entity(%d).pos = Vector(0, 0, 0)" % host.id)

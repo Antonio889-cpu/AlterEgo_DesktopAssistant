@@ -61,13 +61,21 @@ function E:SetSchedule(s)
 end
 for _, n in ipairs({ "Activate", "SetKeyValue", "SetName", "SetMaxHealth",
   "SetIdealYawAndUpdate", "SetEyeTarget", "AddEntityRelationship", "SetEnemy", "UpdateEnemyMemory", "AddGestureSequence",
-  "SetFlexWeight", "EmitSound", "SetRenderMode", "SetColor", "DrawShadow", "AddEffects", "SetNotSolid" }) do E[n] = rec(n) end
-function E:SetParent(p) self.parent = p end
+  "SetFlexWeight", "EmitSound", "SetRenderMode", "SetColor", "DrawShadow", "AddEffects", "SetNotSolid", "SetOwner", "Fire" }) do E[n] = rec(n) end
+function E:SetParent(p) self.parent = p if not p then self.localPos = nil end end
+function E:SetLocalPos(p) self.localPos = p end
+function E:SetLocalAngles(a) self.localAng = a end
+function E:SetCollisionGroup(g) self.group = g end
+function E:GetCollisionGroup() return self.group or 0 end
+function E:WorldToLocalAngles(a) return Angle(a.p, a.y - self.ang.y, a.r) end
 function E:SetVelocity(v) self.vel = v end
 function E:Spawn() self.spawned = true end
 function E:Remove() self.alive = false MOCK.ents[self.id] = nil end
 function E:SetPos(p) self.pos = p end
-function E:GetPos() return self.pos end
+function E:GetPos()
+  if self.parent and self.localPos and self.parent.pos then return self.parent.pos + self.localPos end
+  return self.pos
+end
 function E:SetAngles(a) self.ang = a end
 function E:GetAngles() return self.ang end
 function E:EyeAngles() return self.ang end
@@ -101,7 +109,7 @@ function E:LocalToWorld(p) return p + self.pos end
 function E:ResetSequence(id) self.seq = id end
 function E:GetSequence() return self.seq or 0 end
 function E:GetDriver() return self.driver or NULL end
-function E:GetParent() return self.parentEnt or NULL end
+function E:GetParent() return self.parentEnt or self.parent or NULL end
 function E:IsPlayerHolding() return false end
 function E:SetNWString(k, v) self.nw[k] = v end
 function E:GetNWString(k, d) return self.nw[k] or d end
