@@ -719,7 +719,12 @@ const I18N = (() => {
     "Garry's Mod non trovato: indica la cartella qui sotto": "Garry's Mod not found: enter the folder below",
     "Alter Ego è nel gioco ✓": "Alter Ego is in the game ✓", "Gioco collegato ✓ (lei non è ancora entrata)": "Game linked ✓ (she hasn't joined yet)",
     "Addon installato: ricarica la mappa per attivarlo": "Addon installed: reload the map to activate it", "Addon installato ✓": "Addon installed ✓",
-    "Addon non installato": "Addon not installed", "Addon installato in {d}: carica (o ricarica) una mappa": "Addon installed in {d}: load (or reload) a map",
+    "Addon non installato": "Addon not installed",
+    "Corpo": "Body", "Automatico (Lambda Player se installato)": "Automatic (Lambda Player if installed)",
+    "NPC cittadino (sempre disponibile)": "Citizen NPC (always available)", "Lambda Player": "Lambda Player",
+    "Con": "With", "(addon del Workshop di StarFrost) Alter Ego si muove come un giocatore vero: corsa, salto, armi e physgun da giocatore. Senza, usa un NPC cittadino con il suo modello sopra.":
+      "(a Workshop addon by StarFrost) Alter Ego moves like a real player: running, jumping, player weapons and physgun. Without it she uses a citizen NPC with her model on top.",
+    "Installato ✓": "Installed ✓", "Non installato.": "Not installed.", "Addon installato in {d}: carica (o ricarica) una mappa": "Addon installed in {d}: load (or reload) a map",
   };
 
   let lang = "it";

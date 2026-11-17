@@ -532,6 +532,7 @@ Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Se
 - The app and the game talk through two files in `garrysmod/data/alterego/`: no launch options, no binary modules.
   Single player and servers you host (the addon has to run on the server).
 - Use the **borderless window** video mode: an exclusive full-screen game hides every other window.
+- **Body**: with [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (Workshop addon by StarFrost, not included: subscribe to it on Steam) she is a Lambda Player and moves like a real player (running, jumping, player weapons, a real physgun); its own decisions, chat and voice are switched off, Alter Ego is in charge. Without it she's a citizen NPC. *Automatic* picks Lambda when it's installed; you can choose in the settings or in the C menu.
 - Character model: in the game hold **C** → **Alter Ego** and pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default she's a Half-Life 2 citizen.
 
 ## Pet
@@ -732,6 +733,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **VB-CABLE** by VB-Audio Software: donationware, not bundled; download it from the official website.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 - Extra-content office backgrounds (`src/assets/extras/`): made by the project author with a Garry's Mod map.
+- **Lambda Players** by StarFrost: optional, not included; Alter Ego Link only uses its public hooks and functions.
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): written for this project; some ideas (NPC body, mouth movement, event log) come from [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) by SonnyTaylor (MIT).
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),

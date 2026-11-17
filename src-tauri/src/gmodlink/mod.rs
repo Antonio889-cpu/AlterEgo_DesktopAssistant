@@ -28,6 +28,7 @@ use tauri::{AppHandle, Emitter, Manager};
 const ADDON: &[(&str, &str)] = &[
     ("addon.json", include_str!("../../gmod_addon/addon.json")),
     ("lua/alterego/sandbox.lua", include_str!("../../gmod_addon/lua/alterego/sandbox.lua")),
+    ("lua/alterego/body_lambda.lua", include_str!("../../gmod_addon/lua/alterego/body_lambda.lua")),
     ("lua/autorun/server/sv_alterego_link.lua", include_str!("../../gmod_addon/lua/autorun/server/sv_alterego_link.lua")),
     ("lua/autorun/client/cl_alterego_link.lua", include_str!("../../gmod_addon/lua/autorun/client/cl_alterego_link.lua")),
 ];
@@ -46,11 +47,15 @@ pub struct GState {
     pub bot: Option<Bot>,
     pub players: Vec<Player>,
     pub near: Vec<Near>,
+    /// Lambda Players è installato nel gioco.
+    pub lambda: bool,
 }
 
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(default)]
 pub struct Bot {
+    /// "citizen" o "lambda".
+    pub body: Option<String>,
     pub hp: f64,
     pub mode: String,
     pub weapon: Option<String>,
@@ -108,9 +113,11 @@ pub fn parse_state(raw: &str) -> Option<GState> {
         players: Vec<Player>,
         #[serde(default, deserialize_with = "lua_list")]
         near: Vec<Near>,
+        #[serde(default)]
+        lambda: bool,
     }
     let r: Raw = serde_json::from_str(raw).ok()?;
-    Some(GState { t: r.t, map: r.map, seq: r.seq, events: r.events, tasks: r.tasks, bot: r.bot, players: r.players, near: r.near })
+    Some(GState { t: r.t, map: r.map, seq: r.seq, events: r.events, tasks: r.tasks, bot: r.bot, players: r.players, near: r.near, lambda: r.lambda })
 }
 
 // ---------- stato dell'app ----------
@@ -297,7 +304,7 @@ pub fn install(dir: &Path) -> Result<bool, String> {
 }
 
 fn installed(dir: &Path) -> bool {
-    dir.join("addons").join(ADDON_DIR).join(ADDON[2].0).is_file()
+    dir.join("addons").join(ADDON_DIR).join("lua/autorun/server/sv_alterego_link.lua").is_file()
 }
 
 // ---------- ponte ----------
@@ -314,6 +321,7 @@ fn write_cmds(app: &AppHandle, dir: &Path) {
                 "name": cfg.name.trim(),
                 "auto_join": cfg.auto_join,
                 "tasks": cfg.tasks,
+                "body": cfg.body,
             },
         })
     };
@@ -502,6 +510,13 @@ fn on_event(app: &AppHandle, e: Value) {
             update_config(app, |c| c.gmodlink.model = m);
             lock(app).dirty = true;
         }
+        "body" => {
+            let b = s("body");
+            update_config(app, |c| {
+                c.gmodlink.body = b;
+                c.gmodlink.normalize();
+            });
+        }
         "name" => {
             let n = s("name");
             if !n.trim().is_empty() {
@@ -664,6 +679,10 @@ pub struct Status {
     pub linked: bool,
     /// Alter Ego è nel gioco.
     pub in_game: bool,
+    /// Lambda Players installato (None = non si sa: gioco non collegato).
+    pub lambda: Option<bool>,
+    /// Corpo in uso ("citizen" / "lambda").
+    pub body: Option<String>,
 }
 
 #[tauri::command]
@@ -678,6 +697,8 @@ pub async fn gmodlink_status(app: AppHandle) -> Status {
         game_running: i.game_running,
         linked: fresh,
         in_game: fresh && i.state.as_ref().is_some_and(|s| s.bot.is_some()),
+        lambda: i.state.as_ref().map(|s| s.lambda),
+        body: i.state.as_ref().and_then(|s| s.bot.as_ref()).and_then(|b| b.body.clone()),
     }
 }
 

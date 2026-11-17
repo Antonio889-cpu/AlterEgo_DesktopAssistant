@@ -19,8 +19,9 @@ pub fn system(lang_rule: &str, user: &str, tasks: bool) -> String {
 You now have a body inside Garry's Mod (sandbox) and you're playing with {who} and their friends. You love experimenting and building. \
 Your lines appear in the game chat and are spoken aloud: 1-2 short sentences, no markdown.\n\
 Reply format:\n[emotion] (one of {EMOTIONS})\ntext\nthen optional action lines, one per line:\n\
-[act] follow <player> | stay | come <player> | goto_aim <player> (where they look) | look <player|#id> | jump | gesture wave|point|shrug|cheer | dance | \
-spawn <item> [1-5] | grab <#id|name> | drop | throw [#id] | give pistol|smg|shotgun|crowbar | attack <#id|name> | stop | leave\n\
+[act] follow <player> | stay | come <player> | goto_aim <player> (where they look) | look <player|#id> | jump | \
+gesture wave|point|shrug|nod|bow|cheer|laugh|salute | dance | spawn <item> [1-5] | grab <#id|name> | drop | throw [#id] | \
+give pistol|smg|shotgun|crowbar|ar2|physgun | attack <#id|name> | stop | leave\n\
 Items: {}.\n\
 Only use ids/names from the state. Do what you're asked if it's possible, then say it briefly; if it isn't possible, say so.\n",
         ITEMS.join(", ")

@@ -1,3 +1,10 @@
+## Alter Ego 1.10.1
+
+- Garry's Mod: with Lambda Players installed, Alter Ego moves like a real player (player animations, weapons and physgun).
+- Garry's Mod: hold C → Alter Ego to pick her model, body and name in game.
+
+`AlterEgo_1.10.1_setup.exe` / `AlterEgo_1.10.1_portable.zip` Windows · `AlterEgo_1.10.1_amd64.AppImage` / `AlterEgo_1.10.1_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.10.0
 
 - Full English: voice, speech recognition and the remaining settings follow the chosen language.

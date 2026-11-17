@@ -1261,18 +1261,23 @@ function fillGmodLink(g) {
   $("gl-name").value = g.name || "";
   $("gl-model").value = g.model || "";
   $("gl-dir").value = g.dir || "";
+  $("gl-body").value = g.body || "auto";
   gmodLinkStatus();
 }
 function gmodLinkSettings() {
   return {
     enabled: $("gl-enabled").checked, auto_join: $("gl-auto").checked, tasks: $("gl-tasks").checked,
     chatter: $("gl-chatter").value, name: $("gl-name").value.trim(), model: $("gl-model").value.trim(), dir: $("gl-dir").value.trim(),
+    body: $("gl-body").value,
   };
 }
 async function gmodLinkStatus() {
   const el = $("gl-status");
   try {
     const s = await invoke("gmodlink_status");
+    const ls = $("gl-lambda-state");
+    ls.textContent = s.lambda === true ? t("Installato ✓") : s.lambda === false ? t("Non installato.") : "";
+    ls.className = s.lambda === true ? "ok" : "";
     if (!s.dir) { el.textContent = t("Garry's Mod non trovato: indica la cartella qui sotto"); el.className = "result bad"; return; }
     if (s.in_game) { el.textContent = t("Alter Ego è nel gioco ✓"); el.className = "result ok"; }
     else if (s.linked) { el.textContent = t("Gioco collegato ✓ (lei non è ancora entrata)"); el.className = "result ok"; }
@@ -1284,7 +1289,8 @@ async function saveGmodLink() {
   await invoke("gmodlink_settings", { settings: gmodLinkSettings() });
   gmodLinkStatus();
 }
-for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir"]) $(id).onchange = saveGmodLink;
+for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir", "gl-body"]) $(id).onchange = saveGmodLink;
+$("gl-lambda-link").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "lambda_players" }); };
 $("gl-enabled").onchange = async (e) => {
   await saveGmodLink();
   if (e.target.checked) $("gl-install").click();

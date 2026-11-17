@@ -9,10 +9,18 @@ end)
 local beam = Material("sprites/physbeama")
 local function bots()
   local out = {}
-  for _, e in ipairs(ents.FindByClass("npc_citizen")) do
-    if e:GetNWBool("AELink") then out[#out + 1] = e end
+  for _, c in ipairs({ "npc_citizen", "npc_lambdaplayer" }) do
+    for _, e in ipairs(ents.FindByClass(c)) do
+      if e:GetNWBool("AELink") then out[#out + 1] = e end
+    end
   end
   return out
+end
+
+-- testi nella lingua di Garry's Mod (italiano o inglese)
+local function T(it, en)
+  local cv = GetConVar("gmod_language")
+  return (cv and cv:GetString() == "it") and it or en
 end
 
 hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
@@ -28,8 +36,8 @@ hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
       local t = CurTime() * 4
       render.DrawBeam(from, to, 5, t, t + 1, Color(120, 255, 160, 220))
     end
-    -- nome sopra la testa
-    if IsValid(me) and b:GetPos():DistToSqr(me:GetPos()) < 700 * 700 then
+    -- nome sopra la testa (il corpo Lambda mostra già il suo)
+    if b:GetClass() ~= "npc_lambdaplayer" and IsValid(me) and b:GetPos():DistToSqr(me:GetPos()) < 700 * 700 then
       local pos = b:GetPos() + Vector(0, 0, 82)
       cam.Start3D2D(pos, Angle(0, me:EyeAngles().y - 90, 90), 0.12)
         local talking = b:GetNWFloat("AESpeakUntil", 0) > CurTime()
@@ -91,7 +99,7 @@ list.Set("DesktopWindows", "AlterEgoLink", {
     name.OnEnter = function(self) send("name", self:GetValue()) end
     local nameLbl = right:Add("DLabel")
     nameLbl:Dock(BOTTOM)
-    nameLbl:SetText("Nome / Name (Invio)")
+    nameLbl:SetText(T("Nome (Invio per salvare)", "Name (Enter to save)"))
     nameLbl:SetDark(true)
 
     local row = right:Add("DPanel")
@@ -101,18 +109,31 @@ list.Set("DesktopWindows", "AlterEgoLink", {
     local join = row:Add("DButton")
     join:Dock(LEFT)
     join:SetWide(115)
-    join:SetText("Entra / Join")
+    join:SetText(T("Entra", "Join"))
     join.DoClick = function() send("join") end
     local leave = row:Add("DButton")
     leave:Dock(RIGHT)
     leave:SetWide(115)
-    leave:SetText("Esci / Leave")
+    leave:SetText(T("Esci", "Leave"))
     leave.DoClick = function() send("leave") end
+
+    -- corpo: automatico (Lambda se c'è), cittadino, Lambda Players
+    local body = right:Add("DComboBox")
+    body:Dock(BOTTOM)
+    body:SetTall(24)
+    local hasLambda = scripted_ents.GetStored("npc_lambdaplayer") ~= nil
+    body:AddChoice(T("Corpo: automatico", "Body: automatic"), "auto")
+    body:AddChoice(T("Corpo: NPC cittadino", "Body: citizen NPC"), "citizen")
+    body:AddChoice(T("Corpo: Lambda Player", "Body: Lambda Player") .. (hasLambda and "" or T(" (non installato)", " (not installed)")), "lambda")
+    local cur = "auto"
+    for _, b in ipairs(bots()) do cur = b:GetClass() == "npc_lambdaplayer" and "lambda" or "citizen" end
+    body:ChooseOptionID(cur == "lambda" and 3 or cur == "citizen" and 2 or 1)
+    body.OnSelect = function(_, _, _, data) send("body", data) end
 
     local mine = right:Add("DButton")
     mine:Dock(BOTTOM)
     mine:SetTall(26)
-    mine:SetText("Come il mio / Same as mine")
+    mine:SetText(T("Come il mio", "Same as mine"))
     mine.DoClick = function()
       local m = LocalPlayer():GetModel()
       show(m)
@@ -121,7 +142,7 @@ list.Set("DesktopWindows", "AlterEgoLink", {
     local reset = right:Add("DButton")
     reset:Dock(BOTTOM)
     reset:SetTall(26)
-    reset:SetText("Predefinito / Default")
+    reset:SetText(T("Predefinito", "Default"))
     reset.DoClick = function() show("") send("model", "") end
 
     -- elenco dei playermodel installati, con ricerca
@@ -130,7 +151,7 @@ list.Set("DesktopWindows", "AlterEgoLink", {
     left:DockPadding(6, 6, 6, 6)
     local search = left:Add("DTextEntry")
     search:Dock(TOP)
-    search:SetPlaceholderText("Cerca / Search (es. chihiro)")
+    search:SetPlaceholderText(T("Cerca (es. chihiro)", "Search (e.g. chihiro)"))
     local scroll = left:Add("DScrollPanel")
     scroll:Dock(FILL)
     local grid = scroll:Add("DIconLayout")
