@@ -544,6 +544,15 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
 - **Memoria delle partite**: ogni partita diventa una riga in un archivio separato (`gmod_memory.json`, non nella memoria principale), scritta senza AI.
   Si consulta solo quando serve: una riga sull'ultima partita con gli stessi amici all'inizio, e i ricordi completi quando glieli chiedi
   («ti ricordi…», «l'altra volta…»; nei casi dubbi decide Rizzo Flow, se è il tuo router).
+- **Una personalità che cresce**: gli scherzi e i giochi che si inventa diventano *abitudini* (lo script Lua o le azioni restano, così li rifà
+  senza token). Dopo ognuno guarda la chat per 25 secondi: se ridete diventa una sua preferita, se vi annoiate la lascia perdere
+  (giudica Rizzo Flow se è il router scelto, altrimenti le parole chiave). I tratti (curiosa, dispettosa, audace, affettuosa) cambiano piano
+  con l'esperienza. L'*Imprevedibilità* (0-100) decide quanto spesso inventa qualcosa di nuovo invece di rifare le preferite. Archivio separato
+  `gmod_persona.json`; *Azzera la personalità* nelle impostazioni.
+- **Obiettivi lunghi**: «esplora la mappa e trova una macchina», «riempi la mappa di angurie», «fai una torre di divani»: si dà un obiettivo
+  e ci lavora passo passo (spawna i prop, poi li sistema con la physgun), chiedendosi il passo successivo ogni volta che il precedente finisce,
+  fino alla fine (massimo 40 passi / 90 minuti; «basta» lo ferma). Se Rizzo Flow è il router controlla, senza token, se l'obiettivo è già raggiunto.
+- **Resistenza agli urti**: prop e macchine che le volano addosso fanno meno male (*Alta* di default, oppure *Normale* / *Altissima*).
 - Menu nel gioco: tieni premuto **C** → **Alter Ego** nella barra in alto o l'icona *Alter Ego*, tasto destro su di lei → *Alter Ego…*, oppure il comando `alterego_menu` in console.
 - Modello del personaggio: da quel menu scegli uno dei playermodel installati (con anteprima), oppure «come il mio». Il playermodel viene incollato (bonemerge) su un corpo NPC invisibile, così si anima bene; vanno bene anche i modelli NPC. Di base è una cittadina di Half-Life 2.
 
@@ -560,6 +569,9 @@ simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu e
   e **si abitua** (al decimo barile ti guarda storto invece di saltare). Il dolce le fa venire voglia di giocare con l'anguria.
 - **Adrenalina**: colpi e schivate accumulano adrenalina che svanisce in circa 40 s e arriva al modello in una riga corta, insieme ai suoi "rivali".
   Si possono spegnere i riflessi, l'adrenalina, o mostrare l'attività dei neuroni sopra la sua testa.
+- **FruitFly Monitor**: una finestra CRT verde con il suo umore (curiosa, calma, ansiosa, giocosa, a riposo), un cervello a fil di ferro
+  con le regioni che si accendono quando lavorano (occhi, antenne, corpi a fungo, cervello centrale, gusto, cordone nervoso), l'obiettivo
+  in corso e l'abitudine preferita. Si apre dalle impostazioni, dal menu nel gioco (C → Alter Ego → FruitFly Monitor) o da solo quando entra.
 - Come è stato estratto il circuito: [`tools/flybrain/`](tools/flybrain/).
 
 ## Pet

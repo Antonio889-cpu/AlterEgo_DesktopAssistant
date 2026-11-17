@@ -1265,6 +1265,12 @@ function fillGmodLink(g) {
   $("gl-mischief").value = g.mischief || "full";
   $("gl-idle").checked = g.idle_play !== false;
   $("gl-memory").checked = g.memory !== false;
+  $("gl-tough").value = g.toughness || "high";
+  $("gl-goals").checked = g.goals !== false;
+  $("gl-grow").checked = g.grow !== false;
+  $("gl-chaos").value = g.unpredictability ?? 50;
+  $("gl-chaos-val").textContent = $("gl-chaos").value;
+  $("gl-monitor-auto").checked = !!g.monitor_auto;
   const f = g.fly || {};
   $("gl-fly").checked = f.enabled !== false;
   $("gl-fly-reflex").checked = f.reflexes !== false;
@@ -1318,17 +1324,54 @@ function gmodLinkSettings() {
     chatter: $("gl-chatter").value, name: $("gl-name").value.trim(), model: $("gl-model").value.trim(), dir: $("gl-dir").value.trim(),
     body: $("gl-body").value,
     mischief: $("gl-mischief").value, idle_play: $("gl-idle").checked, memory: $("gl-memory").checked,
+    toughness: $("gl-tough").value, goals: $("gl-goals").checked, grow: $("gl-grow").checked,
+    unpredictability: Number($("gl-chaos").value), monitor_auto: $("gl-monitor-auto").checked,
     fly: {
       enabled: $("gl-fly").checked, reflexes: $("gl-fly-reflex").checked, mood: $("gl-fly-mood").checked, hud: $("gl-fly-hud").checked,
       senses: [...$("gl-fly-senses").querySelectorAll("input")].filter((i) => i.checked).map((i) => i.dataset.sense),
     },
   };
 }
+const TRAIT_NAMES = { curiosity: "curiosa", mischief: "dispettosa", boldness: "audace", warmth: "affettuosa" };
+function personaView(p) {
+  const box = $("gl-persona");
+  box.replaceChildren();
+  const tr = p.traits || {};
+  for (const k of ["curiosity", "mischief", "boldness", "warmth"]) {
+    const row = document.createElement("div");
+    row.className = "fly-row";
+    const name = document.createElement("span");
+    name.textContent = t(TRAIT_NAMES[k]);
+    const track = document.createElement("b");
+    const bar = document.createElement("i");
+    bar.style.width = Math.round((tr[k] ?? 0.5) * 100) + "%";
+    track.appendChild(bar);
+    row.append(name, track);
+    box.appendChild(row);
+  }
+  const hs = (p.habits || []).filter((h) => h.uses > 0 || h.pref !== 0.1);
+  if (hs.length) {
+    const head = document.createElement("div");
+    head.className = "fly-head";
+    head.textContent = t("Le sue abitudini ({n} esperienze):", { n: p.experiences || 0 });
+    box.appendChild(head);
+    for (const h of hs) {
+      const row = document.createElement("div");
+      row.className = "habit";
+      const heart = h.pref > 0.5 ? "♥" : h.pref < -0.2 ? "✗" : "·";
+      row.textContent = `${heart} ${h.id} (${t(h.kind === "prank" ? "scherzo" : "gioco")}, ${h.uses}×)`;
+      box.appendChild(row);
+    }
+  }
+  const g = p.goal;
+  $("gl-goal-now").textContent = g ? t("Obiettivo adesso: {g} (passo {n})", { g: g.text, n: g.steps }) : "";
+}
 async function gmodLinkStatus() {
   const el = $("gl-status");
   try {
     const s = await invoke("gmodlink_status");
     flyLive(s);
+    personaView(s.persona || {});
     $("gl-games").textContent = s.games ? t("{n} partite ricordate", { n: s.games }) : "";
     const ls = $("gl-lambda-state");
     ls.textContent = s.lambda === true ? t("Installato ✓") : s.lambda === false ? t("Non installato.") : "";
@@ -1344,7 +1387,10 @@ async function saveGmodLink() {
   await invoke("gmodlink_settings", { settings: gmodLinkSettings() });
   gmodLinkStatus();
 }
-for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir", "gl-body", "gl-fly-reflex", "gl-fly-mood", "gl-fly-hud", "gl-fly-senses", "gl-mischief", "gl-idle", "gl-memory"]) $(id).onchange = saveGmodLink;
+for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir", "gl-body", "gl-fly-reflex", "gl-fly-mood", "gl-fly-hud", "gl-fly-senses", "gl-mischief", "gl-idle", "gl-memory", "gl-tough", "gl-goals", "gl-grow", "gl-chaos", "gl-monitor-auto"]) $(id).onchange = saveGmodLink;
+$("gl-chaos").oninput = () => { $("gl-chaos-val").textContent = $("gl-chaos").value; };
+$("gl-persona-forget").onclick = async () => { if (confirm(t("Azzerare la personalità? Dimentica abitudini e preferenze."))) { await invoke("gmodlink_persona_forget"); gmodLinkStatus(); } };
+$("gl-monitor").onclick = () => invoke("gmodlink_monitor_open");
 $("gl-forget").onclick = async () => { await invoke("gmodlink_forget"); gmodLinkStatus(); };
 $("gl-fly").onchange = () => { flyDisabled(); saveGmodLink(); };
 $("gl-lambda-link").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "lambda_players" }); };

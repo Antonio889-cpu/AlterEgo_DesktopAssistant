@@ -1,3 +1,12 @@
+## Alter Ego 1.13.0
+
+- Garry's Mod: her personality grows: she invents pranks and games, keeps the ones that make you laugh and drops the others (adjustable unpredictability).
+- Garry's Mod: long goals reasoned step by step (explore the map, fill it with props, build stacks…).
+- Garry's Mod: FruitFly Monitor, a live view of her mood and fly brain.
+- Garry's Mod: thrown props hurt her less (adjustable).
+
+`AlterEgo_1.13.0_setup.exe` / `AlterEgo_1.13.0_portable.zip` Windows · `AlterEgo_1.13.0_amd64.AppImage` / `AlterEgo_1.13.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.12.1
 
 - Garry's Mod: she reacts like a person when something is thrown at her (dodges, jumps or catches it with the physgun) and remembers who did it; walking up to her no longer startles her.

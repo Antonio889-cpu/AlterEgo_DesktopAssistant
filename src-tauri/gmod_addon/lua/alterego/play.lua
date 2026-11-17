@@ -19,6 +19,7 @@ P.lang = P.lang or "it"
 P.lastQuip = 0
 P.lastAction = 0              -- ultimo riflesso/scherzo (per non fare attività nel mezzo dell'azione)
 P.nextIdle = 0
+P.chaos = P.chaos or 0.5       -- imprevedibilità (dall'app, 0..1)
 
 -- ---------- battute immediate (niente modello) ----------
 local Q = {
@@ -203,7 +204,7 @@ function P.react(o, F)
       F.override(F.awayFrom(b, from, 340, o), 1.6, true)
       P.quip("flee", 0.8)
       how = "fled"
-    elseif P.canCatch(threat) and math.random() < 0.35 + (1 - g) * 0.45 then
+    elseif P.canCatch(threat) and math.random() < 0.25 + (1 - g) * 0.45 + (math.random() - 0.5) * P.chaos * 0.4 then
       -- da persona: la prende al volo con la physgun (più ci si abitua, più è tranquilla)
       how = P.catch(threat, culprit)
     elseif strength >= 0.35 then
@@ -293,7 +294,7 @@ local function spawnAt(model, pos)
   p:Activate()
   if IsValid(h) then cleanup.Add(h, "props", p) end
   L.spawned[#L.spawned + 1] = p
-  while #L.spawned > 25 do
+  while #L.spawned > (L.MAX_SPAWNED or 80) do
     local old = table.remove(L.spawned, 1)
     if IsValid(old) then old:Remove() end
   end
@@ -488,16 +489,18 @@ function P.tick()
     local rival = P.topRival(1400, 2)
     if rival and ready("prank", P.mischief == "full" and 20 or 40) then
       -- di solito se lo inventa; a volte (o senza app) uno scherzo pronto
-      if P.inventive() and math.random() < 0.65 then P.askPrank(rival) else P.prank(rival) end
+      -- l'app decide: un suo classico (zero token) o uno nuovo inventato dal modello
+      if P.inventive() and math.random() < 0.85 then P.askPrank(rival) else P.prank(rival) end
       return
     end
   end
   -- gioca da sola
   if P.idle and P.free() and now >= P.nextIdle and now - P.lastAction > 20 then
-    P.nextIdle = now + math.random(30, 60)
+    -- più imprevedibile = intervalli più irregolari
+    P.nextIdle = now + math.random(30, 60) * (1.2 - P.chaos * 0.5) + (math.random() - 0.5) * 30 * P.chaos
     local h = L.host()
     if IsValid(h) and h:GetPos():Distance(b:GetPos()) < 1500 then
-      if P.inventive() and math.random() < 0.25 and ready("idea", 240) then
+      if P.inventive() and math.random() < 0.2 + 0.3 * P.chaos and ready("idea", 180) then
         L.event("idea", {})
         P.lastAction = now
       else
@@ -512,6 +515,8 @@ function P.config(c)
   if c.mischief == "off" or c.mischief == "light" or c.mischief == "full" then P.mischief = c.mischief end
   if c.idle ~= nil then P.idle = c.idle == true end
   if c.lang == "it" or c.lang == "en" then P.lang = c.lang end
+  if tonumber(c.chaos) then P.chaos = math.Clamp(tonumber(c.chaos), 0, 1) end
+  if c.tough == "normal" or c.tough == "high" or c.tough == "tough" then L.tough = c.tough end
 end
 
 return P

@@ -311,6 +311,37 @@ pub fn gate(out: &mut [(String, f32)], senses: &HashMap<String, f32>) {
     }
 }
 
+/// Quello che mostra il FruitFly Monitor: umore (etichetta + barre in %) e regioni del cervello accese (0..1).
+pub fn monitor(senses: &HashMap<String, f32>, out: &[(String, f32)], stress: f32, activity: f32, curiosity: f32, mischief: f32) -> serde_json::Value {
+    let o = |k: &str| out.iter().find(|(n, _)| n == k).map(|(_, v)| *v).unwrap_or(0.0);
+    let i = |k: &str| senses.get(k).copied().unwrap_or(0.0);
+    let act = 1.0 - (-activity / 3000.0).exp();
+    let anxious = (stress + o("escape") * 0.4 + o("backward") * 0.2 + i("pain") * 0.3).min(1.0);
+    let curious = (0.15 + curiosity * 0.25 + o("listen") * 0.4 + o("squint") * 0.2 + (o("turn_l") + o("turn_r")) * 0.15 + i("smell_food") * 0.3 + i("sound") * 0.2).min(1.0);
+    let playful = (mischief * 0.25 + o("feed") * 0.3 + o("brace") * 0.4 + i("touch") * 0.2).min(1.0);
+    let resting = ((1.0 - act) * 0.35 * (1.0 - stress)).max(0.0);
+    let calm = ((1.0 - anxious) * 0.3).max(0.0);
+    let raw = [("curious", curious), ("calm", calm), ("anxious", anxious), ("playful", playful), ("resting", resting)];
+    let sum: f32 = raw.iter().map(|x| x.1).sum::<f32>().max(1e-3);
+    let mut bars: Vec<(String, u32)> = raw.iter().map(|(k, v)| (k.to_string(), (v / sum * 100.0).round() as u32)).collect();
+    // somma esatta 100
+    let tot: i32 = bars.iter().map(|b| b.1 as i32).sum();
+    if let Some(top) = bars.iter_mut().max_by_key(|b| b.1) {
+        top.1 = (top.1 as i32 + 100 - tot).max(0) as u32;
+    }
+    let label = bars.iter().max_by_key(|b| b.1).map(|b| b.0.clone()).unwrap_or_else(|| "calm".into());
+    let regions = serde_json::json!({
+        "optic_l": (i("loom_l") + i("light") * 0.5 + o("squint") * 0.3).min(1.0),
+        "optic_r": (i("loom_r") + i("light") * 0.5 + o("squint") * 0.3).min(1.0),
+        "antenna": (i("touch") + i("sound") * 0.7 + i("smell_food") * 0.6 + i("smell_danger") * 0.6 + i("wind") * 0.5).min(1.0),
+        "mushroom": (i("smell_food") * 0.5 + i("smell_danger") * 0.5 + curious * 0.3).min(1.0),
+        "central": (o("escape") + (o("turn_l") + o("turn_r")) * 0.4 + o("backward") * 0.5 + act * 0.3).min(1.0),
+        "sez": (i("sweet") + o("feed") * 0.7 + o("drink") * 0.7 + i("water") * 0.5).min(1.0),
+        "ventral": (o("groom") + o("brace") * 0.7 + i("pain") * 0.8 + o("escape") * 0.3).min(1.0),
+    });
+    serde_json::json!({ "label": label, "bars": bars, "regions": regions, "activity": act })
+}
+
 /// Umore che nasce dai riflessi (per il modello): stress che sale con dolore e fughe e scende piano.
 #[derive(Default, Debug, Clone)]
 pub struct Mood {
@@ -419,6 +450,19 @@ mod tests {
             assert!(el.as_millis() < 600, "troppo lento: {el:?} per 600 ms");
         }
         eprintln!("600 ms di cervello in {el:?}");
+    }
+
+    #[test]
+    fn monitor_view() {
+        let senses: HashMap<String, f32> = [("loom_l".to_string(), 1.0)].into();
+        let out = vec![("escape".to_string(), 0.9)];
+        let v = monitor(&senses, &out, 0.7, 5000.0, 0.5, 0.5);
+        assert_eq!(v["label"], "anxious");
+        let sum: u64 = v["bars"].as_array().unwrap().iter().map(|b| b[1].as_u64().unwrap()).sum();
+        assert_eq!(sum, 100);
+        assert!(v["regions"]["optic_l"].as_f64().unwrap() > 0.9 && v["regions"]["optic_r"].as_f64().unwrap() < 0.1);
+        let calm = monitor(&HashMap::new(), &[], 0.0, 0.0, 0.5, 0.3);
+        assert!(["calm", "resting", "curious"].contains(&calm["label"].as_str().unwrap()), "{calm}");
     }
 
     #[test]

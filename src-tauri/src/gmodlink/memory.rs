@@ -80,6 +80,8 @@ pub struct Log {
     caught: u32,
     spawned: BTreeMap<String, u32>,
     tasks: Vec<String>,
+    /// Obiettivi lunghi raggiunti (o lasciati) in questa partita.
+    goals: Vec<String>,
     said: Vec<String>,
     rides: u32,
     /// Il riassunto dell'ultima volta è già stato dato al modello.
@@ -126,6 +128,12 @@ impl Log {
                 }
             }
             "ride" => self.rides += 1,
+            "goal" => {
+                if self.goals.len() < 5 {
+                    let done = e["done"].as_bool().unwrap_or(false);
+                    self.goals.push(format!("{}{}", s("text").chars().take(80).collect::<String>(), if done { "" } else { " (gave up)" }));
+                }
+            }
             _ => {}
         }
     }
@@ -142,7 +150,7 @@ impl Log {
     }
 
     fn has_content(&self) -> bool {
-        self.deaths > 0 || !self.hurt_by.is_empty() || !self.threw.is_empty() || !self.pranked.is_empty() || !self.spawned.is_empty() || !self.tasks.is_empty() || !self.said.is_empty() || self.rides > 0
+        self.deaths > 0 || !self.hurt_by.is_empty() || !self.threw.is_empty() || !self.pranked.is_empty() || !self.spawned.is_empty() || !self.tasks.is_empty() || !self.goals.is_empty() || !self.said.is_empty() || self.rides > 0
     }
 
     /// Riassunto in una riga (inglese: è per il modello).
@@ -178,6 +186,9 @@ impl Log {
         }
         if self.rides > 0 {
             parts.push(format!("rode in a vehicle {}x", self.rides));
+        }
+        if !self.goals.is_empty() {
+            parts.push(format!("goals: {}", self.goals.join(", ")));
         }
         if !self.tasks.is_empty() {
             parts.push(format!("scripts: {}", self.tasks.join(", ")));

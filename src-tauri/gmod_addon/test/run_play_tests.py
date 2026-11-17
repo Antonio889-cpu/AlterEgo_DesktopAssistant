@@ -190,6 +190,42 @@ check(L.eval('AELink.api.push(AELink.api.host(), Vector(0, 0, 5000))') and L.eva
 check(L.eval('AELink.api.boom(Vector(0, 0, 0))') == True, "boom lontano da lei")
 check(L.eval('AELink.api.boom(Vector(410, 0, 0))') == False, "niente boom addosso a sé")
 
+# resistenza agli urti: un oggetto che la colpisce fa poco male (impostazione "high")
+L.execute("AELink.play.config({ tough = 'high' })")
+dmg = L.eval("""(function() local d = { v = 60 }
+  d.GetDamage = function() return d.v end d.SetDamage = function(_, x) d.v = x end
+  d.IsDamageType = function(_, t) return t == (DMG_CRUSH or 1) end
+  d.GetAttacker = function() return Entity(%d) end d.GetInflictor = function() return NULL end
+  MOCK.run("EntityTakeDamage", AELink.bot, d) return d.v end)()""" % host.id)
+check(dmg == 18 or dmg <= 20, f"urto attutito: 60 → {dmg}")
+L.execute("AELink.play.config({ tough = 'normal' })")
+dmg2 = L.eval("""(function() local d = { v = 60 }
+  d.GetDamage = function() return d.v end d.SetDamage = function(_, x) d.v = x end
+  d.IsDamageType = function(_, t) return t == (DMG_CRUSH or 1) end
+  d.GetAttacker = function() return Entity(%d) end d.GetInflictor = function() return NULL end
+  MOCK.run("EntityTakeDamage", AELink.bot, d) return d.v end)()""" % host.id)
+check(dmg2 == 60, "resistenza normale: danno pieno")
+L.execute("AELink.play.config({ tough = 'high', chaos = 0.8 })")
+check(abs(L.eval("AELink.play.chaos") - 0.8) < 1e-6, "imprevedibilità dall'app")
+
+# task con `target` (scherzo inventato o rifatto dall'app)
+G.MOCK.files["alterego/cmd.json"] = json.dumps({"t": int(time.time()), "cmds": [{"id": 50, "op": "task", "name": "tgt", "target": "Makoto", "code": "say(name(target))"}]})
+L.execute("MOCK.advance(1.5)")
+check(any(e.get("text") == "Makoto" for e in events("say")), "il task vede la vittima come `target`")
+
+# costruire: spawna e sistema con la physgun (pila di 3 casse)
+L.execute("AELink.bot.pos = Vector(0, 0, 0) Entity(%d).pos = Vector(-500, 0, 0) AELink.mode = 'stay'" % host.id)
+code = "local base = me().pos + vec(100, 0, 0) local prev = nil for i = 1, 3 do local c = spawn_at('crate', base + vec(0, 0, 80 * i)) place(c, prev and top(prev) or base, 90) prev = c end say('torre ' .. count('crate', 500))"
+G.MOCK.files["alterego/cmd.json"] = json.dumps({"t": int(time.time()), "cmds": [{"id": 51, "op": "task", "name": "tower", "code": code}]})
+L.execute("MOCK.advance(20)")
+crates = L.eval('(function() local t = {} for _, e in pairs(MOCK.ents) do if e.alive and e.model == "models/props_junk/wood_crate001a.mdl" and e.frozen then t[#t + 1] = e.pos.z end end table.sort(t) return t end)()')
+zs = [crates[k] for k in sorted(crates.keys())] if crates else []
+check(len(zs) >= 3 and zs[-3:] == [20, 60, 100], f"pila: casse bloccate una sopra l'altra {zs}")
+check(any(e.get("text", "").startswith("torre") for e in events("say")), "il task conta le casse")
+# esplorare: un punto nuovo
+p1 = L.eval("AELink.explorePoint(1500)")
+check(p1 is not None and L.eval("AELink.explorePoint(1500):Distance(AELink.bot:GetPos())") > 100, "explore: un punto lontano da dove è")
+
 # scherzi uno per uno
 L.execute("AELink.bot.pos = Vector(400, 0, 0) Entity(%d).pos = Vector(0, 0, 0)" % host.id)
 before = count("models/props_c17/oildrum001_explosive.mdl")
