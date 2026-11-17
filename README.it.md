@@ -534,7 +534,17 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
   Single player e server che ospiti tu (l'addon deve girare sul server).
 - Usa la modalità video **finestra senza bordi**: un gioco a schermo intero esclusivo copre ogni altra finestra.
 - **Corpo**: con [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (addon del Workshop di StarFrost, non incluso: iscriviti da Steam) è un Lambda Player e si muove come un giocatore vero (corsa, salto, armi da giocatore, physgun vera); le sue decisioni, la sua chat e la sua voce sono spente, comanda Alter Ego. Senza, è un NPC cittadino. *Automatico* sceglie Lambda quando è installato; si sceglie nelle impostazioni o nel menu C.
-- Modello del personaggio: nel gioco tieni premuto **C** → **Alter Ego** e scegli uno dei playermodel installati (con anteprima), oppure «come il mio». Il playermodel viene incollato (bonemerge) su un corpo NPC invisibile, così si anima bene; vanno bene anche i modelli NPC. Di base è una cittadina di Half-Life 2.
+- **Gioca come un'amica in partita**: schiva, ride, scherza («gg», «me la paghi!»), si ricorda chi la bersaglia e prima o poi
+  si vendica con uno scherzo: ti rilancia il prop, ti fa cadere un'anguria in testa, ti blocca con una cassa, ti spara per un attimo
+  o fa esplodere un barile accanto a te (*Dispetti*: tutti, leggeri, nessuno). Quando non succede niente gioca da sola
+  (impila prop, tiro al bersaglio sui barili, emote). Le battute rapide sono immediate e non costano token.
+- **Veicoli e sedersi**: spawna una jeep, un airboat o un sedile; si siede su sedie, divani, sedili o per terra («siediti», «alzati»);
+  se sali in macchina mentre ti segue, sale come passeggera e scende con te.
+- **Memoria delle partite**: ogni partita diventa una riga in un archivio separato (`gmod_memory.json`, non nella memoria principale), scritta senza AI.
+  Si consulta solo quando serve: una riga sull'ultima partita con gli stessi amici all'inizio, e i ricordi completi quando glieli chiedi
+  («ti ricordi…», «l'altra volta…»; nei casi dubbi decide Rizzo Flow, se è il tuo router).
+- Menu nel gioco: tieni premuto **C** → **Alter Ego** nella barra in alto o l'icona *Alter Ego*, tasto destro su di lei → *Alter Ego…*, oppure il comando `alterego_menu` in console.
+- Modello del personaggio: da quel menu scegli uno dei playermodel installati (con anteprima), oppure «come il mio». Il playermodel viene incollato (bonemerge) su un corpo NPC invisibile, così si anima bene; vanno bene anche i modelli NPC. Di base è una cittadina di Half-Life 2.
 
 ### Cervello di moscerino (riflessi)
 
@@ -542,13 +552,13 @@ Il suo corpo ha anche un **vero cervello di moscerino**: un pezzo del connettoma
 da [FlyWire](https://flywire.ai) (~9.500 neuroni e ~690.000 sinapsi, quelli che rispondono ai sensi usati nel gioco),
 simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu et al. (Nature 2024). Attivo di base; zero token.
 
-- **Sensi** (sempre attivi): dolore (colpi, fuoco), oggetti in arrivo (*looming*: un prop o una macchina che le vola addosso, da sinistra o da destra), dolce (un'anguria a portata), tocco (physgun, *usa*).
+- **Sensi** (sempre attivi): dolore (colpi, fuoco), oggetti in arrivo (*looming*: un prop o una macchina che le vola addosso, da sinistra o da destra), dolce (un'anguria vicina), tocco (physgun, *usa*).
   Sensi in più nelle impostazioni: olfatto (cibo, fumo, esplosioni), temperatura e acqua, udito (spari, rumori forti), luce (torcia in faccia), vento (quando la lanci).
-- **Riflessi**: vengono dai veri neuroni discendenti. Qualcosa che le vola addosso accende la **Giant Fiber** e lei scappa con un salto
-  (i neuroni di svolta scelgono il lato), i neuroni *moonwalker* la fanno indietreggiare, quelli delle setole la fanno spolverare,
-  il dolce attiva i motoneuroni della proboscide e lei va a **mangiare l'anguria** (+15 HP).
-- **Istinto**: dolore e fughe accumulano uno "stress" che svanisce in circa 40 s e arriva al modello in una riga corta,
-  così dopo che le spari può essere scossa. Si possono spegnere i riflessi, lo stress, o mostrare l'attività dei neuroni sopra la sua testa.
+- **Riflessi**: vengono dai veri neuroni discendenti (qualcosa che le vola addosso accende la **Giant Fiber**, i neuroni di svolta scelgono il lato),
+  ma si esprimono **da giocatrice, non da insetto**: fa un passo di lato, scappa solo da barili esplosivi e macchine,
+  e **si abitua** (al decimo barile ti guarda storto invece di saltare). Il dolce le fa venire voglia di giocare con l'anguria.
+- **Adrenalina**: colpi e schivate accumulano adrenalina che svanisce in circa 40 s e arriva al modello in una riga corta, insieme ai suoi "rivali".
+  Si possono spegnere i riflessi, l'adrenalina, o mostrare l'attività dei neuroni sopra la sua testa.
 - Come è stato estratto il circuito: [`tools/flybrain/`](tools/flybrain/).
 
 ## Pet

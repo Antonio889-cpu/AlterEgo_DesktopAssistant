@@ -33,28 +33,37 @@ function LB.applyModel(bot, model)
 end
 
 --- Stato "comandato da Alter Ego": gira nel coroutine del Lambda (MoveToPos può aspettare).
+-- Movimento fluido: un solo percorso verso l'entità da seguire (Lambda lo aggiorna da solo),
+-- isteresi larga tra "partire" e "fermarsi", corsa decisa strada facendo.
+local START_FOLLOW, STOP_FOLLOW = 230, 110
 function LB.control(self)
   if self ~= L.bot or (self.GetIsDead and self:GetIsDead()) then return end
   local mode = L.mode
+  if mode == "sit" then return end
   if mode == "follow" then
     local t = L.target
     if not IsValid(t) or (t:IsPlayer() and not t:Alive()) then t = L.host() L.target = t end
     if not IsValid(t) then return end
     local d = self:GetPos():Distance(t:GetPos())
-    if d > 170 then
-      self:MoveToPos(t, { run = d > 380, tol = 90, update = 0.25, callback = function(s)
-        if L.mode ~= "follow" or L.bot ~= s or not IsValid(t) then return false end
-        if s:GetPos():Distance(t:GetPos()) < 120 then return false end
+    if d > START_FOLLOW then
+      self:MoveToPos(t, { run = d > 420, tol = 60, update = 0.4, cbTime = 0.2, callback = function(s)
+        if L.mode ~= "follow" or L.bot ~= s or not IsValid(t) or L.target ~= t then return false end
+        local dd = s:GetPos():Distance(t:GetPos())
+        if dd < STOP_FOLLOW then return false end
+        if s.SetRun then s:SetRun(dd > 320) end
       end })
-    else
-      self:LookTo(t, 1)
+    elseif (self.AELookAt or 0) < CurTime() then
+      self.AELookAt = CurTime() + 1.2
+      self:LookTo(t, 1.5)
     end
   elseif mode == "goto" then
     local g = L.goal
     if not isvector(g) then return end
-    if self:GetPos():Distance(g) > 60 then
-      self:MoveToPos(g, { run = true, tol = 30, update = 0.25, callback = function(s)
-        if L.mode ~= "goto" or L.goal ~= g or L.bot ~= s then return false end
+    if self:GetPos():Distance(g) > 50 then
+      self:MoveToPos(g, { run = self:GetPos():Distance(g) > 250, tol = 30, update = 0.6, cbTime = 0.2, callback = function(s)
+        if L.mode ~= "goto" or L.bot ~= s then return false end
+        -- nuova destinazione: si aggiorna il percorso senza ripartire da fermi
+        if L.goal ~= g and isvector(L.goal) then g = L.goal s.l_recomputepath = g end
       end })
     end
   elseif mode == "attack" then
@@ -62,7 +71,10 @@ function LB.control(self)
     if IsValid(e) and e ~= self then self:AttackTarget(e, true) end
   else
     local h = L.host()
-    if IsValid(h) and h:GetPos():Distance(self:GetPos()) < 500 then self:LookTo(h, 1) end
+    if IsValid(h) and h:GetPos():Distance(self:GetPos()) < 500 and (self.AELookAt or 0) < CurTime() then
+      self.AELookAt = CurTime() + 1.2
+      self:LookTo(h, 1.5)
+    end
   end
 end
 
@@ -157,6 +169,8 @@ end)
 hook.Add("LambdaOnKilled", "AELink", function(l, info)
   if l ~= L.bot then return end
   local a = info and info.GetAttacker and info:GetAttacker()
+  if L.sit then L.sit.stand(true) end
+  if L.play then L.play.onDied(a) end
   L.drop()
   L.deadAt = CurTime()
   L.event("died", { by = IsValid(a) and L.friendly(a) or "world" })

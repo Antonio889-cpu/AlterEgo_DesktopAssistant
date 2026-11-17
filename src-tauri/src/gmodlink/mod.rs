@@ -11,6 +11,7 @@
 //! riga. I compiti lunghi diventano piccoli script Lua che girano nel gioco senza altri token.
 
 pub mod fly;
+pub mod memory;
 pub mod prompt;
 pub mod quick;
 
@@ -31,6 +32,8 @@ const ADDON: &[(&str, &str)] = &[
     ("lua/alterego/sandbox.lua", include_str!("../../gmod_addon/lua/alterego/sandbox.lua")),
     ("lua/alterego/body_lambda.lua", include_str!("../../gmod_addon/lua/alterego/body_lambda.lua")),
     ("lua/alterego/fly.lua", include_str!("../../gmod_addon/lua/alterego/fly.lua")),
+    ("lua/alterego/sit.lua", include_str!("../../gmod_addon/lua/alterego/sit.lua")),
+    ("lua/alterego/play.lua", include_str!("../../gmod_addon/lua/alterego/play.lua")),
     ("lua/autorun/server/sv_alterego_link.lua", include_str!("../../gmod_addon/lua/autorun/server/sv_alterego_link.lua")),
     ("lua/autorun/client/cl_alterego_link.lua", include_str!("../../gmod_addon/lua/autorun/client/cl_alterego_link.lua")),
 ];
@@ -46,6 +49,8 @@ pub struct GState {
     pub seq: f64,
     pub events: Vec<Value>,
     pub tasks: Vec<String>,
+    /// Giocatori che la bersagliano (punteggio di rivalità, solo ≥ 1).
+    pub rivals: std::collections::HashMap<String, f64>,
     pub bot: Option<Bot>,
     pub players: Vec<Player>,
     pub near: Vec<Near>,
@@ -63,6 +68,8 @@ pub struct Bot {
     pub weapon: Option<String>,
     pub held: Option<String>,
     pub following: Option<String>,
+    /// Dove è seduta ("ground", "jeep#12"…).
+    pub sitting: Option<String>,
 }
 
 #[derive(Deserialize, Default, Debug, Clone)]
@@ -84,6 +91,15 @@ pub struct Near {
     pub d: f64,
     pub dir: Option<String>,
     pub hostile: Option<bool>,
+}
+
+// tabella di Lua che può arrivare vuota come `[]`
+fn lua_map<'de, D: serde::Deserializer<'de>>(d: D) -> Result<std::collections::HashMap<String, f64>, D::Error> {
+    let v = Value::deserialize(d)?;
+    Ok(match v {
+        Value::Object(o) => o.into_iter().filter_map(|(k, x)| x.as_f64().map(|f| (k, f))).collect(),
+        _ => Default::default(),
+    })
 }
 
 // JSON vuoto di Lua: `{}` al posto di `[]`
@@ -109,6 +125,8 @@ pub fn parse_state(raw: &str) -> Option<GState> {
         events: Vec<Value>,
         #[serde(default, deserialize_with = "lua_list")]
         tasks: Vec<String>,
+        #[serde(default, deserialize_with = "lua_map")]
+        rivals: std::collections::HashMap<String, f64>,
         #[serde(default)]
         bot: Option<Bot>,
         #[serde(default, deserialize_with = "lua_list")]
@@ -119,7 +137,7 @@ pub fn parse_state(raw: &str) -> Option<GState> {
         lambda: bool,
     }
     let r: Raw = serde_json::from_str(raw).ok()?;
-    Some(GState { t: r.t, map: r.map, seq: r.seq, events: r.events, tasks: r.tasks, bot: r.bot, players: r.players, near: r.near, lambda: r.lambda })
+    Some(GState { t: r.t, map: r.map, seq: r.seq, events: r.events, tasks: r.tasks, rivals: r.rivals, bot: r.bot, players: r.players, near: r.near, lambda: r.lambda })
 }
 
 // ---------- stato dell'app ----------
@@ -153,6 +171,8 @@ struct Inner {
     /// A chi ha risposto per ultimo e quando (per capire se un messaggio è rivolto a lei).
     talking_with: Option<(String, Instant)>,
     game_running: bool,
+    /// Partita in corso (per la memoria delle partite).
+    session: Option<memory::Log>,
 }
 
 impl Default for Link {
@@ -251,6 +271,20 @@ fn fly_tick(app: &AppHandle, dir: &Path, cfg: &crate::config::FlyConfig) {
     }
 }
 
+fn data_dir(app: &AppHandle) -> PathBuf {
+    app.state::<crate::assistant::Conversation>().data_dir.clone()
+}
+
+/// Chiude la partita in corso e la mette nell'archivio delle partite.
+fn end_session(app: &AppHandle) {
+    let log = lock(app).session.take();
+    if let Some(log) = log {
+        if cfg_of(app).gmodlink.memory && log.finish(&data_dir(app), now_secs() as i64) {
+            crate::applog::info("gmodlink", "partita salvata nella memoria delle partite");
+        }
+    }
+}
+
 /// "stress 0.6, fled" per la riga di stato (vuoto se calma o spento).
 fn instinct(app: &AppHandle, cfg: &crate::config::GmodLinkConfig) -> String {
     if !cfg.fly.enabled || !cfg.fly.mood {
@@ -321,6 +355,11 @@ pub fn send(app: &AppHandle, ops: Vec<Value>) {
     }
     let mut i = lock(app);
     for mut op in ops {
+        if op["op"] == "spawn" {
+            if let (Some(log), Some(w)) = (i.session.as_mut(), op["what"].as_str()) {
+                log.spawned(w);
+            }
+        }
         i.next_id += 1;
         op["id"] = json!(i.next_id);
         i.cmds.push_back(op);
@@ -412,7 +451,9 @@ fn installed(dir: &Path) -> bool {
 // ---------- ponte ----------
 
 fn write_cmds(app: &AppHandle, dir: &Path) {
-    let cfg = app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).gmodlink.clone();
+    let full = cfg_of(app);
+    let lang = crate::providers::prompt::reply_lang(&full).to_string();
+    let cfg = full.gmodlink;
     let body = {
         let i = lock(app);
         json!({
@@ -424,6 +465,11 @@ fn write_cmds(app: &AppHandle, dir: &Path) {
                 "auto_join": cfg.auto_join,
                 "tasks": cfg.tasks,
                 "body": cfg.body,
+                "play": {
+                    "mischief": cfg.mischief,
+                    "idle": cfg.idle_play,
+                    "lang": lang,
+                },
                 "fly": {
                     "on": cfg.fly.enabled,
                     "reflexes": cfg.fly.reflexes,
@@ -473,6 +519,14 @@ pub fn spawn(app: AppHandle) {
                     i.state_at = None;
                     i.installed_for = None;
                 }
+                // gioco chiuso o fermo da 2 minuti: la partita è finita
+                let stale = i.state_at.is_none_or(|t| t.elapsed() > Duration::from_secs(120));
+                let ended = i.session.is_some() && (!running || stale);
+                drop(i);
+                if ended {
+                    end_session(&app);
+                }
+                let mut i = lock(&app);
                 // addon sempre aggiornato (ha effetto al prossimo caricamento della mappa)
                 if let Some(d) = dir.filter(|d| i.installed_for.as_ref() != Some(d)) {
                     i.installed_for = Some(d.clone());
@@ -524,6 +578,26 @@ pub fn spawn(app: AppHandle) {
                 };
                 i.last_seq = Some(s.seq);
                 let ev: Vec<Value> = s.events.iter().filter(|e| e["seq"].as_f64().unwrap_or(0.0) > last).cloned().collect();
+                // partita: nuova mappa = nuova partita
+                let map_changed = i.session.as_ref().is_some_and(|l| l.map != s.map);
+                if map_changed {
+                    if let Some(old) = i.session.take() {
+                        if cfg.memory {
+                            old.finish(&data_dir(&app), now_secs() as i64);
+                        }
+                    }
+                }
+                if s.bot.is_some() && i.session.is_none() {
+                    i.session = Some(memory::Log::new(now_secs() as i64, &s.map));
+                }
+                if let Some(log) = i.session.as_mut() {
+                    for p in &s.players {
+                        log.players.insert(p.name.clone());
+                    }
+                    for e in &ev {
+                        log.event(e);
+                    }
+                }
                 i.state = Some(s);
                 ev
             };
@@ -586,6 +660,9 @@ fn on_event(app: &AppHandle, e: Value) {
                 }
                 return;
             }
+            if let Some(log) = lock(app).session.as_mut() {
+                log.said(&from, &text);
+            }
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
                 match handle(&app, &from, &text, None).await {
@@ -597,9 +674,11 @@ fn on_event(app: &AppHandle, e: Value) {
             });
         }
         "say" => {
-            // frase scritta da un task: niente modello
-            speak(app, "happy", &s("text"));
+            // frase di un task o battuta immediata della giocatrice: niente modello
+            let emo = e["emotion"].as_str().filter(|x| prompt::EMOTIONS.split('|').any(|k| k == *x)).unwrap_or("happy");
+            speak(app, emo, &s("text"));
         }
+        "prank" => remember(app, &format!("[you pranked {} ({})]", s("who"), s("kind")), ""),
         "notify" => comment(app, &format!("[your task {} says] {}", s("task"), s("text")), true),
         "task" => {
             let status = s("status");
@@ -688,6 +767,33 @@ fn comment(app: &AppHandle, what: &str, force: bool) {
     });
 }
 
+/// Ricordi delle partite passate da dare al modello adesso, se servono:
+/// alla prima risposta della partita una riga sull'ultima volta con questi giocatori; poi solo se la frase
+/// li chiede (parole chiave, oppure Rizzo Flow nei casi dubbi).
+async fn memories(app: &AppHandle, cfg: &crate::config::Config, text: &str) -> Option<String> {
+    if !cfg.gmodlink.memory {
+        return None;
+    }
+    let (present, first) = {
+        let mut i = lock(app);
+        let present: Vec<String> = i.state.as_ref().map(|s| s.players.iter().map(|p| p.name.clone()).collect()).unwrap_or_default();
+        let first = i.session.as_mut().is_some_and(|l| !std::mem::replace(&mut l.recalled, true));
+        (present, first)
+    };
+    let want = match memory::need(text) {
+        memory::Need::Yes => true,
+        memory::Need::Maybe if cfg.saving.router == "rizzo" => memory::rizzo_wants(&cfg.saving.router_url, text).await.unwrap_or(false),
+        _ => false,
+    };
+    if !want && !first {
+        return None;
+    }
+    let dir = data_dir(app);
+    let st = tauri::async_runtime::spawn_blocking(move || memory::load(&dir)).await.ok()?;
+    let out = if want { memory::recall(&st, &present, 3) } else { memory::brief(&st, &present) };
+    (!out.is_empty()).then_some(out)
+}
+
 /// Risponde a `text` detto da `from` (o reagisce a `event`). Restituisce "[emozione]\ntesto"
 /// (per la voce e il box sul PC); la riga va anche nella chat del gioco.
 pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>) -> Result<String, String> {
@@ -726,6 +832,10 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
         (st, h, o)
     };
     let mut user = state_line;
+    if let Some(mem) = memories(app, &cfg, if event.is_none() { text } else { "" }).await {
+        user.push('\n');
+        user.push_str(&mem);
+    }
     if !overheard.is_empty() {
         user.push_str(&format!("\n[chat] {}", overheard.join(" / ")));
     }
@@ -810,6 +920,8 @@ pub struct Status {
     pub body: Option<String>,
     /// Cervello di moscerino: dimensioni e uscite adesso.
     pub fly: FlyStatus,
+    /// Partite ricordate nella memoria delle partite.
+    pub games: usize,
 }
 
 #[derive(Serialize)]
@@ -835,6 +947,7 @@ pub async fn gmodlink_status(app: AppHandle) -> Status {
         in_game: fresh && i.state.as_ref().is_some_and(|s| s.bot.is_some()),
         lambda: i.state.as_ref().map(|s| s.lambda),
         body: i.state.as_ref().and_then(|s| s.bot.as_ref()).and_then(|b| b.body.clone()),
+        games: memory::count(&data_dir(&app)),
         fly: {
             let (neurons, synapses) = fly::size();
             let f = fly_lock(&app);
@@ -870,6 +983,12 @@ pub fn gmodlink_settings(app: AppHandle, settings: crate::config::GmodLinkConfig
         c.gmodlink.normalize();
     });
     lock(&app).dirty = true;
+}
+
+/// Dimentica tutte le partite (memoria delle partite).
+#[tauri::command]
+pub fn gmodlink_forget(app: AppHandle) {
+    memory::forget(&data_dir(&app));
 }
 
 /// Entra / esce dal gioco (pulsanti nelle impostazioni).

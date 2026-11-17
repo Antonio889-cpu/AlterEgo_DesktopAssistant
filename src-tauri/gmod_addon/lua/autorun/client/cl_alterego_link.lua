@@ -24,10 +24,10 @@ local function T(it, en)
 end
 
 local FLY = {
-  { "e", "fuga", "escape", Color(255, 90, 90) }, { "b", "indietro", "back", Color(255, 160, 80) },
-  { "g", "grooming", "grooming", Color(255, 220, 90) }, { "f", "mangia", "eat", Color(120, 255, 120) },
-  { "d", "beve", "drink", Color(90, 200, 255) }, { "l", "ascolta", "listen", Color(180, 140, 255) },
-  { "s", "abbagliata", "dazzled", Color(255, 255, 200) }, { "w", "vento", "wind", Color(160, 220, 220) },
+  { "e", "schivata", "dodge", Color(255, 90, 90) }, { "b", "indietro", "back", Color(255, 160, 80) },
+  { "g", "sussulto", "flinch", Color(255, 220, 90) }, { "f", "gioco", "play", Color(120, 255, 120) },
+  { "d", "acqua", "water", Color(90, 200, 255) }, { "l", "ascolta", "listen", Color(180, 140, 255) },
+  { "s", "abbagliata", "dazzled", Color(255, 255, 200) }, { "w", "in volo", "airborne", Color(160, 220, 220) },
   { "tl", "gira sx", "turn L", Color(200, 200, 200) }, { "tr", "gira dx", "turn R", Color(200, 200, 200) },
 }
 local function drawFly(b, me, raw)
@@ -61,6 +61,25 @@ local function drawFly(b, me, raw)
   cam.End3D2D()
 end
 
+--- Mano destra (il raggio parte da lì): arma del Lambda, osso della mano, o all'altezza del petto.
+local function handPos(b)
+  local w = b.GetWeaponENT and b:GetWeaponENT()
+  if IsValid(w) and not w:GetNoDraw() then
+    local a = w:GetAttachment(1)
+    if a and a.Pos then return a.Pos end
+  end
+  for _, e in ipairs({ b:GetNWEntity("AESkinEnt"), b }) do
+    if IsValid(e) then
+      local bone = e:LookupBone("ValveBiped.Bip01_R_Hand")
+      if bone then
+        local pos = e:GetBonePosition(bone)
+        if pos and pos ~= e:GetPos() then return pos end
+      end
+    end
+  end
+  return b:GetPos() + Vector(0, 0, 48) + b:GetForward() * 14
+end
+
 hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
   if sky then return end
   local me = LocalPlayer()
@@ -68,7 +87,7 @@ hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
     -- raggio verso l'oggetto tenuto
     local held = b:GetNWEntity("AEHeld")
     if IsValid(held) then
-      local from = b:EyePos() + b:GetForward() * 14 - Vector(0, 0, 14)
+      local from = handPos(b)
       local to = held:WorldSpaceCenter()
       render.SetMaterial(beam)
       local t = CurTime() * 4
@@ -109,13 +128,7 @@ local function currentModel()
   return ""
 end
 
-list.Set("DesktopWindows", "AlterEgoLink", {
-  title = "Alter Ego",
-  icon = "icon64/playermodel.png",
-  width = 720,
-  height = 480,
-  onewindow = true,
-  init = function(icon, window)
+local function buildMenu(window)
     window:SetTitle("Alter Ego")
     window:SetSizable(true)
     window:SetMinWidth(560)
@@ -223,5 +236,45 @@ list.Set("DesktopWindows", "AlterEgoLink", {
     end
     search.OnChange = function(self) fill(self:GetValue()) end
     fill("")
-  end,
+end
+
+-- 1. icona nel menu contestuale (tieni premuto C)
+list.Set("DesktopWindows", "AlterEgoLink", {
+  title = "Alter Ego",
+  icon = "icon64/playermodel.png",
+  width = 720,
+  height = 480,
+  onewindow = true,
+  init = function(icon, window) buildMenu(window) end,
 })
+
+-- 2. finestra aperta a mano (barra del menu C, tasto destro su di lei, console "alterego_menu")
+local frame
+local function openMenu()
+  if IsValid(frame) then frame:MakePopup() return end
+  frame = vgui.Create("DFrame")
+  frame:SetSize(math.min(720, ScrW() - 40), math.min(480, ScrH() - 40))
+  frame:Center()
+  buildMenu(frame)
+  frame:MakePopup()
+end
+concommand.Add("alterego_menu", openMenu)
+
+-- 3. voce "Alter Ego" nella barra in alto del menu C
+hook.Add("PopulateMenuBar", "AELink", function(menubar)
+  local m = menubar:AddOrGetMenu("Alter Ego")
+  m:AddOption(T("Modello, corpo e nome…", "Model, body and name…"), openMenu):SetIcon("icon16/user_female.png")
+  m:AddOption(T("Entra", "Join"), function() send("join") end):SetIcon("icon16/user_add.png")
+  m:AddOption(T("Esci", "Leave"), function() send("leave") end):SetIcon("icon16/user_delete.png")
+end)
+
+-- 4. tasto destro su di lei (menu C) → Alter Ego…
+if properties and properties.Add then
+  properties.Add("alterego", {
+    MenuLabel = "Alter Ego…",
+    MenuIcon = "icon16/user_female.png",
+    Order = 1,
+    Filter = function(self, ent) return IsValid(ent) and ent:GetNWBool("AELink") end,
+    Action = function() openMenu() end,
+  })
+end

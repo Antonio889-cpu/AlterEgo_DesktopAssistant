@@ -1262,6 +1262,9 @@ function fillGmodLink(g) {
   $("gl-model").value = g.model || "";
   $("gl-dir").value = g.dir || "";
   $("gl-body").value = g.body || "auto";
+  $("gl-mischief").value = g.mischief || "full";
+  $("gl-idle").checked = g.idle_play !== false;
+  $("gl-memory").checked = g.memory !== false;
   const f = g.fly || {};
   $("gl-fly").checked = f.enabled !== false;
   $("gl-fly-reflex").checked = f.reflexes !== false;
@@ -1277,8 +1280,8 @@ function flyDisabled() {
   $("gl-fly-senses").querySelectorAll("input").forEach((i) => { i.disabled = off; });
 }
 const FLY_NAMES = {
-  escape: "fuga", backward: "indietreggia", groom: "si spolvera", feed: "mangia", drink: "beve", listen: "ascolta",
-  squint: "abbagliata", brace: "vento", turn_l: "gira a sinistra", turn_r: "gira a destra",
+  escape: "schivata", backward: "passo indietro", groom: "sussulto", feed: "voglia di giocare", drink: "acqua", listen: "ascolta",
+  squint: "abbagliata", brace: "in volo", turn_l: "gira a sinistra", turn_r: "gira a destra",
 };
 let flyTimer = null;
 function flyLive(s) {
@@ -1290,7 +1293,7 @@ function flyLive(s) {
   if (live) {
     const head = document.createElement("div");
     head.className = "fly-head";
-    head.textContent = t("Adesso: {a} spike/s · stress {st}", { a: Math.round(f.activity || 0), st: (f.stress || 0).toFixed(2) });
+    head.textContent = t("Adesso: {a} spike/s · adrenalina {st}", { a: Math.round(f.activity || 0), st: (f.stress || 0).toFixed(2) });
     box.appendChild(head);
     for (const [k, v] of f.out) {
       const row = document.createElement("div");
@@ -1314,6 +1317,7 @@ function gmodLinkSettings() {
     enabled: $("gl-enabled").checked, auto_join: $("gl-auto").checked, tasks: $("gl-tasks").checked,
     chatter: $("gl-chatter").value, name: $("gl-name").value.trim(), model: $("gl-model").value.trim(), dir: $("gl-dir").value.trim(),
     body: $("gl-body").value,
+    mischief: $("gl-mischief").value, idle_play: $("gl-idle").checked, memory: $("gl-memory").checked,
     fly: {
       enabled: $("gl-fly").checked, reflexes: $("gl-fly-reflex").checked, mood: $("gl-fly-mood").checked, hud: $("gl-fly-hud").checked,
       senses: [...$("gl-fly-senses").querySelectorAll("input")].filter((i) => i.checked).map((i) => i.dataset.sense),
@@ -1325,6 +1329,7 @@ async function gmodLinkStatus() {
   try {
     const s = await invoke("gmodlink_status");
     flyLive(s);
+    $("gl-games").textContent = s.games ? t("{n} partite ricordate", { n: s.games }) : "";
     const ls = $("gl-lambda-state");
     ls.textContent = s.lambda === true ? t("Installato ✓") : s.lambda === false ? t("Non installato.") : "";
     ls.className = s.lambda === true ? "ok" : "";
@@ -1339,7 +1344,8 @@ async function saveGmodLink() {
   await invoke("gmodlink_settings", { settings: gmodLinkSettings() });
   gmodLinkStatus();
 }
-for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir", "gl-body", "gl-fly-reflex", "gl-fly-mood", "gl-fly-hud", "gl-fly-senses"]) $(id).onchange = saveGmodLink;
+for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir", "gl-body", "gl-fly-reflex", "gl-fly-mood", "gl-fly-hud", "gl-fly-senses", "gl-mischief", "gl-idle", "gl-memory"]) $(id).onchange = saveGmodLink;
+$("gl-forget").onclick = async () => { await invoke("gmodlink_forget"); gmodLinkStatus(); };
 $("gl-fly").onchange = () => { flyDisabled(); saveGmodLink(); };
 $("gl-lambda-link").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "lambda_players" }); };
 $("gl-enabled").onchange = async (e) => {

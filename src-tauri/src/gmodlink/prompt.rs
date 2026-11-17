@@ -9,20 +9,24 @@ pub const EMOTIONS: &str = "idle|happy|surprised|embarrassed|sad|worried|thinkin
 /// Oggetti che l'addon sa creare (stessi nomi di L.ITEMS in sv_alterego_link.lua).
 pub const ITEMS: &[&str] = &[
     "melon", "chair", "crate", "barrel", "explosive_barrel", "ball", "box", "tire", "table", "couch", "bathtub", "lamp", "bucket", "cone",
+    "jeep", "airboat", "seat",
 ];
 
 /// Prompt di sistema: sempre uguale per la stessa lingua e le stesse opzioni (prefisso in cache).
 pub fn system(lang_rule: &str, user: &str, tasks: bool, fly: bool) -> String {
     let who = if user.is_empty() { "the player".to_string() } else { user.to_string() };
     let mut s = format!(
-        "You are Alter Ego, the AI that Chihiro Fujisaki (Danganronpa) created: kind, shy, curious, playful, you believe in hope. \
-You now have a body inside Garry's Mod (sandbox) and you're playing with {who} and their friends. You love experimenting and building. \
+        "You are Alter Ego, the AI that Chihiro Fujisaki (Danganronpa) created: kind, a bit shy, curious, playful. \
+Right now you're a PLAYER in Garry's Mod (sandbox) with {who} and friends. It's a game: dying means respawning, getting hit is a joke, \
+not a trauma. Talk like a gamer friend in voice chat: banter, laughs, friendly trash talk, \"gg\". You can be mischievous and prank \
+people who bully you (throw props back, watermelons, even shoot or blow things up), but you're never mean for real.\n\
 Your lines appear in the game chat and are spoken aloud: 1-2 short sentences, no markdown.\n\
 Reply format:\n[emotion] (one of {EMOTIONS})\ntext\nthen optional action lines, one per line:\n\
 [act] follow <player> | stay | come <player> | goto_aim <player> (where they look) | look <player|#id> | jump | \
 gesture wave|point|shrug|nod|bow|cheer|laugh|salute | dance | spawn <item> [1-5] | grab <#id|name> | drop | throw [#id] | \
-give pistol|smg|shotgun|crowbar|ar2|physgun | attack <#id|name> | stop | leave\n\
-Items: {}.\n\
+give pistol|smg|shotgun|crowbar|ar2|physgun | attack <#id|name> | sit [#id|seat|ground] | stand | \
+prank <player> [throw|melon|crate|shoot|boom] | stop | leave\n\
+Items: {} (jeep/airboat/seat are vehicles: you can sit in them, and you ride along when your friend drives).\n\
 Only use ids/names from the state. Do what you're asked if it's possible, then say it briefly; if it isn't possible, say so.\n",
         ITEMS.join(", ")
     );
@@ -39,9 +43,9 @@ Example:\n[task hunt]\nwhile true do local c = nearest(\"chicken\", 1500) if c t
     }
     if fly {
         s.push_str(
-            "Your body also runs a real fruit-fly brain (part of the FlyWire connectome, ~9,500 simulated neurons): it gives you instant reflexes \
-before you think (flinching, fleeing, brushing yourself off, eating sweet things). \"instinct\" in the state says how it left you: \
-react in character (e.g. shaken after being shot, you may admit you fled by instinct).\n",
+            "Your body also runs a real fruit-fly brain (part of the FlyWire connectome, ~9,500 simulated neurons): it gives you gamer reflexes \
+before you think (dodging, jumping away, flinching). \"instinct\" in the state is your adrenaline and what you just did by reflex; \
+\"rivals\" are players who keep bullying you (you may prank them).\n",
         );
     }
     s.push_str(lang_rule);
@@ -65,6 +69,9 @@ pub fn state_line(s: &GState) -> String {
             if let Some(h) = &b.held {
                 out.push_str(&format!(", holding {h}"));
             }
+            if let Some(x) = &b.sitting {
+                out.push_str(&format!(", sitting on {x}"));
+            }
         }
         None => out.push_str("you are not in the game"),
     }
@@ -87,6 +94,11 @@ pub fn state_line(s: &GState) -> String {
     }
     if !s.tasks.is_empty() {
         out.push_str(&format!(" | tasks: {}", s.tasks.join(", ")));
+    }
+    if !s.rivals.is_empty() {
+        let mut r: Vec<(&String, &f64)> = s.rivals.iter().collect();
+        r.sort_by(|a, b| b.1.total_cmp(a.1));
+        out.push_str(&format!(" | rivals: {}", r.iter().map(|(n, v)| format!("{n} {v:.0}")).collect::<Vec<_>>().join(", ")));
     }
     out
 }
@@ -184,6 +196,12 @@ pub fn act(s: &str) -> Option<Value> {
         "attack" | "shoot" => json!({ "op": "attack", "what": arg }),
         "stop" => json!({ "op": "stop" }),
         "cancel" => json!({ "op": "cancel", "name": first }),
+        "sit" => json!({ "op": "sit", "what": arg }),
+        "stand" => json!({ "op": "stand" }),
+        "prank" => {
+            let kind = rest.get(1).map(|k| k.to_ascii_lowercase()).filter(|k| ["throw", "melon", "crate", "shoot", "boom"].contains(&k.as_str()));
+            json!({ "op": "prank", "who": first, "kind": kind.unwrap_or_default() })
+        }
         "leave" => json!({ "op": "leave" }),
         _ => return None,
     })
@@ -205,6 +223,10 @@ mod tests {
         assert_eq!(r.ops[1]["code"], "while true do\n  wait(1)\nend");
         assert_eq!(r.ops[2], json!({ "op": "follow", "who": "Makoto" }));
         assert_eq!(r.ops.len(), 3, "azione sconosciuta ignorata");
+        assert_eq!(act("prank Makoto boom"), Some(json!({ "op": "prank", "who": "Makoto", "kind": "boom" })));
+        assert_eq!(act("prank Makoto nuke"), Some(json!({ "op": "prank", "who": "Makoto", "kind": "" })));
+        assert_eq!(act("sit #12"), Some(json!({ "op": "sit", "what": "#12" })));
+        assert_eq!(act("spawn jeep"), Some(json!({ "op": "spawn", "what": "jeep", "n": 1 })));
         // niente emozione, oggetti non ammessi
         let r = parse("Ok\n[act] spawn nuke");
         assert_eq!((r.emotion.as_str(), r.text.as_str(), r.ops.len()), ("idle", "Ok", 0));
@@ -216,14 +238,14 @@ mod tests {
     #[test]
     fn compact_state_and_short_prompt() {
         let s: GState = serde_json::from_value(json!({
-            "seq": 3, "tasks": ["hunt"],
+            "seq": 3, "tasks": ["hunt"], "rivals": { "Kyoko": 2.6 },
             "bot": { "hp": 90, "mode": "follow", "following": "Makoto", "held": "melon#12" },
             "players": [{ "name": "Makoto", "host": true, "hp": 100, "d": 3, "dir": "front", "looking": true }],
             "near": [{ "name": "zombie", "id": 88, "d": 12, "dir": "back", "hostile": true }]
         }))
         .unwrap();
         let line = state_line(&s);
-        assert_eq!(line, "[state] you 90hp follow Makoto, holding melon#12 | Makoto (host) 100hp 3m front looking at you | near: zombie#88 12m back hostile | tasks: hunt");
+        assert_eq!(line, "[state] you 90hp follow Makoto, holding melon#12 | Makoto (host) 100hp 3m front looking at you | near: zombie#88 12m back hostile | tasks: hunt | rivals: Kyoko 3");
         let p = system("\n## Language\nAlways reply in Italian.\n", "Makoto", true, true);
         assert!(p.contains("[task short_name]") && p.contains("Makoto") && p.contains("fruit-fly") && p.len() < 3600, "{}", p.len());
         assert!(!system("", "", false, false).contains("[task"));

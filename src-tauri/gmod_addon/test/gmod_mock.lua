@@ -94,10 +94,19 @@ function E:IsOnFire() return self.fire == true end
 function E:GetMaxHealth() return 100 end
 function E:FlashlightIsOn() return self.flashlight == true end
 function E:GetAimVector() return self.aim or self.ang:Forward() end
+function E:LookupAttachment() return 0 end
+function E:GetAttachment() return nil end
+function E:WorldToLocal(p) return p - self.pos end
+function E:LocalToWorld(p) return p + self.pos end
+function E:ResetSequence(id) self.seq = id end
+function E:GetSequence() return self.seq or 0 end
+function E:GetDriver() return self.driver or NULL end
+function E:GetParent() return self.parentEnt or NULL end
+function E:IsPlayerHolding() return false end
 function E:SetNWString(k, v) self.nw[k] = v end
 function E:GetNWString(k, d) return self.nw[k] or d end
 E.SetNWBool, E.SetNWFloat, E.SetNWEntity = E.SetNWString, E.SetNWString, E.SetNWString
-function E:LookupSequence(s) return (s == "g_wave" or s == "cheer1") and 5 or -1 end
+function E:LookupSequence(s) return (s == "g_wave" or s == "cheer1") and 5 or (s == "sit" or s == "sit_zen") and 9 or -1 end
 function E:GetFlexIDByName(n) return n == "jaw_drop" and 1 or nil end
 function E:IsCurrentSchedule(s) local c = self.calls for i = #c, 1, -1 do if c[i][1] == "SetSchedule" then return c[i][2] == s end end return false end
 function E:Give(c) self.weapon = MOCK.entity(c) end
@@ -120,6 +129,16 @@ function E:Alive() return self.hp > 0 end
 function E:GetEyeTrace() return { HitPos = self.pos + Vector(300, 0, 0), Entity = self.lookAt } end
 
 -- ---------- librerie ----------
+MOCK.cslua = {}
+function AddCSLuaFile(p) MOCK.cslua[#MOCK.cslua + 1] = p end
+function VectorRand() return Vector(1, 0, 0) end
+SCHED_NPC_FREEZE = 5
+MOCK.lists = { Vehicles = {
+  Jeep = { Class = "prop_vehicle_jeep", Model = "models/buggy.mdl", KeyValues = { vehiclescript = "scripts/vehicles/jeep_test.txt" } },
+  Airboat = { Class = "prop_vehicle_airboat", Model = "models/airboat.mdl", KeyValues = { vehiclescript = "scripts/vehicles/airboat.txt" } },
+  Chair_Office2 = { Class = "prop_vehicle_prisoner_pod", Model = "models/props_combine/breenchair.mdl", KeyValues = { vehiclescript = "scripts/vehicles/prisoner_pod.txt" } },
+} }
+list = { Get = function(n) return MOCK.lists[n] or {} end, Set = function() end }
 ents = {
   Create = function(c) return MOCK.entity(c) end,
   FindInSphere = function(p, r)

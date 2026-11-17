@@ -320,24 +320,22 @@ impl Mood {
         self.recent.retain(|(_, t)| t.elapsed().as_secs() < 20);
     }
 
-    /// "stress 0.6, fled, groomed" (vuoto se calma).
+    /// "adrenaline 0.6, dodged, got hit" (vuoto se calma).
     pub fn line(&self) -> String {
         let mut parts = Vec::new();
         if self.stress >= 0.1 {
-            parts.push(format!("stress {:.1}", self.stress));
+            parts.push(format!("adrenaline {:.1}", self.stress));
         }
-        if self.hunger_fed >= 0.3 {
-            parts.push("just ate".to_string());
-        }
+
         let word = |k: &str| match k {
-            "escape" => "fled",
-            "backward" => "backed off",
-            "groom" => "groomed",
-            "feed" => "tasted something sweet",
-            "listen" => "startled by a sound",
-            "squint" => "dazzled",
-            "brace" => "was flung",
-            "drink" => "drank",
+            "escape" => "dodged something",
+            "backward" => "stepped back",
+            "groom" => "flinched",
+            "feed" => "eyed a watermelon",
+            "listen" => "heard a bang",
+            "squint" => "dazzled by a light",
+            "brace" => "got flung",
+            "drink" => "splashed in water",
             _ => "",
         };
         let mut seen: Vec<&str> = Vec::new();
@@ -413,7 +411,7 @@ mod tests {
         }
         assert!(m.stress > 0.5, "{}", m.stress);
         let l = m.line();
-        assert!(l.starts_with("stress") && l.contains("fled") && l.contains("groomed"), "{l}");
+        assert!(l.starts_with("adrenaline") && l.contains("dodged") && l.contains("flinched"), "{l}");
         m.recent.clear();
         m.stress = 0.0;
         assert_eq!(m.line(), "");
