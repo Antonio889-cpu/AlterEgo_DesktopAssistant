@@ -1,3 +1,9 @@
+## Alter Ego 1.11.0
+
+- Garry's Mod: Alter Ego now has the reflexes of a real fruit-fly brain (FlyWire connectome, simulated on your PC): she flees from things flying at her, flinches when hurt and eats watermelons by instinct. Extra senses and an in-game neuron view in the settings.
+
+`AlterEgo_1.11.0_setup.exe` / `AlterEgo_1.11.0_portable.zip` Windows · `AlterEgo_1.11.0_amd64.AppImage` / `AlterEgo_1.11.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.10.1
 
 - Garry's Mod: with Lambda Players installed, Alter Ego moves like a real player (player animations, weapons and physgun).

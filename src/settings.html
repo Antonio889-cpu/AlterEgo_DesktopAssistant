@@ -354,6 +354,22 @@
       <label>Modello del personaggio <input id="gl-model" placeholder="models/humans/group01/female_01.mdl" /></label>
       <p class="note sub">Più comodo dal gioco: tieni premuto C → icona «Alter Ego» e scegli tra i playermodel installati (con anteprima). Vanno bene sia i playermodel sia i modelli NPC.</p>
       <label>Cartella di Garry's Mod <input id="gl-dir" placeholder="trovata da sola (gioco aperto o libreria Steam)" /></label>
+      <h3>Cervello di moscerino</h3>
+      <label class="inline"><input type="checkbox" id="gl-fly" /> Riflessi e istinto da un vero cervello di moscerino</label>
+      <p class="note sub">Un pezzo del cervello reale di Drosophila, mappato neurone per neurone dal progetto FlyWire, simulato sul PC in tempo reale. Sente dolore, oggetti che le arrivano addosso, il dolce e il tocco, e reagisce prima ancora di pensare: scappa, indietreggia, si spolvera, mangia le angurie. Non consuma token.</p>
+      <p class="note sub" id="gl-fly-size"></p>
+      <label class="inline"><input type="checkbox" id="gl-fly-reflex" /> Il corpo reagisce da solo</label>
+      <label class="inline"><input type="checkbox" id="gl-fly-mood" /> Alter Ego sente lo stress dei riflessi (pochi token in più)</label>
+      <label class="inline"><input type="checkbox" id="gl-fly-hud" /> Mostra l'attività dei neuroni sopra la sua testa</label>
+      <p class="note sub">Sensi in più:</p>
+      <div id="gl-fly-senses" class="checks">
+        <label class="inline"><input type="checkbox" data-sense="smell" /> Olfatto: cibo, fumo, esplosioni</label>
+        <label class="inline"><input type="checkbox" data-sense="thermo" /> Temperatura e acqua: fuoco, freddo, bagnato</label>
+        <label class="inline"><input type="checkbox" data-sense="hearing" /> Udito: spari e rumori forti</label>
+        <label class="inline"><input type="checkbox" data-sense="light" /> Luce: torcia puntata in faccia</label>
+        <label class="inline"><input type="checkbox" data-sense="wind" /> Vento: quando la lanci o vola</label>
+      </div>
+      <div id="gl-fly-live" class="fly-live"></div>
     </section>
 
     <section data-tab="voice">

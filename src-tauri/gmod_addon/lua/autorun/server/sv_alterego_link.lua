@@ -199,6 +199,7 @@ function L.applyModel(bot, model)
 end
 local LB = include("alterego/body_lambda.lua")
 L.LB = LB
+local Fly = include("alterego/fly.lua")
 
 local function relate(bot)
   for _, p in ipairs(player.GetAll()) do
@@ -286,6 +287,8 @@ local function face(pos)
   local y = (pos - L.bot:GetPos()):Angle().y
   pcall(L.bot.SetIdealYawAndUpdate, L.bot, y)
 end
+
+L.goTo, L.face, L.stand = goTo, face, stand
 
 function L.look(e)
   if botOk() and IsValid(e) then
@@ -657,6 +660,7 @@ OPS.config = function(c)
   if c.name and c.name ~= "" then L.name = c.name end
   if c.auto_join ~= nil then L.autoJoin = c.auto_join end
   if c.tasks ~= nil then L.allowTasks = c.tasks end
+  if c.fly then L.fly.config(c.fly) end
   if c.body and c.body ~= "" and c.body ~= L.body and not L.menuBody then
     L.body = c.body
   elseif L.menuBody and c.body == L.menuBody then
@@ -818,6 +822,7 @@ end
 hook.Add("Think", "AELink", function()
   bridge()
   brain()
+  Fly.tick(botOk())
   Sandbox.tick()
   -- rientra da sola dopo una morte, se l'app è collegata
   if L.deadAt and CurTime() - L.deadAt > (L.kind == "lambda" and 8 or 6) and L.linked() then
@@ -836,6 +841,7 @@ end)
 
 hook.Add("EntityTakeDamage", "AELink", function(target, dmg)
   if target ~= L.bot or not IsValid(target) then return end
+  Fly.onDamage(dmg)
   local a = dmg:GetAttacker()
   local now = CurTime()
   if (L.lastHurt or 0) + 4 > now then return end
@@ -871,6 +877,7 @@ end)
 -- niente frasi da cittadino di Half-Life 2: parla solo con la voce di Alter Ego (dal PC)
 hook.Add("EntityEmitSound", "AELink", function(data)
   if IsValid(L.bot) and data.Entity == L.bot and data.SoundName and data.SoundName:find("^vo/") then return false end
+  if data.Entity ~= L.bot then Fly.onSound(data) end
 end)
 hook.Add("PlayerSpawnedVehicle", "AELink", function(ply, v) L.event("spawned", { who = ply:Nick(), what = "vehicle" }) end)
 

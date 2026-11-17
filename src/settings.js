@@ -1262,19 +1262,69 @@ function fillGmodLink(g) {
   $("gl-model").value = g.model || "";
   $("gl-dir").value = g.dir || "";
   $("gl-body").value = g.body || "auto";
+  const f = g.fly || {};
+  $("gl-fly").checked = f.enabled !== false;
+  $("gl-fly-reflex").checked = f.reflexes !== false;
+  $("gl-fly-mood").checked = f.mood !== false;
+  $("gl-fly-hud").checked = !!f.hud;
+  $("gl-fly-senses").querySelectorAll("input").forEach((i) => { i.checked = (f.senses || []).includes(i.dataset.sense); });
+  flyDisabled();
   gmodLinkStatus();
+}
+function flyDisabled() {
+  const off = !$("gl-fly").checked;
+  for (const id of ["gl-fly-reflex", "gl-fly-mood", "gl-fly-hud"]) $(id).disabled = off;
+  $("gl-fly-senses").querySelectorAll("input").forEach((i) => { i.disabled = off; });
+}
+const FLY_NAMES = {
+  escape: "fuga", backward: "indietreggia", groom: "si spolvera", feed: "mangia", drink: "beve", listen: "ascolta",
+  squint: "abbagliata", brace: "vento", turn_l: "gira a sinistra", turn_r: "gira a destra",
+};
+let flyTimer = null;
+function flyLive(s) {
+  const f = s.fly || {};
+  if (f.neurons) $("gl-fly-size").textContent = t("{n} neuroni e {s} sinapsi reali (connettoma FlyWire, CC-BY 4.0). Sempre attivi: dolore, oggetti in arrivo, dolce, tocco.", { n: f.neurons.toLocaleString(), s: f.synapses.toLocaleString() });
+  const box = $("gl-fly-live");
+  box.replaceChildren();
+  const live = s.in_game && $("gl-fly").checked && (f.out || []).length > 0;
+  if (live) {
+    const head = document.createElement("div");
+    head.className = "fly-head";
+    head.textContent = t("Adesso: {a} spike/s · stress {st}", { a: Math.round(f.activity || 0), st: (f.stress || 0).toFixed(2) });
+    box.appendChild(head);
+    for (const [k, v] of f.out) {
+      const row = document.createElement("div");
+      row.className = "fly-row";
+      const name = document.createElement("span");
+      name.textContent = t(FLY_NAMES[k] || k);
+      const bar = document.createElement("i");
+      bar.style.width = Math.round(v * 100) + "%";
+      const track = document.createElement("b");
+      track.appendChild(bar);
+      row.append(name, track);
+      box.appendChild(row);
+    }
+  }
+  // aggiornamento continuo solo mentre lei è nel gioco
+  if (s.in_game && !flyTimer) flyTimer = setInterval(() => { if (!document.hidden) gmodLinkStatus(); }, 1000);
+  if (!s.in_game && flyTimer) { clearInterval(flyTimer); flyTimer = null; }
 }
 function gmodLinkSettings() {
   return {
     enabled: $("gl-enabled").checked, auto_join: $("gl-auto").checked, tasks: $("gl-tasks").checked,
     chatter: $("gl-chatter").value, name: $("gl-name").value.trim(), model: $("gl-model").value.trim(), dir: $("gl-dir").value.trim(),
     body: $("gl-body").value,
+    fly: {
+      enabled: $("gl-fly").checked, reflexes: $("gl-fly-reflex").checked, mood: $("gl-fly-mood").checked, hud: $("gl-fly-hud").checked,
+      senses: [...$("gl-fly-senses").querySelectorAll("input")].filter((i) => i.checked).map((i) => i.dataset.sense),
+    },
   };
 }
 async function gmodLinkStatus() {
   const el = $("gl-status");
   try {
     const s = await invoke("gmodlink_status");
+    flyLive(s);
     const ls = $("gl-lambda-state");
     ls.textContent = s.lambda === true ? t("Installato ✓") : s.lambda === false ? t("Non installato.") : "";
     ls.className = s.lambda === true ? "ok" : "";
@@ -1289,7 +1339,8 @@ async function saveGmodLink() {
   await invoke("gmodlink_settings", { settings: gmodLinkSettings() });
   gmodLinkStatus();
 }
-for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir", "gl-body"]) $(id).onchange = saveGmodLink;
+for (const id of ["gl-auto", "gl-tasks", "gl-chatter", "gl-name", "gl-model", "gl-dir", "gl-body", "gl-fly-reflex", "gl-fly-mood", "gl-fly-hud", "gl-fly-senses"]) $(id).onchange = saveGmodLink;
+$("gl-fly").onchange = () => { flyDisabled(); saveGmodLink(); };
 $("gl-lambda-link").onclick = (e) => { e.preventDefault(); invoke("open_link_cmd", { which: "lambda_players" }); };
 $("gl-enabled").onchange = async (e) => {
   await saveGmodLink();

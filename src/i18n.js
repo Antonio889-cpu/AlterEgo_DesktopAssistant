@@ -724,6 +724,19 @@ const I18N = (() => {
     "NPC cittadino (sempre disponibile)": "Citizen NPC (always available)", "Lambda Player": "Lambda Player",
     "Con": "With", "(addon del Workshop di StarFrost) Alter Ego si muove come un giocatore vero: corsa, salto, armi e physgun da giocatore. Senza, usa un NPC cittadino con il suo modello sopra.":
       "(a Workshop addon by StarFrost) Alter Ego moves like a real player: running, jumping, player weapons and physgun. Without it she uses a citizen NPC with her model on top.",
+    "Cervello di moscerino": "Fruit-fly brain", "Riflessi e istinto da un vero cervello di moscerino": "Reflexes and instinct from a real fruit-fly brain",
+    "Un pezzo del cervello reale di Drosophila, mappato neurone per neurone dal progetto FlyWire, simulato sul PC in tempo reale. Sente dolore, oggetti che le arrivano addosso, il dolce e il tocco, e reagisce prima ancora di pensare: scappa, indietreggia, si spolvera, mangia le angurie. Non consuma token.":
+      "A piece of the real Drosophila brain, mapped neuron by neuron by the FlyWire project, simulated on your PC in real time. It feels pain, objects flying at her, sweetness and touch, and reacts before she even thinks: she flees, backs off, brushes herself off, eats watermelons. It uses no tokens.",
+    "Il corpo reagisce da solo": "Her body reacts on its own", "Alter Ego sente lo stress dei riflessi (pochi token in più)": "Alter Ego feels the stress of her reflexes (a few extra tokens)",
+    "Mostra l'attività dei neuroni sopra la sua testa": "Show neuron activity above her head", "Sensi in più:": "Extra senses:",
+    "Olfatto: cibo, fumo, esplosioni": "Smell: food, smoke, explosions", "Temperatura e acqua: fuoco, freddo, bagnato": "Temperature and water: fire, cold, wet",
+    "Udito: spari e rumori forti": "Hearing: gunshots and loud noises", "Luce: torcia puntata in faccia": "Light: flashlight in her face",
+    "Vento: quando la lanci o vola": "Wind: when you throw her or she flies",
+    "{n} neuroni e {s} sinapsi reali (connettoma FlyWire, CC-BY 4.0). Sempre attivi: dolore, oggetti in arrivo, dolce, tocco.":
+      "{n} real neurons and {s} synapses (FlyWire connectome, CC-BY 4.0). Always on: pain, incoming objects, sweetness, touch.",
+    "Adesso: {a} spike/s · stress {st}": "Now: {a} spikes/s · stress {st}",
+    "fuga": "escape", "indietreggia": "backs off", "si spolvera": "brushes off", "mangia": "eats", "beve": "drinks", "ascolta": "listens",
+    "abbagliata": "dazzled", "vento": "wind", "gira a sinistra": "turns left", "gira a destra": "turns right",
     "Installato ✓": "Installed ✓", "Non installato.": "Not installed.", "Addon installato in {d}: carica (o ricarica) una mappa": "Addon installed in {d}: load (or reload) a map",
   };
 

@@ -6,3 +6,5 @@ assets/sfx/dr_*
 .env
 dist/
 graphify-out/
+tools/flybrain/data/
+__pycache__/

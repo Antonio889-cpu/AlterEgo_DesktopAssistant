@@ -87,7 +87,13 @@ function E:IsVehicle() return self.class:find("^prop_vehicle") ~= nil end
 function E:IsWeapon() return self.class:find("^weapon_") ~= nil end
 function E:GetMoveType() return self.class == "prop_physics" and MOVETYPE_VPHYSICS or 0 end
 function E:BoundingRadius() return 20 end
-function E:GetVelocity() return Vector() end
+function E:GetVelocity() return self.vel or Vector() end
+function E:GetRight() local r = math.rad(self.ang.y) return Vector(math.sin(r), -math.cos(r), 0) end
+function E:WaterLevel() return self.water or 0 end
+function E:IsOnFire() return self.fire == true end
+function E:GetMaxHealth() return 100 end
+function E:FlashlightIsOn() return self.flashlight == true end
+function E:GetAimVector() return self.aim or self.ang:Forward() end
 function E:SetNWString(k, v) self.nw[k] = v end
 function E:GetNWString(k, d) return self.nw[k] or d end
 E.SetNWBool, E.SetNWFloat, E.SetNWEntity = E.SetNWString, E.SetNWString, E.SetNWString
@@ -125,7 +131,20 @@ ents = {
   FindByClass = function(c) local o = {} for _, e in pairs(MOCK.ents) do if e.class == c then o[#o + 1] = e end end return o end,
 }
 player = { GetAll = function() local o = {} for _, e in pairs(MOCK.ents) do if e.class == "player" and e.alive then o[#o + 1] = e end end table.sort(o, function(a, b) return a.id < b.id end) return o end }
-hook = { Add = function(ev, id, f) MOCK.hooks[ev] = f end }
+-- più hook per evento (id diversi), come in GMod: vince il primo valore restituito
+MOCK.hookids = {}
+hook = { Add = function(ev, id, f)
+  MOCK.hookids[ev] = MOCK.hookids[ev] or {}
+  MOCK.hookids[ev][id] = f
+  MOCK.hooks[ev] = function(...)
+    local r
+    for _, g in pairs(MOCK.hookids[ev]) do
+      local x = g(...)
+      if r == nil and x ~= nil then r = x end
+    end
+    return r
+  end
+end }
 function MOCK.run(ev, ...) local f = MOCK.hooks[ev] if f then return f(...) end end
 timer = {
   Create = function(id, d, n, f) MOCK.timers[id] = { d = d, n = n, f = f, at = MOCK.now + d } end,

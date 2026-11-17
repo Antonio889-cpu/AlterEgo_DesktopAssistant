@@ -535,6 +535,21 @@ Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Se
 - **Body**: with [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (Workshop addon by StarFrost, not included: subscribe to it on Steam) she is a Lambda Player and moves like a real player (running, jumping, player weapons, a real physgun); its own decisions, chat and voice are switched off, Alter Ego is in charge. Without it she's a citizen NPC. *Automatic* picks Lambda when it's installed; you can choose in the settings or in the C menu.
 - Character model: in the game hold **C** → **Alter Ego** and pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default she's a Half-Life 2 citizen.
 
+### Fruit-fly brain (reflexes)
+
+Her body also runs a **real fruit-fly brain**: part of the *Drosophila melanogaster* connectome mapped neuron by neuron
+by [FlyWire](https://flywire.ai) (~9,500 neurons and ~690,000 synapses, the ones that respond to the senses used in the game),
+simulated on your PC in real time with the leaky integrate-and-fire model of Shiu et al. (Nature 2024). On by default; no tokens.
+
+- **Senses** (always on): pain (hits, fire), *looming* objects (a prop or a car flying at her, left or right), sweetness (a watermelon within reach), touch (physgun, *use*).
+  Extra senses in the settings: smell (food, smoke, explosions), temperature and water, hearing (gunshots, loud noises), light (a flashlight in her face), wind (when you throw her).
+- **Reflexes**: they come from the real descending neurons. Something flying at her fires the **Giant Fiber** and she jumps away
+  (the turning neurons pick the side), the *moonwalker* neurons make her back off, the bristle neurons make her brush herself off,
+  sweetness drives the proboscis motor neurons and she goes and **eats the watermelon** (+15 HP).
+- **Instinct**: pain and escapes build up a "stress" that fades in about 40 s and reaches the AI in one short line,
+  so she can be shaken after you shoot her. You can turn off the reflexes, the stress, or show the neuron activity above her head.
+- How the circuit was extracted: [`tools/flybrain/`](tools/flybrain/).
+
 ## Pet
 
 When nothing is happening, Alter Ego goes out to explore: the TV switches off and she jumps out
@@ -734,6 +749,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **Font** [DotGothic16](https://github.com/fontworks-fonts/DotGothic16): SIL Open Font License 1.1 (`src/assets/fonts/OFL.txt`).
 - Extra-content office backgrounds (`src/assets/extras/`): made by the project author with a Garry's Mod map.
 - **Lambda Players** by StarFrost: optional, not included; Alter Ego Link only uses its public hooks and functions.
+- **FlyWire connectome** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([data](https://zenodo.org/records/10676866), [annotations](https://github.com/flyconnectome/flywire_annotations)). Model parameters from Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` is a subset of the FlyWire data (active neurons only, synapse signs from the predicted neurotransmitters).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): written for this project; some ideas (NPC body, mouth movement, event log) come from [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) by SonnyTaylor (MIT).
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),
