@@ -82,26 +82,50 @@
   }
 
   // ---------- Alter Ego che parla ----------
+  // Non sta sempre sullo schermo: compare quando ha qualcosa da dire (accensione da TV), scrive,
+  // resta il tempo di leggere e si spegne. Tra un intervento e l'altro passa un po' di tempo,
+  // così non commenta ogni clic.
+  const AE_GAP_MS = 45_000;
   let typing = null;
-  function say(text, face) {
+  let hideTimer = null;
+  let lastSaid = 0;
+  const ae = side.querySelector("#w-ae");
+  ae.classList.add("w-gone");
+  function hideAe() {
+    clearTimeout(hideTimer);
+    if (ae.classList.contains("w-gone")) return;
+    ae.classList.remove("w-on");
+    ae.classList.add("w-off");
+    setTimeout(() => { ae.classList.add("w-gone"); ae.classList.remove("w-off"); }, REDUCED.matches ? 0 : 420);
+  }
+  function say(text, face, force) {
+    if (!document.body.classList.contains("wide")) return;
+    const now = Date.now();
+    if (!force && now - lastSaid < AE_GAP_MS) return;
+    lastSaid = now;
     const el = $("w-ae-text");
     const img = $("w-ae-face");
-    if (face && !img.src.endsWith(face + ".png")) {
-      img.classList.remove("w-pop");
-      void img.offsetWidth;
-      img.src = `assets/sprites/${face}.png`;
-      img.classList.add("w-pop");
-    }
+    if (face) img.src = `assets/sprites/${face}.png`;
     const msg = t(text);
     clearInterval(typing);
-    if (REDUCED.matches || !document.body.classList.contains("wide")) { el.textContent = msg; return; }
-    let i = 0;
-    el.textContent = "";
-    typing = setInterval(() => {
-      el.textContent = msg.slice(0, ++i);
-      if (i >= msg.length) clearInterval(typing);
-    }, 26);
+    clearTimeout(hideTimer);
+    ae.classList.remove("w-gone", "w-off");
+    void ae.offsetWidth;
+    ae.classList.add("w-on");
+    const stay = 2500 + msg.length * 70;
+    if (REDUCED.matches) el.textContent = msg;
+    else {
+      let i = 0;
+      el.textContent = "";
+      typing = setInterval(() => {
+        el.textContent = msg.slice(0, ++i);
+        if (i >= msg.length) clearInterval(typing);
+      }, 26);
+    }
+    hideTimer = setTimeout(hideAe, stay + (REDUCED.matches ? 0 : msg.length * 26));
   }
+  // un clic sul fumetto lo congeda subito
+  ae.onclick = hideAe;
 
   // ---------- animazioni ----------
   function sweep() {
@@ -114,6 +138,7 @@
 
   // ---------- schede ----------
   let lastTab = "general";
+  let entering = true; // primo commento appena si apre la dashboard
   const baseShow = window.showTab;
   window.showTab = function (name) {
     if (name === "home" && !document.body.classList.contains("wide")) name = "general";
@@ -125,7 +150,8 @@
     side.querySelectorAll("#w-nav button").forEach((b) => b.classList.toggle("on", b.dataset.group === g.id));
     syncTabs(g);
     if (document.body.classList.contains("wide")) {
-      say(g.say, g.face);
+      say(g.say, g.face, entering);
+      entering = false;
       sweep();
       if (name === "home") refreshHome();
       if (name === "games") applyGame();
@@ -209,6 +235,8 @@
     const wide = WIDE.matches;
     const was = document.body.classList.contains("wide");
     document.body.classList.toggle("wide", wide);
+    if (wide && !was) entering = true;
+    if (!wide) hideAe();
     if (wide && !was && boot !== true && !REDUCED.matches) {
       document.body.classList.remove("w-boot");
       void document.body.offsetWidth;

@@ -61,7 +61,12 @@ body.wide #w-side { display: flex; flex-direction: column; grid-column: 1; grid-
 #w-ae { margin-top: auto; position: relative; display: flex; flex-direction: column; align-items: center; min-height: 0; }
 #w-ae img { width: 100%; max-width: 200px; aspect-ratio: 612 / 483; object-fit: cover; object-position: 50% 20%; filter: drop-shadow(0 0 6px rgba(156,255,58,.35));
   animation: w-bob 3.2s ease-in-out infinite; }
-#w-ae img.w-pop { animation: w-pop .35s ease-out, w-bob 3.2s ease-in-out .35s infinite; }
+#w-ae { cursor: pointer; transform-origin: 50% 60%; }
+#w-ae.w-gone { visibility: hidden; }
+#w-ae.w-on { animation: w-ae-on .45s cubic-bezier(.2,.8,.2,1) both; }
+#w-ae.w-off { animation: w-ae-off .42s ease-in both; }
+@keyframes w-ae-on { 0% { clip-path: inset(49% 0 49% 0); filter: brightness(3); opacity: 1; } 40% { clip-path: inset(49% 0 49% 0); filter: brightness(2); } 100% { clip-path: inset(0); filter: none; } }
+@keyframes w-ae-off { 0% { clip-path: inset(0); } 55% { clip-path: inset(49% 0 49% 0); filter: brightness(2.5); } 100% { clip-path: inset(49% 48% 49% 48%); filter: brightness(3); opacity: 0; } }
 .w-ae-bubble { order: 2; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: #071407;
   font: 13px/1.4 "DotGothic16", monospace; min-height: 4.4em; }
 .w-ae-bubble b { color: var(--accent); font-weight: normal; display: block; }
@@ -140,7 +145,6 @@ body.wide main > section label > input:not([type=checkbox]):not([type=range]) { 
 @keyframes w-pulse { 50% { opacity: .45; box-shadow: 0 0 2px currentColor; } }
 @keyframes w-bob { 50% { transform: translateY(-3px); } }
 @keyframes w-blink { 50% { opacity: 0; } }
-@keyframes w-pop { 0% { transform: scale(.94); filter: brightness(2) drop-shadow(0 0 10px #9cff3a); } 100% { transform: none; } }
 @keyframes w-in { from { opacity: 0; transform: translateY(8px); } }
 /* passaggio di sezione: una riga luminosa scende sullo schermo, il contenuto "si sintonizza" */
 body.wide main.w-sweep::after { content: ""; position: sticky; display: block; grid-column: 1 / -1; top: 0; height: 0; margin-top: -16px;
