@@ -8,6 +8,8 @@
 //! - **Imprevedibilità** (impostazione 0-100): quanto spesso inventa invece di rifare le preferite e
 //!   quanto sceglie a caso tra le abitudini (temperatura della scelta).
 //! - La reazione dei giocatori la giudica Rizzo Flow (se è il router scelto), altrimenti parole chiave.
+//! - **Pratica** nei gesti da giocatrice (prendere al volo, lanciare, saltare, scegliere l'arma, costruire):
+//!   sale un po' a ogni tentativo, di più quando sbaglia (la lezione resta), e nel gioco sbaglia meno.
 //!
 //! Archivio separato: `gmod_persona.json` nella cartella dei dati.
 
@@ -17,6 +19,9 @@ use std::path::{Path, PathBuf};
 
 const FILE: &str = "gmod_persona.json";
 const MAX_HABITS: usize = 40;
+const MAX_SKILLS: usize = 12;
+/// Anche con tanta pratica ogni tanto sbaglia (è una persona).
+const SKILL_CAP: f32 = 0.9;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(default)]
@@ -61,6 +66,8 @@ pub struct Persona {
     pub habits: Vec<Habit>,
     /// Scherzi/attività provate in tutto (per la "maturità").
     pub experiences: u32,
+    /// Pratica 0..0,9 per gesto ("catch", "throw", "jump", "tool", "build").
+    pub skills: std::collections::BTreeMap<String, f32>,
 }
 
 pub fn path(dir: &Path) -> PathBuf {
@@ -225,6 +232,19 @@ impl Persona {
         s
     }
 
+    /// Un tentativo di `what` (riuscito o no). Ritorna la pratica nuova.
+    pub fn practice(&mut self, what: &str, ok: bool) -> f32 {
+        let k: String = what.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').take(16).collect::<String>().to_lowercase();
+        if k.is_empty() || (self.skills.len() >= MAX_SKILLS && !self.skills.contains_key(&k)) {
+            return 0.0;
+        }
+        let s = self.skills.entry(k).or_insert(0.0);
+        // da un errore si impara più che da un successo
+        let rate = if ok { 0.02 } else { 0.05 };
+        *s = (*s + rate * (SKILL_CAP - *s).max(0.0)).min(SKILL_CAP);
+        *s
+    }
+
     /// Le preferite per le impostazioni e il monitor.
     pub fn top(&self, n: usize) -> Vec<Value> {
         let mut v: Vec<&Habit> = self.habits.iter().collect();
@@ -374,5 +394,26 @@ mod tests {
         assert_eq!(g[0]["who"], "{target}");
         assert!(keyword_reaction(&["ahahah troppo bella".into()]) > 0.0);
         assert!(keyword_reaction(&["basta!".into()]) < 0.0);
+    }
+
+    #[test]
+    fn practice_makes_better() {
+        let mut p = Persona::default();
+        let a = p.practice("catch", true);
+        let b = p.practice("catch", false);
+        assert!(a > 0.0 && b - a > a, "si impara di più dagli errori: {a} {b}");
+        for _ in 0..500 {
+            p.practice("catch", false);
+        }
+        assert!(p.skills["catch"] <= SKILL_CAP + 1e-6, "mai perfetta");
+        assert_eq!(p.practice("", true), 0.0);
+        assert!(p.practice("Jump!", true) > 0.0 && p.skills.contains_key("jump"));
+        for i in 0..20 {
+            p.practice(&format!("x{i}"), true);
+        }
+        assert_eq!(p.skills.len(), MAX_SKILLS);
+        // archivio vecchio senza pratica: si legge lo stesso
+        let old: Persona = serde_json::from_str(r#"{"traits":{"curiosity":0.7},"habits":[],"experiences":3}"#).unwrap();
+        assert!(old.skills.is_empty() && old.experiences == 3);
     }
 }

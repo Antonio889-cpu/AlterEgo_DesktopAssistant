@@ -16,6 +16,7 @@ mod mind;
 pub mod persona;
 pub mod prompt;
 pub mod quick;
+pub mod quips;
 
 use crate::{update_config, AppState};
 use serde::{Deserialize, Serialize};
@@ -34,6 +35,7 @@ const ADDON: &[(&str, &str)] = &[
     ("lua/alterego/sandbox.lua", include_str!("../../gmod_addon/lua/alterego/sandbox.lua")),
     ("lua/alterego/body_lambda.lua", include_str!("../../gmod_addon/lua/alterego/body_lambda.lua")),
     ("lua/alterego/fly.lua", include_str!("../../gmod_addon/lua/alterego/fly.lua")),
+    ("lua/alterego/human.lua", include_str!("../../gmod_addon/lua/alterego/human.lua")),
     ("lua/alterego/sit.lua", include_str!("../../gmod_addon/lua/alterego/sit.lua")),
     ("lua/alterego/play.lua", include_str!("../../gmod_addon/lua/alterego/play.lua")),
     ("lua/autorun/server/sv_alterego_link.lua", include_str!("../../gmod_addon/lua/autorun/server/sv_alterego_link.lua")),
@@ -83,6 +85,10 @@ pub struct Player {
     pub d: Option<f64>,
     pub dir: Option<String>,
     pub looking: bool,
+    /// Sta parlando in voce adesso (lei aspetta il suo turno).
+    pub talking: bool,
+    /// false = lei non lo vede né lo sente (sa solo che è in partita).
+    pub seen: Option<bool>,
 }
 
 #[derive(Deserialize, Default, Debug, Clone)]
@@ -153,6 +159,10 @@ pub struct Link {
     busy: tokio::sync::Mutex<()>,
     /// Personalità, scherzi in prova, obiettivo lungo.
     mind: Mutex<mind::Mind>,
+    /// Battute brevi generate dal modello (per l'addon).
+    quips: Mutex<quips::Quips>,
+    /// Client a parte per le battute: non interrompe le risposte in corso.
+    quip_ai: crate::providers::Ai,
 }
 
 #[derive(Default)]
@@ -187,6 +197,8 @@ impl Default for Link {
             ai: crate::providers::Ai::with_kind("gmod"),
             busy: tokio::sync::Mutex::new(()),
             mind: Mutex::new(mind::Mind::default()),
+            quips: Mutex::new(quips::Quips::default()),
+            quip_ai: crate::providers::Ai::with_kind("gmod"),
         }
     }
 }
@@ -310,6 +322,65 @@ fn now_secs() -> u64 {
 
 fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, Inner> {
     app.state::<Link>().inner().inner.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn quips_lock(app: &AppHandle) -> std::sync::MutexGuard<'_, quips::Quips> {
+    app.state::<Link>().inner().quips.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+/// Chiede al modello un pacchetto di battute brevi, se serve (`low`: una categoria sta finendo).
+fn ask_quips(app: &AppHandle, low: bool) {
+    let cfg = cfg_of(app);
+    let key = format!("{}/{}", crate::providers::prompt::reply_lang(&cfg), cfg.personality.pronouns());
+    {
+        let mut q = quips_lock(app);
+        if !q.due(&key, low) {
+            return;
+        }
+        q.busy = true;
+        q.asked = Some(Instant::now());
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut ai = cfg.ai.clone();
+        ai.thinking = "off".into();
+        ai.max_tokens = 900;
+        let system = quips::system(crate::providers::prompt::pronoun_rule(&cfg), crate::providers::prompt::language_rule(&cfg));
+        let msgs = vec![crate::providers::ChatMessage::new("user", &quips::user())];
+        let ch = tauri::ipc::Channel::new(|_| Ok(()));
+        let link = app.state::<Link>();
+        let res = crate::providers::chat(&link.quip_ai, ai, system, msgs, None, ch).await;
+        let mut q = quips_lock(&app);
+        q.busy = false;
+        match res.map(|r| quips::parse(&r.text)) {
+            Ok(Some(b)) => {
+                let n: usize = b.values().map(Vec::len).sum();
+                q.store(&key, b);
+                drop(q);
+                lock(&app).dirty = true;
+                crate::applog::info("gmodlink", &format!("battute nuove: {n} righe"));
+            }
+            Ok(None) => crate::applog::warn("gmodlink", "battute: risposta del modello non leggibile (restano quelle di riserva)"),
+            Err(e) => crate::applog::warn("gmodlink", &format!("battute: {e}")),
+        }
+    });
+}
+
+/// Aspetta il suo turno: non parla sopra a chi sta parlando in voce (al massimo ~4 s).
+async fn wait_turn(app: &AppHandle) {
+    let mut waited = false;
+    for _ in 0..28 {
+        let busy = lock(app).state.as_ref().is_some_and(|s| s.players.iter().any(|p| p.talking));
+        if !busy {
+            break;
+        }
+        waited = true;
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    }
+    if waited {
+        // una piccola pausa dopo che l'altro ha finito, come una persona
+        tokio::time::sleep(Duration::from_millis(350)).await;
+    }
 }
 
 /// Alter Ego è nel gioco adesso (stato aggiornato da poco e corpo presente).
@@ -459,7 +530,13 @@ fn installed(dir: &Path) -> bool {
 fn write_cmds(app: &AppHandle, dir: &Path) {
     let full = cfg_of(app);
     let lang = crate::providers::prompt::reply_lang(&full).to_string();
+    let pronouns = full.personality.pronouns();
     let cfg = full.gmodlink;
+    let skills = mind::skills(app);
+    let (quips, quips_v) = {
+        let q = quips_lock(app);
+        (q.lines.clone(), q.v)
+    };
     let body = {
         let i = lock(app);
         json!({
@@ -477,6 +554,10 @@ fn write_cmds(app: &AppHandle, dir: &Path) {
                     "lang": lang,
                     "chaos": cfg.unpredictability as f64 / 100.0,
                     "tough": cfg.toughness,
+                    "pronouns": pronouns,
+                    "skills": skills,
+                    "quips": quips,
+                    "quips_v": quips_v,
                 },
                 "fly": {
                     "on": cfg.fly.enabled,
@@ -615,6 +696,10 @@ pub fn spawn(app: AppHandle) {
             if cfg.goals {
                 mind::goal_tick(&app);
             }
+            // battute fresche all'inizio della partita e ogni tanto (una richiesta piccola)
+            if active(&app) {
+                ask_quips(&app, false);
+            }
         }
     });
 }
@@ -691,6 +776,24 @@ fn on_event(app: &AppHandle, e: Value) {
             speak(app, emo, &s("text"));
         }
         "prank" => remember(app, &format!("[you pranked {} ({})]", s("who"), s("kind")), ""),
+        // le battute generate stanno finendo
+        "quips_low" => ask_quips(app, true),
+        // un gesto riuscito o sbagliato: pratica (sbaglia meno col tempo) e, se sbaglia, se lo ricorda
+        "try" => {
+            let ok = e["ok"].as_bool().unwrap_or(true);
+            mind::practice(app, &s("what"), ok);
+            if !ok {
+                let what = match s("what").as_str() {
+                    "catch" => "you tried to catch something and fumbled it",
+                    "throw" => "you meant to throw something but it slipped",
+                    "jump" => "you botched a jump",
+                    "tool" => "you pulled out the wrong weapon",
+                    "build" => "your tower came out crooked and fell",
+                    _ => "you messed something up",
+                };
+                remember(app, &format!("[{what}; you laughed it off]"), "");
+            }
+        }
         // qualcuno le ha lanciato qualcosa: lo sa e se lo ricorda (niente modello: la battuta l'ha già fatta il gioco)
         "thrown" => {
             let by = s("by");
@@ -698,6 +801,7 @@ fn on_event(app: &AppHandle, e: Value) {
                 "caught" => "you caught it with the physgun",
                 "returned" => "you caught it and threw it back",
                 "jumped" => "you jumped out of the way",
+                "fumbled" => "you tried to catch it but fumbled",
                 "fled" => "you ran from it",
                 "hit" => "it hit you",
                 "ignored" => "you didn't even flinch",
@@ -920,7 +1024,13 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
     ai.thinking = "off".into();
     ai.max_tokens = 700;
     let fly_mood = cfg.gmodlink.fly.enabled && cfg.gmodlink.fly.mood;
-    let system = prompt::system(crate::providers::prompt::language_rule(&cfg), cfg.user_name.trim(), cfg.gmodlink.tasks, fly_mood);
+    let system = prompt::system(
+        crate::providers::prompt::language_rule(&cfg),
+        crate::providers::prompt::pronoun_rule(&cfg),
+        cfg.user_name.trim(),
+        cfg.gmodlink.tasks,
+        fly_mood,
+    );
     let ch = tauri::ipc::Channel::new(|_| Ok(()));
     let res = crate::providers::chat(&link.ai, ai, system, merged, None, ch).await?;
     let r = prompt::parse(&res.text);
@@ -932,6 +1042,7 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
     mind::goal_line(app, r.goal.as_deref(), &ops);
     send(app, ops.clone());
     if !r.text.is_empty() {
+        wait_turn(app).await;
         send(app, vec![json!({ "op": "say", "text": r.text })]);
     }
     // in memoria solo il testo e i nomi dei task (il codice no: costa token)
