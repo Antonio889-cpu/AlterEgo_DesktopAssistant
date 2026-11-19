@@ -9,7 +9,7 @@
   let saveTimer = null;
 
   const CHECKS = { "mc-follow": "follow", "mc-gather": "gather", "mc-build": "build", "mc-explore": "explore", "mc-fly": "fly", "mc-learn": "learn", "mc-csl": "csl", "mc-slim": "slim" };
-  const TEXTS = { "mc-host": "host", "mc-username": "username", "mc-player": "player", "mc-version": "version", "mc-skin-cmd": "skin_cmd" };
+  const TEXTS = { "mc-host": "host", "mc-username": "username", "mc-player": "player", "mc-version": "version", "mc-skin-cmd": "skin_cmd", "mc-version-mode": "version_mode" };
 
   function fill(m) {
     if (!m) return;
@@ -106,6 +106,7 @@
     full: "Il server è pieno.",
     refused: "Nessun mondo a questo indirizzo: apri il mondo in LAN oppure controlla indirizzo e porta.",
     no_lan: "Nessun mondo in LAN trovato: in Minecraft premi Esc → Apri in LAN, oppure scrivi la porta.",
+    bridge: "Ponte ViaProxy: {reason}",
     other: "Disconnessione dal server: {reason}",
   };
   async function status() {

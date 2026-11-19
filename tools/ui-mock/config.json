@@ -366,6 +366,8 @@
     "skin_cmd": "",
     "slim": false,
     "csl": true,
-    "node": ""
+    "node": "",
+    "version_mode": "auto",
+    "servers": []
   }
 }

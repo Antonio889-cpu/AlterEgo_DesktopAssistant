@@ -412,7 +412,7 @@
         <div class="mc-body">
           <div class="status-line"><i class="dot" id="mc-dot"></i> <b id="mc-state">Non collegato</b> <span id="mc-where">· Java Edition, mondo aperto in LAN</span></div>
           <p id="mc-kick" class="note sub mc-kick" hidden></p>
-          <div class="actions"><button class="main" id="mc-join">▶ Entra nel mondo</button><button id="mc-leave">■ Scollega</button></div>
+          <div class="actions"><button class="main" id="mc-join">▶ Entra nel mondo</button><button id="mc-leave">■ Scollega</button><button id="mc-console-open" title="Log in diretta, chat e comandi">Console</button></div>
           <label>Iniziativa <input type="range" id="mc-initiative" min="0" max="100" step="5" /> <span id="mc-initiative-val"></span> <span class="note">più iniziativa, più sorprese</span></label>
           <div class="checks">
             <label class="inline"><input type="checkbox" id="mc-follow" /> Seguimi</label>
@@ -435,6 +435,7 @@
         <label>Nome dell'account (offline) <input id="mc-username" maxlength="16" placeholder="AlterEgo" /></label>
         <label>Il tuo nome in Minecraft <input id="mc-player" maxlength="16" placeholder="il giocatore più vicino" /></label>
         <label>Versione <input id="mc-version" maxlength="12" placeholder="automatica" /></label>
+        <label>Versione del gioco <select id="mc-version-mode"><option value="auto">Automatica (ponte se serve)</option><option value="native">Nativa (solo Mineflayer)</option><option value="via">Via ponte (ViaProxy)</option></select></label>
       </div>
       <label class="inline"><input type="checkbox" id="mc-fly" /> Riflessi ed emozioni dal cervello di moscerino (zero token)</label>
       <label class="inline"><input type="checkbox" id="mc-learn" /> Impara giocando: le sequenze riuscite diventano abilità, gli errori lezioni</label>
@@ -443,6 +444,39 @@
       <p class="note sub">Serve Node.js (quello del sistema se c'è, altrimenti una versione portatile da nodejs.org) e Mineflayer con i suoi plugin (licenza MIT, circa 650 MB).</p>
       <div class="actions"><button id="mc-install">Installa / aggiorna</button> <span id="mc-node" class="result"></span></div>
       <p id="mc-progress" class="result"></p>
+      <h3>Ogni versione: ponte ViaProxy</h3>
+      <p class="note sub">Mineflayer arriva fino a Minecraft 26.1. Se il server ha una versione che non conosce, Alter Ego avvia in locale ViaProxy (ViaVersion, ViaBackwards, ViaRewind: open source, GPL-3.0) e entra attraverso il ponte. Serve Java 17 o più recente: se manca, scarico Java portatile (Eclipse Temurin).</p>
+      <div class="actions"><button id="mc-via-install">Installa il ponte</button> <span id="mc-via-state" class="result"></span></div>
+      <p id="mc-via-progress" class="result"></p>
+      <h3>Server: accesso e spostamenti</h3>
+      <p class="note sub">Per il server indicato sopra: <b id="mc-srv-addr" data-no-i18n>…</b>. La password resta nel portachiavi del sistema e va solo nei comandi che iniziano con «/», mai in chat.</p>
+      <label class="inline"><input type="checkbox" id="mc-srv-auth" /> Registrazione e login automatici (AuthMe e simili)</label>
+      <div class="mc-row">
+        <label>Comando di registrazione <input id="mc-srv-register" maxlength="120" placeholder="/register {password} {password}" /></label>
+        <label>Comando di login <input id="mc-srv-login" maxlength="120" placeholder="/login {password}" /></label>
+      </div>
+      <div class="mc-row">
+        <label>Password dell'account <input id="mc-srv-pass" type="password" autocomplete="new-password" maxlength="64" placeholder="vuota = generata" /></label>
+      </div>
+      <div class="actions"><button id="mc-srv-pass-save">Salva password</button><button id="mc-srv-pass-gen">Genera</button><button id="mc-srv-pass-clear">Dimentica</button> <span id="mc-srv-pass-msg" class="result"></span></div>
+      <label class="inline"><input type="checkbox" id="mc-srv-registered" /> Account già registrato su questo server (solo login)</label>
+      <label class="inline"><input type="checkbox" id="mc-srv-follow" /> Seguimi tra lobby, warp, mondi e sottoserver</label>
+      <label class="inline"><input type="checkbox" id="mc-srv-invites" /> Accetta i miei inviti (party, /tpa)</label>
+      <div class="mc-row">
+        <label>Accetta il party <input id="mc-srv-party" maxlength="120" placeholder="/party accept {player}" /></label>
+        <label>Accetta il teletrasporto <input id="mc-srv-tpa" maxlength="120" placeholder="/tpaccept" /></label>
+        <label>Teletrasporto da te <input id="mc-srv-tpato" maxlength="120" placeholder="/tpa {player}" /></label>
+      </div>
+      <div class="mc-row">
+        <label>Cambia server <input id="mc-srv-server" maxlength="120" placeholder="/server {name}" /></label>
+        <label>Warp <input id="mc-srv-warp" maxlength="120" placeholder="/warp {name}" /></label>
+        <label>Lobby <input id="mc-srv-hub" maxlength="120" placeholder="/hub" /></label>
+      </div>
+      <div class="mc-row">
+        <label>Chiedi dove sei <input id="mc-srv-ask" maxlength="120" placeholder="/msg {player} {text}" /></label>
+        <label>Comandi al minuto (massimo) <input id="mc-srv-rate" type="number" min="1" max="30" /></label>
+      </div>
+      <p class="note sub">Segnaposto: {player} = il tuo nome, {name} = server o warp, {text} = la domanda. In chat puoi scrivere «vieni al warp spawn», «entra nel mio party», «vieni nel server survival», «torna alla lobby», «teletrasportati da me». Se non ti trova più, te lo chiede.</p>
       <h3>Skin</h3>
       <p class="note sub">Con un account offline la skin la vede solo chi ha uno di questi due:</p>
       <label class="inline"><input type="checkbox" id="mc-csl" /> CustomSkinLoader (mod sul tuo Minecraft): copia la skin quando entra nel mondo</label>
@@ -848,5 +882,6 @@
   <script src="wide.js"></script>
   <script src="vrchat.js"></script>
   <script src="minecraft.js"></script>
+  <script src="mc-net.js"></script>
 </body>
 </html>

@@ -20,6 +20,7 @@ pub const BOT: &[(&str, &str)] = &[
     ("package-lock.json", include_str!("../../mc_bot/package-lock.json")),
     ("bot.js", include_str!("../../mc_bot/bot.js")),
     ("lib.js", include_str!("../../mc_bot/lib.js")),
+    ("conn.js", include_str!("../../mc_bot/conn.js")),
 ];
 
 /// Ramo LTS di Node scaricato se manca (Jod, supporto fino ad aprile 2027).

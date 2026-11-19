@@ -1,0 +1,83 @@
+/* Console Minecraft (mc-console.html): stessa lingua visiva della Libreria LLM e della dashboard larga
+   (models.css, wide.css): terminale CRT verde, DotGothic16, bagliore, scanline. */
+@font-face { font-family: "DotGothic16"; src: url("assets/fonts/DotGothic16-Regular.ttf"); }
+:root {
+  --bg: #0b1f0c; --panel: #12301a; --deep: #071407; --field: #061206; --line: #2f6b2a; --line2: #1d3d1f;
+  --text: #e4ffd4; --muted: #9cc78f; --accent: #9cff3a; --warn: #ffd36b; --bad: #ff8a7a; --sky: #8fd8ff; --pink: #ffb3e6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { overflow: hidden; color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+  background: radial-gradient(ellipse at 60% 0%, #10301a 0%, var(--bg) 60%); }
+body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
+button, input { font: inherit; color: var(--text); }
+button { background: #1d4a1f; border: 1px solid var(--line); border-radius: 0; padding: 5px 11px; cursor: pointer; white-space: nowrap; }
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+button.main { background: var(--accent); color: #062006; border-color: var(--accent); font-weight: 700; }
+button.main:hover { box-shadow: 0 0 12px rgba(156,255,58,.45); }
+input { background: var(--field); border: 1px solid var(--line); border-radius: 0; padding: 5px 8px; min-width: 0; max-width: 100%; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+label.inline { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--muted); }
+
+#app { height: 100%; display: flex; flex-direction: column; min-width: 0; position: relative; }
+
+header { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 18px; min-width: 0;
+  border-bottom: 2px solid var(--line); background: var(--deep); box-shadow: 0 0 18px rgba(156,255,58,.12); }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.brand-t { min-width: 0; }
+/* blocco d'erba in CSS, come nella sezione Minecraft delle impostazioni */
+.logo { flex: none; width: 28px; height: 28px; background: linear-gradient(#5fbf3a 0 35%, #3f8a26 35% 45%, #6b4a2b 45% 70%, #57391f 70%);
+  box-shadow: inset -4px -4px 0 rgba(0,0,0,.25), 0 0 10px rgba(156,255,58,.35); }
+h1 { margin: 0; font: 22px "DotGothic16", monospace; color: var(--accent); letter-spacing: .08em; text-shadow: 0 0 8px rgba(156,255,58,.6);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { margin: 0; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { flex: none; display: flex; align-items: center; gap: 8px; padding: 5px 12px; background: var(--deep); border: 1px solid var(--line);
+  font: 13px "DotGothic16", monospace; max-width: 45%; }
+.pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.pill.ok .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 2.4s ease-in-out infinite; }
+.pill.wait .dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+@keyframes pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .pill.ok .dot { animation: none; } }
+
+.toolbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 18px; border-bottom: 1px solid var(--line2);
+  background: rgba(3,12,4,.55); min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.chips button { padding: 3px 9px; font: 12px "DotGothic16", monospace; background: var(--deep); color: var(--muted); }
+.chips button.on { color: #062006; background: var(--accent); border-color: var(--accent); }
+#q { flex: 1 1 180px; }
+
+.log { flex: 1; min-height: 0; overflow: auto; padding: 8px 18px 10px; background: rgba(2,8,3,.6);
+  font: 13px/1.5 Consolas, "DejaVu Sans Mono", monospace; }
+.log .ln { display: grid; grid-template-columns: 62px 64px minmax(0, 1fr); gap: 10px; padding: 1px 0; border-bottom: 1px dotted rgba(47,107,42,.25); }
+.log .ln time { color: #5d7a4c; }
+.log .ln b { font: 11px/1.9 "DotGothic16", monospace; font-weight: 400; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.log .ln span { overflow-wrap: anywhere; white-space: pre-wrap; }
+.log .chat span { color: var(--text); }
+.log .chat b { color: var(--accent); }
+.log .sys span { color: #c8e6b8; }
+.log .event b, .log .event span { color: var(--sky); }
+.log .cmd b, .log .cmd span { color: var(--pink); }
+.log .auth b, .log .auth span { color: var(--warn); }
+.log .via b { color: #c9a7ff; }
+.log .via span { color: #d9c8ff; }
+.log .error b, .log .error span { color: var(--bad); }
+.log mark { background: rgba(156,255,58,.35); color: inherit; }
+.empty { position: absolute; left: 0; right: 0; top: 45%; text-align: center; color: var(--muted); font: 15px "DotGothic16", monospace; padding: 0 20px; pointer-events: none; }
+.empty[hidden] { display: none; }
+
+.input { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 18px; border-top: 2px solid var(--line); background: var(--deep); min-width: 0; }
+.prompt { color: var(--accent); font: 18px "DotGothic16", monospace; text-shadow: 0 0 6px rgba(156,255,58,.6); }
+#line { flex: 1; font-family: Consolas, "DejaVu Sans Mono", monospace; }
+.status { flex: none; margin: 0; padding: 0 18px 6px; min-height: 1.3em; color: var(--muted); font-size: 12px; background: var(--deep); overflow-wrap: anywhere; }
+.status.bad { color: var(--bad); }
+
+@media (max-width: 700px) {
+  header, .toolbar, .log, .input { padding-left: 10px; padding-right: 10px; }
+  .log .ln { grid-template-columns: 52px minmax(0, 1fr); }
+  .log .ln b { display: none; }
+  .pill { max-width: 40%; }
+}

@@ -613,6 +613,21 @@ Alter Ego joins your **Minecraft Java Edition** world and plays with you. *Setti
   [CustomSkinLoader](https://github.com/xfl03/MCCustomSkinLoader) (client mod: the app copies the skin to `.minecraft/CustomSkinLoader/LocalSkin/skins/`)
   or the [SkinsRestorer](https://skinsrestorer.net) server plugin (upload the PNG at skinsrestorer.net/upload and paste the `/skin url` command:
   he/she types it after joining).
+- **Every game version**: Mineflayer speaks 1.8.8 to 26.1. Before joining, the app asks the server its version (status ping); if Mineflayer
+  doesn't know it, the app starts [ViaProxy](https://github.com/ViaVersion/ViaProxy) (ViaVersion, ViaBackwards, ViaRewind; GPL-3.0, downloaded
+  on request, not bundled) on a free local port and he/she joins through the bridge with the newest version Mineflayer knows. ViaProxy needs
+  Java 17+: the system one if it's new enough, otherwise a portable Eclipse Temurin JRE from Adoptium (SHA-256 checked). The ViaProxy JAR has a
+  pinned version and SHA-256. *Game version*: automatic / native / through the bridge. ViaProxy closes when he/she leaves or the app quits.
+- **Servers with a login** (AuthMe and similar): per server, a register command (default `/register {password} {password}`, used once) and a
+  login command (default `/login {password}`). He/she reads the server messages to tell which one is needed, waits a human moment and retries
+  a few times at most. The password (yours or generated) lives in the system keychain, never in `config.json` or the logs, and only goes into
+  a command starting with `/`, never into public chat.
+- **Lobbies, warps, parties, sub-servers**: he/she follows you when you change world or sub-server (BungeeCord/Velocity): party invites and
+  `/tpa` requests from you are accepted, "come to warp spawn", "join my party", "come to server survival", "back to the lobby" in chat become
+  the server's commands (configurable per server), and when you vanish he/she asks where you went. Automatic commands are rate-limited.
+- **Minecraft console**: a window with the bot's live log (server chat, events, sent commands with passwords masked, the ViaProxy bridge,
+  errors), filters, search and a line to chat or send game commands from his/her account (↑↓ history). Open it from the Minecraft section or
+  the dashboard; the log is also kept in a rotated `console.log` in the app's data folder.
 
 ## VRChat: hang out together
 
@@ -855,6 +870,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **FlyWire connectome** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([data](https://zenodo.org/records/10676866), [annotations](https://github.com/flyconnectome/flywire_annotations)). Model parameters from Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` is a subset of the FlyWire data (active neurons only, synapse signs from the predicted neurotransmitters).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): written for this project; some ideas (NPC body, mouth movement, event log) come from [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) by SonnyTaylor (MIT).
 - **Minecraft bot** (`src-tauri/mc_bot/`): written for this project on top of [Mineflayer](https://github.com/PrismarineJS/mineflayer) and its plugins mineflayer-pathfinder, mineflayer-pvp, mineflayer-collectblock and mineflayer-tool (PrismarineJS and contributors, MIT); some ideas (small composable skills, always-on modes) come from [Mindcraft](https://github.com/mindcraft-bots/mindcraft) (MIT). The "Alter Ego (Chihiro)" skin is original pixel art made with `tools/make_mc_skin.py`. Minecraft is a trademark of Mojang/Microsoft; this project is not affiliated with them.
+- **ViaProxy bridge** (downloaded at runtime, not bundled): [ViaProxy](https://github.com/ViaVersion/ViaProxy) by RK_01 and the ViaVersion team, with [ViaVersion](https://github.com/ViaVersion/ViaVersion), [ViaBackwards](https://github.com/ViaVersion/ViaBackwards), [ViaRewind](https://github.com/ViaVersion/ViaRewind) and ViaLegacy (GPL-3.0). Portable Java: [Eclipse Temurin](https://adoptium.net) (GPL-2.0 with Classpath Exception).
 - **VRChat integration** (`src-tauri/src/vrchat/`): written for this project (own small OSC encoder, no OSC crate). Ideas only — no code — from ProjectGabriel-Remastered (AGPL-3.0). VRChat is a trademark of VRChat Inc.; this project is not affiliated with it. OSC and chatbox addresses from VRChat's public OSC documentation; the web API endpoints from the community [vrchatapi](https://vrchatapi.github.io) documentation.
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),

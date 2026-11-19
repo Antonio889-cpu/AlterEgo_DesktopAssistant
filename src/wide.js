@@ -60,7 +60,7 @@
     <div class="w-row">
       <div class="w-panel w-span7"><h3>Attività recente</h3><ol class="w-feed" id="w-feed"></ol></div>
       <div class="w-panel w-span5"><h3>Modelli locali</h3><ol class="w-models" id="w-models"></ol><button class="w-link" data-go="local">Apri la Libreria LLM →</button></div>
-      <div class="w-panel w-span12"><h3>Integrazioni</h3><div class="w-games" id="w-home-games"></div></div>
+      <div class="w-panel w-span12"><h3>Integrazioni</h3><div class="w-games" id="w-home-games"></div><button class="w-link" id="w-mc-console">Apri la console Minecraft →</button></div>
     </div>`;
   document.querySelector("main").prepend(home);
 
@@ -210,7 +210,8 @@
     // integrazioni
     $("w-home-games").innerHTML = hero.querySelector(".w-games").innerHTML.replace(/ on"/g, '"').replace(/id="[^"]*"/g, "");
     $("w-home-games").querySelectorAll(".w-game").forEach((b) => (b.onclick = () => { game = b.dataset.game; showTab("games"); }));
-    home.querySelectorAll(".w-link").forEach((b) => (b.onclick = () => showTab(GROUPS.find((g) => g.id === b.dataset.go).tabs[0])));
+    home.querySelectorAll(".w-link[data-go]").forEach((b) => (b.onclick = () => showTab(GROUPS.find((g) => g.id === b.dataset.go).tabs[0])));
+    $("w-mc-console").onclick = () => invoke("minecraft_console_open").catch(() => {});
     const box = $("w-cards");
     box.innerHTML = cards.join("");
     box.querySelectorAll(".w-card").forEach((c, i) => {

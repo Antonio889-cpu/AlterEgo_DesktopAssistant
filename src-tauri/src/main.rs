@@ -721,6 +721,16 @@ fn main() {
             mclink::minecraft_skin_csl,
             mclink::minecraft_skin_export,
             mclink::minecraft_forget,
+            mclink::via::minecraft_via_status,
+            mclink::via::minecraft_via_install,
+            mclink::servers::minecraft_server_get,
+            mclink::servers::minecraft_server_set,
+            mclink::servers::minecraft_password_set,
+            mclink::servers::minecraft_password_clear,
+            mclink::console::minecraft_console_list,
+            mclink::console::minecraft_console_send,
+            mclink::console::minecraft_console_clear,
+            mclink::console::minecraft_console_open,
             rizzo::rizzo_set_dir,
             localai::local_catalog_open,
             hermes::hermes_status,
@@ -832,6 +842,8 @@ fn main() {
                 vrchat::shutdown(app);
                 rizzo::stop(app);
                 localai::stop(app);
+                // Minecraft: il ponte ViaProxy non resta acceso
+                mclink::via::shutdown();
             }
         });
 }

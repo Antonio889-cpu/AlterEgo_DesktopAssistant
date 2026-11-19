@@ -51,9 +51,18 @@
     description: "text-generation", capabilities: i % 3 === 1 ? ["vision"] : [], sizes: [["8b", "12b", "3b", "24b", "2b"][i % 5]], downloads: String(120000 - i * 7000), updated: "2026-10-0" + (1 + (i % 9)), source: "huggingface",
   }));
   const community = Array.from({ length: MANY ? 40 : 8 }, (_, i) => ({ name: long(["orcarouter/LFM3-1.7B-abliterated", "huihui_ai/qwen3-abliterated", "sam860/deepseek-r1-uncensored-8b", "mannix/llama3.1-8b-heretic"][i % 4] + (i >= 4 ? "-" + i : "")), description: "", capabilities: [], sizes: [], downloads: String(3400 - i * 300), updated: "November 11, 2026", source: "community" }));
+  // righe finte della Console Minecraft
+  const CON = [["event", "connessione a 127.0.0.1:41779 come AlterEgo"], ["via", "ViaProxy 3.4.14 (Java 21) su 127.0.0.1:41779 → play.example.net:25565"], ["via", "ViaProxy: Binding proxy server to 127.0.0.1:41779"],
+    ["event", "nel mondo: Minecraft 26.1 su play.example.net:25565 (ponte ViaProxy)"], ["sys", "Please, login with the command: /login <password>"], ["auth", "login → /login ••••"], ["sys", "Successful login!"],
+    ["chat", "<Makoto> vieni al warp spawn"], ["cmd", "» Arrivo!"], ["event", "Makoto chiede: Warp(\"spawn\") → /warp spawn"], ["sys", "Teleporting to spawn..."], ["error", "troppi comandi in un minuto: salto /tpaccept (invito da Makoto)"]];
+  let conId = 0;
+  const conLines = Array.from({ length: MANY ? 2000 : CON.length }, (_, i) => { const [kind, text] = CON[i % CON.length]; return { id: ++conId, ts: Date.now() - (2000 - i) * 1000, kind, text: LONG ? text + " " + "lunghissimo-".repeat(20) : text }; });
   const evl = {};
   const fire = (ev, payload) => (evl[ev] || []).forEach((f) => f({ event: ev, payload }));
   // la Libreria mostra la coda con un download già in corso (avviato dalle Impostazioni)
+  if (/mc-console\.html/.test(location.pathname)) {
+    setInterval(() => { const [kind, text] = CON[conId % CON.length]; fire("minecraft-console", { id: ++conId, ts: Date.now(), kind, text: long(text) }); }, 400);
+  }
   if (/models\.html/.test(location.pathname)) {
     let done = 0;
     setInterval(() => { done = Math.min(9.3e9, done + 3.1e8); fire("local-progress", { task: "pull", name: long("qwen3:14b"), status: "pulling a8cc1361f314", completed: 3.9e9 + done * 0.1, total: 9.3e9, done: false }); }, 250);
@@ -72,6 +81,19 @@
     minecraft_skin_set: () => "64x64",
     minecraft_skin_csl: () => long("C:/Users/makoto/AppData/Roaming/.minecraft/CustomSkinLoader/LocalSkin/skins/AlterEgo.png"),
     minecraft_install: () => "v22.23.5",
+    // 1.15: ponte ViaProxy, server (AuthMe, warp, sottoserver) e console
+    minecraft_via_status: () => ({ java: { path: long("C:/Program Files/Eclipse Adoptium/jre-21/bin/java.exe"), major: 21, managed: false }, jar: true, version: "3.4.14", installing: false,
+      active: LONG ? { port: 41779, target: long("play.example.net") + ":25565", client: "26.1" } : null, java_min: 17 }),
+    minecraft_via_install: () => "Pronto: ViaProxy 3.4.14 e Java 21.",
+    minecraft_server_get: () => ({ addr: long("play.example.net") + ":25565", has_password: true, profile: { addr: "play.example.net:25565", auth: true, register_cmd: "/register {password} {password}", login_cmd: "/login {password}", registered: LONG,
+      follow: true, accept_invites: true, party_cmd: "/party accept {player}", tpa_accept_cmd: "/tpaccept", tpa_to_cmd: "/tpa {player}", server_cmd: "/server {name}", warp_cmd: "/warp {name}", hub_cmd: "/hub", ask_cmd: long("/msg {player} {text}"), max_per_min: 6 } }),
+    minecraft_server_set: () => null,
+    minecraft_password_set: () => null,
+    minecraft_password_clear: () => null,
+    minecraft_console_open: () => null,
+    minecraft_console_clear: () => null,
+    minecraft_console_send: ({ text }) => { fire("minecraft-console", { id: ++conId, ts: Date.now(), kind: text.startsWith("/") ? "cmd" : "cmd", text: (text.startsWith("/") ? "" : "» ") + text }); return null; },
+    minecraft_console_list: () => conLines,
     memory_overview: () => ({ messages: MANY ? 98231 : 1240, facts: Array.from({ length: n }, (_, i) => ({ id: i, ts: now - i * 3600, content: long("Ama il caffè e programma in Rust " + i) })), summaries: [], db_path: "C:/Users/makoto/AppData/Roaming/AlterEgo/memory.db" }),
     costs_list: () => Array.from({ length: MANY ? 5000 : 40 }, (_, i) => ({ ts: now - i * 900, kind: "chat", provider: "deepseek", model: "deepseek-chat", input: 1800 + i, cached: 12000, output: 120, ms: 900, cost: 0.0004 })),
     ai_usage: () => ({ deepseek: { requests: 42, input: 51234, cached: 40100 } }),

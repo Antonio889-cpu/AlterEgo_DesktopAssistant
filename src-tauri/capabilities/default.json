@@ -11,7 +11,8 @@
     "sqlview",
     "models",
     "pet",
-    "flymonitor"
+    "flymonitor",
+    "mc-console"
   ],
   "permissions": [
     "core:default",

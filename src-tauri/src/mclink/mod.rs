@@ -11,14 +11,18 @@
 //! di importante, con un prompt corto e fisso (in cache) e lo stato in una riga. Quello che funziona diventa
 //! un'abilità da rifare senza token, quello che non funziona una lezione (skills.rs).
 
+pub mod auth;
+pub mod console;
 pub mod node;
 pub mod prompt;
 pub mod proto;
 pub mod quick;
 pub mod quips;
 pub mod reflex;
+pub mod servers;
 pub mod skills;
 pub mod skin;
+pub mod via;
 
 use crate::gmodlink::fly;
 use crate::{update_config, AppState};
@@ -176,6 +180,7 @@ fn running(app: &AppHandle) -> bool {
 /// Manda comandi al bot (numerati). Restituisce i numeri usati.
 pub fn send(app: &AppHandle, ops: Vec<Value>) -> Vec<u64> {
     let mut ids = Vec::new();
+    let mut sent = Vec::new();
     let mut i = lock(app);
     for op in ops {
         i.next_id += 1;
@@ -184,7 +189,13 @@ pub fn send(app: &AppHandle, ops: Vec<Value>) -> Vec<u64> {
         let ok = i.stdin.as_mut().is_some_and(|s| s.write_all(line.as_bytes()).and_then(|_| s.flush()).is_ok());
         if ok {
             ids.push(id);
+            sent.push(op);
         }
+    }
+    drop(i);
+    // nella console Minecraft (password coperte)
+    for op in &sent {
+        console::on_send(app, op);
     }
     ids
 }
@@ -269,6 +280,8 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
                 let _ = c.wait();
             }
             drop(i);
+            // il ponte serviva solo a questo bot
+            via::stop_proxy(&a);
             if was {
                 crate::applog::info("minecraft", "bot uscito dal mondo");
             }
@@ -276,9 +289,10 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
         }
     });
     let skin_cmd = skin::skin_cmd(&cfg.skin_cmd, cfg.slim).unwrap_or_default();
-    send(
+    // nativo o ponte ViaProxy (ping di stato), poi "connect" (via.rs)
+    via::launch(
         app,
-        vec![json!({
+        json!({
             "op": "connect",
             "host": if cfg.host.trim().is_empty() { "127.0.0.1" } else { cfg.host.trim() },
             "port": cfg.port,
@@ -286,7 +300,10 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
             "version": cfg.version.trim(),
             "skin": skin_cmd,
             "cfg": bot_cfg(app),
-        })],
+        }),
+        node.path.clone(),
+        dir.clone(),
+        gen,
     );
     crate::applog::info("minecraft", &format!("entro in {}:{} come {} (node {})", cfg.host, if cfg.port == 0 { "LAN".to_string() } else { cfg.port.to_string() }, cfg.username, node.version));
     let _ = app.emit("minecraft-link", "starting");
@@ -323,6 +340,7 @@ fn on_incoming(app: &AppHandle, m: Incoming) {
     match m {
         Incoming::Ready => {}
         Incoming::State(s) => {
+            servers::on_state(app, &s);
             let mut i = lock(app);
             i.state = Some(*s);
             i.state_at = Some(Instant::now());
@@ -422,6 +440,8 @@ fn addressed(app: &AppHandle, from: &str, whisper: bool, text: &str) -> bool {
 }
 
 fn on_event(app: &AppHandle, e: Value) {
+    // console, login, inviti, spostamenti tra server (servers.rs)
+    let Some(e) = servers::on_event(app, e) else { return };
     let kind = e["kind"].as_str().unwrap_or("").to_string();
     let s = |k: &str| e[k].as_str().unwrap_or("").to_string();
     match kind.as_str() {
@@ -866,7 +886,10 @@ pub async fn minecraft_status(app: AppHandle) -> Status {
 #[tauri::command]
 pub fn minecraft_settings(app: AppHandle, settings: crate::config::MinecraftConfig) {
     update_config(&app, |c| {
+        // i profili dei server si cambiano solo da minecraft_server_set
+        let servers = std::mem::take(&mut c.minecraft.servers);
         c.minecraft = settings;
+        c.minecraft.servers = servers;
         c.minecraft.normalize();
     });
     send(&app, vec![json!({ "op": "config", "cfg": bot_cfg(&app) })]);

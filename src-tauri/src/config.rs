@@ -966,6 +966,10 @@ pub struct MinecraftConfig {
     pub csl: bool,
     /// Node.js scelto a mano (vuoto = di sistema o scaricato dall'app).
     pub node: String,
+    /// Versione del gioco: "auto" (ping, ponte ViaProxy se serve), "native" (solo Mineflayer), "via" (sempre il ponte).
+    pub version_mode: String,
+    /// Impostazioni per server: login (AuthMe), inviti, warp, sottoserver (password nel portachiavi).
+    pub servers: Vec<crate::mclink::servers::ServerProfile>,
 }
 
 impl Default for MinecraftConfig {
@@ -989,6 +993,8 @@ impl Default for MinecraftConfig {
             slim: false,
             csl: true,
             node: String::new(),
+            version_mode: "auto".into(),
+            servers: Vec::new(),
         }
     }
 }
@@ -1046,6 +1052,10 @@ impl MinecraftConfig {
         }
         self.skin_cmd = self.skin_cmd.trim().chars().take(250).collect();
         self.node = self.node.trim().trim_matches('"').to_string();
+        if !["auto", "native", "via"].contains(&self.version_mode.as_str()) {
+            self.version_mode = "auto".into();
+        }
+        crate::mclink::servers::normalize(&mut self.servers);
     }
 }
 

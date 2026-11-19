@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Alter Ego – Console Minecraft</title>
+  <link rel="stylesheet" href="mc-console.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <div class="brand-t">
+          <h1>CONSOLE MINECRAFT</h1>
+          <p class="sub" id="where">Non collegato</p>
+        </div>
+      </div>
+      <span id="pill" class="pill"><i class="dot"></i><span id="pill-text">…</span></span>
+    </header>
+
+    <div class="toolbar">
+      <div class="chips" id="chips" role="group" aria-label="Filtri">
+        <button data-kind="all" class="on">Tutto</button>
+        <button data-kind="chat">Chat</button>
+        <button data-kind="sys">Server</button>
+        <button data-kind="event">Eventi</button>
+        <button data-kind="cmd">Comandi</button>
+        <button data-kind="auth">Login</button>
+        <button data-kind="via">Ponte</button>
+        <button data-kind="error">Errori</button>
+      </div>
+      <input id="q" type="search" placeholder="Cerca nel log…" autocomplete="off" spellcheck="false" aria-label="Cerca" />
+      <label class="inline"><input type="checkbox" id="follow" checked /> Scorri in fondo</label>
+      <button id="clear" title="Svuota la console (il file di log resta)">Svuota</button>
+    </div>
+
+    <main id="log" class="log" aria-live="polite" data-no-i18n></main>
+    <div id="empty" class="empty">Niente ancora: entra in un mondo e qui compare tutto in diretta.</div>
+
+    <form id="input" class="input" autocomplete="off">
+      <span class="prompt" aria-hidden="true">&gt;</span>
+      <input id="line" maxlength="256" spellcheck="false" placeholder="Scrivi in chat, oppure un comando con «/» (↑↓ cronologia)" aria-label="Chat o comando" />
+      <button id="send" class="main" type="submit">Invia</button>
+    </form>
+    <p id="status" class="status" role="status"></p>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="mc-console.js"></script>
+</body>
+</html>

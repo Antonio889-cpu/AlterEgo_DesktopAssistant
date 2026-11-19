@@ -13,6 +13,7 @@
 "use strict";
 
 const L = require("./lib");
+const Conn = require("./conn"); // rete: ping, messaggi del server, comandi "/", sottoserver
 
 // niente console.log su stdout (alcune librerie scrivono lì): tutto su stderr
 const log = (...a) => process.stderr.write(a.map(String).join(" ") + "\n");
@@ -47,6 +48,11 @@ function scanLan(ms) {
 
 if (process.argv.includes("--scan-lan")) {
   scanLan(3500).then((list) => { out({ t: "lan", worlds: list }); process.exit(0); });
+  return;
+}
+// solo versione del server (node bot.js --ping host porta): nativo o ponte ViaProxy?
+if (process.argv.includes("--ping")) {
+  Conn.pingMain(process.argv, scanLan, out).catch((e) => { out({ t: "ping", ok: false, err: String(e && e.message || e) }); process.exit(0); });
   return;
 }
 
@@ -500,6 +506,7 @@ const NOW = new Set(["stop", "stay", "reflex", "config", "quips", "quip", "look"
 function handle(cmd) {
   lastAct = Date.now();
   if (cmd.op === "connect") return connect(cmd);
+  if (Conn.OPS.has(cmd.op)) return Conn.handle(cmd, bot, ack);
   if (!bot || !bot.entity) {
     if (cmd.op === "config") { Object.assign(cfg, cmd.cfg || {}); return ack(cmd, true); }
     return ack(cmd, false, "not connected");
@@ -589,6 +596,7 @@ async function connect(o) {
   bot.loadPlugin(toolPlugin);
   bot.loadPlugin(pvp);
   bot.loadPlugin(collectBlock);
+  Conn.attach(bot, { ev, log });
   let joined = false;
   bot.once("spawn", () => {
     joined = true;
