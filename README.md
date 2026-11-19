@@ -573,6 +573,43 @@ simulated on your PC in real time with the leaky integrate-and-fire model of Shi
   Open it from the settings, from the in-game menu (C → Alter Ego → FruitFly Monitor) or automatically when he/she joins.
 - How the circuit was extracted: [`tools/flybrain/`](tools/flybrain/).
 
+## VRChat: hang out together
+
+> **Risk notice.** VRChat's [Terms of Service](https://hello.vrchat.com/legal) (13.2) forbid using the service "inconsistent with individual
+> human usage" or through automated means, and the [Community Guidelines](https://hello.vrchat.com/community-guidelines) forbid bots that
+> abuse the platform and services that ask for your credentials. Alter Ego in VRChat is an automated player: the account can be suspended or
+> banned. Use a **dedicated account** (never your main one), in desktop mode, only where people are fine with it. The settings show this
+> notice once and *Join* stays off until you accept it.
+
+Alter Ego plays VRChat on the same PC as an autonomous player: a second VRChat client in **desktop mode** logged into his/her own account,
+driven through **OSC** (UDP `127.0.0.1:9000` to VRChat, `9001` from VRChat; ports configurable). Turn on OSC in VRChat
+(action menu → Options → OSC → Enabled). Settings → Integrations → VRChat.
+
+- **Body**: movement through `/input/*` (walk, turn, jump). Every input has a deadline and a **watchdog** zeroes all of them at the end of
+  each step, on *Disconnect*, on errors, if the thread crashes and when the app quits (VRChat warns that a stuck `MoveForward` walks forever).
+- **Senses without sight**: OSC gives no positions, so he/she feels the world through the avatar's **contacts and PhysBones** parameters
+  (headpats, boops, proximity left/right, slaps, a tail being pulled). They feed the **fruit-fly brain** (reflexes such as stepping back or a quick
+  head turn, plus adrenaline/mood): zero tokens. The mapping is automatic from common parameter names or you set it yourself.
+- **Hearing**: he/she listens to the audio VRChat plays (WASAPI loopback of the output device on Windows; on Linux the PulseAudio/PipeWire
+  "Monitor" source if available), cuts phrases with voice-activity detection and transcribes them with your speech-to-text service.
+  VRChat audio is spatial, so the volume says how close someone is and the left/right balance which side they are: without sight he/she
+  **follows by ear** (turns toward the voice, walks until it's close). His/her own voice is skipped while it plays.
+- **Sight (optional)**: *Off* / *Local* (an Ollama vision model such as `qwen2.5vl:3b` or `gemma3:4b` only describes a small screenshot of the
+  VRChat window in a few words) / *Cloud* (the screenshot goes to your default provider, if vision is on). Only the text description reaches the
+  model that decides, one look every N seconds (and right after a "follow"/"come"/"look" request).
+- **Voice**: through [Mic-Link](#mic-link): pick *AlterEgo Link Audio* as the microphone in VRChat. Text also goes to the **chatbox**
+  (`/chatbox/input`, 144 characters, long replies split into pages, typing indicator while thinking). He/she waits for his/her turn and
+  doesn't talk over people (VAD on the captured audio). Optional push-to-talk mode holds `/input/Voice` while speaking.
+- **Brain**: quick commands by keywords with zero tokens ("follow me", "come here", "stay", "wave", "dance", "jump", "look around", "leave"),
+  the default AI provider only when someone talks to him/her or something relevant happens, with a short cached system prompt and a one-line state.
+  Short reaction lines (headpat, boop…) are generated once by the model in the right language and pronouns, with neutral built-in fallbacks.
+- **Gestures and expressions**: emotes through an avatar parameter (default `VRCEmote`: wave=1, clap=2, point=3, cheer=4, dance=5…) and,
+  if your avatar has one, an expression parameter mapped from his/her emotion.
+- **Avatars without login**: the list comes from VRChat's local OSC config files
+  (`%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\OSC\usr_*\Avatars\avtr_*.json`) with each avatar's parameters (handy to map contacts and gestures).
+  **Optional login** (off by default, at your own risk) is used only to switch avatar from the app (VRChat's unofficial web API, 2FA by app or
+  email). The password is never saved; the session cookie stays in the system keyring (Credential Manager on Windows).
+
 ## Pet
 
 When nothing is happening, Alter Ego goes out to explore: the TV switches off and he/she jumps out
@@ -774,6 +811,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **Lambda Players** by StarFrost: optional, not included; Alter Ego Link only uses its public hooks and functions.
 - **FlyWire connectome** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([data](https://zenodo.org/records/10676866), [annotations](https://github.com/flyconnectome/flywire_annotations)). Model parameters from Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` is a subset of the FlyWire data (active neurons only, synapse signs from the predicted neurotransmitters).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): written for this project; some ideas (NPC body, mouth movement, event log) come from [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) by SonnyTaylor (MIT).
+- **VRChat integration** (`src-tauri/src/vrchat/`): written for this project (own small OSC encoder, no OSC crate). Ideas only — no code — from ProjectGabriel-Remastered (AGPL-3.0). VRChat is a trademark of VRChat Inc.; this project is not affiliated with it. OSC and chatbox addresses from VRChat's public OSC documentation; the web API endpoints from the community [vrchatapi](https://vrchatapi.github.io) documentation.
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),
   adapted for the app (background removed, green CRT tint). Thank you, Ayari! 💚

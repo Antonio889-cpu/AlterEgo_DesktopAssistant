@@ -289,6 +289,55 @@ pub fn small_base64(max: u32) -> Result<String, String> {
     b64(nw, nh, &resample(w, h, &rgba, nw.max(1), nh.max(1)))
 }
 
+/// Ritaglia `(x, y, w, h)` dall'immagine (limitato ai bordi). None se fuori o vuoto.
+pub fn crop(w: u32, h: u32, rgba: &[u8], area: (i32, i32, i32, i32)) -> Option<(u32, u32, Vec<u8>)> {
+    let x0 = area.0.clamp(0, w as i32) as u32;
+    let y0 = area.1.clamp(0, h as i32) as u32;
+    let x1 = (area.0 + area.2).clamp(0, w as i32) as u32;
+    let y1 = (area.1 + area.3).clamp(0, h as i32) as u32;
+    if x1 <= x0 + 8 || y1 <= y0 + 8 {
+        return None;
+    }
+    let mut out = Vec::with_capacity(((x1 - x0) * (y1 - y0) * 4) as usize);
+    for y in y0..y1 {
+        let i = ((y * w + x0) * 4) as usize;
+        out.extend_from_slice(&rgba[i..i + ((x1 - x0) * 4) as usize]);
+    }
+    Some((x1 - x0, y1 - y0, out))
+}
+
+/// Zona della finestra con questo titolo sullo schermo principale (Windows; None se non c'è o è ridotta a icona).
+#[cfg(windows)]
+fn window_area(title: &str) -> Option<(i32, i32, i32, i32)> {
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowW, GetWindowRect, IsIconic};
+    let wide: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+    unsafe {
+        let hwnd = FindWindowW(std::ptr::null(), wide.as_ptr());
+        if hwnd.is_null() || IsIconic(hwnd) != 0 {
+            return None;
+        }
+        let mut r = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        if GetWindowRect(hwnd, &mut r) == 0 {
+            return None;
+        }
+        Some((r.left, r.top, r.right - r.left, r.bottom - r.top))
+    }
+}
+
+#[cfg(not(windows))]
+fn window_area(_title: &str) -> Option<(i32, i32, i32, i32)> {
+    None
+}
+
+/// Screenshot piccolo della finestra `title` (tutto lo schermo se non si trova), lato lungo `max` px.
+pub fn window_base64(title: &str, max: u32) -> Result<String, String> {
+    let (w, h, rgba) = capture_rgba()?;
+    let (w, h, rgba) = window_area(title).and_then(|a| crop(w, h, &rgba, a)).unwrap_or((w, h, rgba));
+    let (nw, nh) = if w >= h { (max.min(w), ((h as f64) * max.min(w) as f64 / w as f64).round() as u32) } else { (((w as f64) * max.min(h) as f64 / h as f64).round() as u32, max.min(h)) };
+    b64(nw.max(1), nh.max(1), &resample(w, h, &rgba, nw.max(1), nh.max(1)))
+}
+
 /// Screenshot di tutto lo schermo principale alla dimensione della griglia (righelli e cursore se `grid`).
 pub fn screenshot_base64(grid: bool) -> Result<String, String> {
     let (w, h, rgba) = capture_rgba()?;
@@ -357,6 +406,19 @@ mod tests {
         let (z, area) = super::zoom_base64(100, 80, 240, 135, true).unwrap();
         std::fs::write(format!("{dir}/zoom.png"), dec(&z)).unwrap();
         assert_eq!(area, (100, 80, 240, 135));
+    }
+
+    #[test]
+    fn crop_window_area() {
+        let (w, h) = (100u32, 50u32);
+        let rgba: Vec<u8> = (0..w * h).flat_map(|i| [(i % w) as u8, (i / w) as u8, 0, 255]).collect();
+        let (cw, ch, c) = super::crop(w, h, &rgba, (10, 5, 30, 20)).unwrap();
+        assert_eq!((cw, ch, c.len()), (30, 20, 30 * 20 * 4));
+        assert_eq!(&c[..2], &[10, 5]);
+        // finestra che esce dallo schermo: limitata ai bordi
+        let (cw, ch, _) = super::crop(w, h, &rgba, (-20, 40, 200, 100)).unwrap();
+        assert_eq!((cw, ch), (100, 10));
+        assert!(super::crop(w, h, &rgba, (200, 0, 10, 10)).is_none());
     }
 
     #[test]

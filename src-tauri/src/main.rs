@@ -33,6 +33,7 @@ mod stt;
 mod tray;
 mod update;
 mod voicestudio;
+mod vrchat;
 mod web;
 mod window;
 
@@ -116,6 +117,7 @@ pub struct FrontConfig {
     hermes_brain: bool,
     pet: config::PetConfig,
     gmodlink: config::GmodLinkConfig,
+    vrchat: config::VrchatConfig,
     extras: config::ExtrasConfig,
 }
 
@@ -163,6 +165,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         hermes_brain: cfg.hermes_brain,
         pet: cfg.pet.clone(),
         gmodlink: cfg.gmodlink.clone(),
+        vrchat: cfg.vrchat.clone(),
         extras: cfg.extras.clone(),
     }
 }
@@ -508,6 +511,7 @@ fn main() {
             app.manage(pet::PetRt::default());
             app.manage(extras::Extras::default());
             app.manage(gmodlink::Link::default());
+            app.manage(vrchat::Vrc::default());
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
@@ -548,7 +552,13 @@ fn main() {
             *app.state::<AppState>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
             *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
             *app.state::<extras::Extras>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
-            *app.state::<gmodlink::Link>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
+            *app.state::<gmodlink::Link>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
+            {
+                let v = app.state::<vrchat::Vrc>();
+                for ai in [&v.ai, &v.look_ai, &v.quip_ai] {
+                    *ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
+                }
+            }
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             voicestudio::autostart(&handle);
@@ -686,6 +696,15 @@ fn main() {
             gmodlink::gmodlink_fly_view,
             gmodlink::gmodlink_monitor_open,
             gmodlink::gmodlink_persona_forget,
+            vrchat::vrchat_status,
+            vrchat::vrchat_settings,
+            vrchat::vrchat_accept,
+            vrchat::vrchat_join,
+            vrchat::vrchat_avatars,
+            vrchat::vrchat_vision_models,
+            vrchat::vrchat_login,
+            vrchat::vrchat_logout,
+            vrchat::vrchat_select_avatar,
             rizzo::rizzo_set_dir,
             localai::local_catalog_open,
             hermes::hermes_status,
@@ -789,6 +808,8 @@ fn main() {
             if let tauri::RunEvent::Exit = event {
                 // il server Kokoro avviato da noi si chiude con l'app
                 app.state::<audio::kokoro::Kokoro>().stop();
+                // VRChat: nessun ingresso resta premuto dopo l'uscita
+                vrchat::shutdown(app);
                 rizzo::stop(app);
                 localai::stop(app);
             }

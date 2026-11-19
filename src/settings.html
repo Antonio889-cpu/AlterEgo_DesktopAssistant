@@ -421,32 +421,75 @@
       </div>
     </section>
 
-    <section data-tab="games" data-game="vrchat" class="game-vrc preview">
-      <h2>VRChat <span class="soon">Anteprima · in arrivo</span></h2>
+    <section data-tab="games" data-game="vrchat" class="game-vrc">
+      <h2>VRChat: gioca con me</h2>
+      <div id="vrc-warn" class="vrc-warn" hidden>
+        <b>Prima di iniziare: rischio per l'account</b>
+        <p>Alter Ego gioca da solo, come un giocatore automatico. I Termini di VRChat (13.2) vietano l'uso «non coerente con l'uso individuale umano» e i mezzi automatizzati, e le Linee guida della community vietano i bot che abusano della piattaforma: l'account usato può essere sospeso o bannato. Usa un account dedicato (mai il tuo principale), in modalità desktop, e solo dove gli altri sono d'accordo.</p>
+        <div class="actions"><button id="vrc-accept" class="main">Ho capito: accetto il rischio per quell'account</button></div>
+      </div>
+      <div class="status-line"><i class="dot" id="vrc-dot"></i> <b id="vrc-state">Offline</b> · <span id="vrc-osc">OSC su 127.0.0.1:9000</span></div>
+      <div class="actions"><button class="main" id="vrc-join">▶ Entra</button><button id="vrc-leave">■ Scollega</button> <span id="vrc-result" class="result"></span></div>
+      <p class="note sub" id="vrc-detail"></p>
       <div class="vrc-grid">
         <div>
           <h3>Account e avatar</h3>
-          <div class="status-line"><i class="dot"></i> <b>Offline</b> · OSC su 127.0.0.1:9000</div>
-          <label>Avatar <select disabled><option>Letti dai file OSC di VRChat (senza login)</option></select></label>
-          <label class="inline"><input type="checkbox" disabled /> Accedi all'account per cambiare avatar da qui (facoltativo, a tuo rischio)</label>
+          <label>Avatar <select id="vrc-avatar"></select></label>
+          <div class="actions"><button id="vrc-avatars-refresh">Aggiorna elenco</button> <button id="vrc-avatar-use">Usa questo avatar</button> <span id="vrc-avatar-result" class="result"></span></div>
+          <p class="note vrc-params" id="vrc-params"></p>
+          <label>Cartella OSC di VRChat <input id="vrc-osc-dir" placeholder="trovata da sola (AppData\LocalLow\VRChat\VRChat\OSC)" /></label>
+          <label class="inline"><input type="checkbox" id="vrc-login" /> Accedi all'account per cambiare avatar da qui (facoltativo, a tuo rischio)</label>
+          <div id="vrc-login-box" class="vrc-login" hidden>
+            <p class="note">Usa l'API web non ufficiale di VRChat, e le Linee guida di VRChat sconsigliano i servizi che chiedono le credenziali. La password non viene salvata: il cookie di accesso resta solo nel portachiavi di sistema di questo PC.</p>
+            <label>Nome utente o email <input id="vrc-user" autocomplete="off" maxlength="80" /></label>
+            <label>Password <input id="vrc-pass" type="password" autocomplete="off" maxlength="200" /></label>
+            <label id="vrc-code-row" hidden>Codice 2FA <input id="vrc-code" inputmode="numeric" maxlength="16" placeholder="dall'app di autenticazione o dall'email" /></label>
+            <div class="actions"><button id="vrc-login-go">Accedi</button> <button id="vrc-logout">Esci dall'account</button> <span id="vrc-login-result" class="result"></span></div>
+          </div>
         </div>
         <div>
           <h3>Sensi</h3>
           <label>Vista
-            <select disabled><option>Spenta: solo OSC (tatto e vicinanza dai contatti dell'avatar)</option><option>Modello di visione locale</option><option>Modello di visione cloud</option></select>
+            <select id="vrc-vision"><option value="off">Spenta: solo OSC (tatto e vicinanza dai contatti dell'avatar)</option><option value="local">Modello di visione locale</option><option value="cloud">Modello di visione cloud</option></select>
           </label>
-          <label class="inline"><input type="checkbox" checked disabled /> Sente chi parla vicino (audio di VRChat → trascrizione)</label>
-          <div class="checks">
-            <label class="inline"><input type="checkbox" checked disabled /> Segue i miei movimenti</label>
-            <label class="inline"><input type="checkbox" checked disabled /> Risponde nelle conversazioni</label>
-            <label class="inline"><input type="checkbox" checked disabled /> Gesti ed espressioni</label>
-            <label class="inline"><input type="checkbox" disabled /> Esplora per conto suo</label>
-            <label class="inline"><input type="checkbox" disabled /> Parla con gli altri giocatori</label>
-          </div>
+          <label id="vrc-vmodel-row">Modello di visione <select id="vrc-vmodel"></select></label>
+          <label>Un'occhiata ogni <select id="vrc-look"><option value="5">5 secondi</option><option value="8">8 secondi</option><option value="15">15 secondi</option><option value="30">30 secondi</option><option value="60">60 secondi</option></select></label>
+          <p class="note sub">Locale: un modello di Ollama descrive soltanto uno screenshot piccolo della finestra di VRChat, poi decide il provider predefinito. Cloud: lo screenshot va al provider predefinito (serve la visione attiva nella scheda AI).</p>
+          <label class="inline"><input type="checkbox" id="vrc-hearing" /> Sente chi parla vicino (audio di VRChat → trascrizione)</label>
+          <label class="sub">Audio da ascoltare <select id="vrc-hear-dev"></select></label>
+          <label class="inline"><input type="checkbox" id="vrc-fly" /> Riflessi ed emozioni dal cervello di moscerino (contatti dell'avatar)</label>
+          <label class="inline sub"><input type="checkbox" id="vrc-reflex" /> Il corpo reagisce da solo (passo indietro, scatto della testa)</label>
         </div>
       </div>
+      <h3>Contatti → sensi</h3>
+      <p class="note">Parametri dei contatti e dei PhysBones dell'avatar che diventano tatto, dolore o vicinanza. Lista vuota: automatica dai nomi (HeadPat, Boop, Proximity_L…).</p>
+      <div id="vrc-contacts" class="vrc-contacts"></div>
+      <datalist id="vrc-param-list"></datalist>
+      <div class="actions"><button id="vrc-contact-add">Aggiungi contatto</button> <button id="vrc-contact-auto">Torna all'automatico</button></div>
+      <h3>Comportamento</h3>
+      <div class="checks">
+        <label class="inline"><input type="checkbox" id="vrc-follow" /> Segue i miei movimenti</label>
+        <label class="inline"><input type="checkbox" id="vrc-answer" /> Risponde nelle conversazioni</label>
+        <label class="inline"><input type="checkbox" id="vrc-gestures" /> Gesti ed espressioni</label>
+        <label class="inline"><input type="checkbox" id="vrc-explore" /> Esplora per conto suo</label>
+        <label class="inline"><input type="checkbox" id="vrc-others" /> Parla con gli altri giocatori</label>
+      </div>
+      <label>Commenti spontanei <select id="vrc-chatter"><option value="off">Mai</option><option value="low">Pochi</option><option value="normal">Normali</option><option value="often">Tanti</option></select></label>
+      <p class="note sub">Senza vista segue a orecchio: si gira verso la voce e cammina finché la sente vicina. Con la vista segue la persona più vicina che vede.</p>
+      <h3>Voce e chatbox</h3>
+      <label class="inline"><input type="checkbox" id="vrc-chatbox" /> Scrive anche nella chatbox (144 caratteri, a pagine)</label>
+      <label>Microfono in VRChat <select id="vrc-mic"><option value="open">Sempre aperto (consigliato)</option><option value="ptt">Push-to-talk (tiene premuto Voice mentre parla)</option></select></label>
+      <p class="note sub">In VRChat scegli come microfono «AlterEgo Link Audio» (Mic-Link, scheda Voce): la voce di Alter Ego esce dall'avatar. Alter Ego aspetta il suo turno e non parla sopra agli altri. <span id="vrc-miclink"></span></p>
+      <h3>Gesti ed espressioni</h3>
+      <label>Parametro delle emote <input id="vrc-emote-param" list="vrc-param-list" maxlength="64" /></label>
+      <label>Valori delle emote <input id="vrc-emotes" maxlength="300" /></label>
+      <label>Parametro delle espressioni <input id="vrc-expr-param" list="vrc-param-list" maxlength="64" placeholder="vuoto = spento" /></label>
+      <label>Valori per emozione <input id="vrc-exprs" maxlength="300" /></label>
+      <h3>OSC</h3>
+      <label>Porta verso VRChat <input id="vrc-send" type="number" min="1024" max="65535" /></label>
+      <label>Porta da VRChat <input id="vrc-recv" type="number" min="1024" max="65535" /></label>
+      <p class="note sub">In VRChat attiva l'OSC: menu azioni → Opzioni → OSC → Attivo. Al rientro, VRChat aggiorna i file degli avatar con i loro parametri.</p>
       <p class="note">Gioca con un account dedicato in modalità desktop, guidato via OSC. VRChat non permette i bot nei suoi Termini: usalo solo se accetti il rischio per quell'account.</p>
-      <div class="actions"><button class="main" disabled>▶ Entra</button><button disabled>■ Scollega</button></div>
     </section>
 
     <section data-tab="voice">
@@ -771,5 +814,6 @@
   <script src="i18n.js"></script>
   <script src="settings.js"></script>
   <script src="wide.js"></script>
+  <script src="vrchat.js"></script>
 </body>
 </html>

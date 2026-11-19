@@ -575,6 +575,43 @@ simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu e
   in corso e l'abitudine preferita. Si apre dalle impostazioni, dal menu nel gioco (C → Alter Ego → FruitFly Monitor) o da solo quando entra.
 - Come è stato estratto il circuito: [`tools/flybrain/`](tools/flybrain/).
 
+## VRChat: stiamo insieme
+
+> **Avviso sul rischio.** I [Termini di servizio](https://hello.vrchat.com/legal) di VRChat (13.2) vietano l'uso «non coerente con l'uso
+> individuale umano» e i mezzi automatizzati, e le [Linee guida della community](https://hello.vrchat.com/community-guidelines) vietano i bot
+> che abusano della piattaforma e i servizi che chiedono le credenziali. Alter Ego in VRChat è un giocatore automatico: l'account può essere
+> sospeso o bannato. Usa un **account dedicato** (mai il tuo principale), in modalità desktop, solo dove agli altri sta bene. Le impostazioni
+> mostrano l'avviso una volta ed *Entra* resta spento finché non lo accetti.
+
+Alter Ego gioca a VRChat sullo stesso PC come un giocatore autonomo: un secondo client di VRChat in **modalità desktop** con il suo account,
+guidato via **OSC** (UDP `127.0.0.1:9000` verso VRChat, `9001` da VRChat; porte modificabili). In VRChat attiva l'OSC
+(menu azioni → Opzioni → OSC → Attivo). Impostazioni → Integrazioni → VRChat.
+
+- **Corpo**: movimenti con `/input/*` (cammina, si gira, salta). Ogni ingresso ha una scadenza e un **cane da guardia** li azzera tutti alla fine
+  di ogni passo, con *Scollega*, in caso di errore, se il thread si ferma e quando chiudi l'app (VRChat avverte che un `MoveForward` bloccato cammina per sempre).
+- **Sensi senza vista**: l'OSC non dà posizioni, quindi lui/lei sente il mondo con i parametri dei **contatti e dei PhysBones** dell'avatar
+  (carezze, boop, vicinanza a sinistra/destra, schiaffi, coda tirata). Vanno al **cervello di moscerino** (riflessi come un passo indietro o
+  uno scatto della testa, più adrenalina e umore): zero token. I collegamenti sono automatici dai nomi più comuni o li scegli tu.
+- **Udito**: ascolta l'audio che suona VRChat (loopback WASAPI del dispositivo di uscita su Windows; su Linux la sorgente "Monitor" di
+  PulseAudio/PipeWire se c'è), taglia le frasi col rilevamento della voce e le trascrive con il tuo servizio di riconoscimento vocale.
+  L'audio di VRChat è spaziale: il volume dice quanto è vicino chi parla e il bilanciamento da che parte, così senza vista **segue a orecchio**
+  (si gira verso la voce e cammina finché è vicina). La sua voce, mentre suona, viene scartata.
+- **Vista (facoltativa)**: *Spenta* / *Locale* (un modello di visione di Ollama come `qwen2.5vl:3b` o `gemma3:4b` descrive soltanto uno
+  screenshot piccolo della finestra di VRChat) / *Cloud* (lo screenshot va al provider predefinito, se ha la visione attiva). Al modello che
+  decide arriva solo la descrizione, un'occhiata ogni N secondi (e subito dopo "seguimi"/"vieni"/"guarda").
+- **Voce**: con [Mic-Link](#mic-link): in VRChat scegli *AlterEgo Link Audio* come microfono. Il testo va anche nella **chatbox**
+  (`/chatbox/input`, 144 caratteri, risposte lunghe divise in pagine, "sta scrivendo" mentre pensa). Aspetta il suo turno e non parla sopra
+  agli altri (VAD sull'audio catturato). In modalità push-to-talk tiene premuto `/input/Voice` mentre parla.
+- **Cervello**: comandi rapidi a parole chiave senza token ("seguimi", "vieni qui", "fermati", "saluta", "balla", "salta", "guardati intorno", "esci"),
+  il provider AI predefinito solo quando qualcuno gli/le parla o succede qualcosa, con prompt di sistema corto in cache e stato in una riga.
+  Le battute brevi (carezza, boop…) le scrive il modello una volta, nella lingua e con i pronomi giusti, con riserve neutre incluse.
+- **Gesti ed espressioni**: emote con un parametro dell'avatar (predefinito `VRCEmote`: wave=1, clap=2, point=3, cheer=4, dance=5…) e, se
+  l'avatar ce l'ha, un parametro di espressione collegato alla sua emozione.
+- **Avatar senza login**: l'elenco viene dai file di configurazione OSC di VRChat
+  (`%USERPROFILE%\AppData\LocalLow\VRChat\VRChat\OSC\usr_*\Avatars\avtr_*.json`) con i parametri di ogni avatar (utili per contatti e gesti).
+  L'**accesso facoltativo** (spento di default, a tuo rischio) serve solo a cambiare avatar dall'app (API web non ufficiale di VRChat, 2FA con app
+  o email). La password non viene mai salvata; il cookie di sessione resta nel portachiavi di sistema (Credential Manager su Windows).
+
 ## Pet
 
 Quando non succede niente, Alter Ego esce a esplorare: la TV si spegne e lui/lei salta fuori
@@ -775,6 +812,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - **Lambda Players** di StarFrost: facoltativo, non incluso; Alter Ego Link usa solo i suoi hook e le sue funzioni pubbliche.
 - **Connettoma FlyWire** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([dati](https://zenodo.org/records/10676866), [annotazioni](https://github.com/flyconnectome/flywire_annotations)). Parametri del modello da Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` è un sottoinsieme dei dati FlyWire (solo i neuroni attivi, segno delle sinapsi dai neurotrasmettitori previsti).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): scritto per questo progetto; alcune idee (corpo da NPC, movimento della bocca, diario degli eventi) vengono da [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) di SonnyTaylor (MIT).
+- **Integrazione VRChat** (`src-tauri/src/vrchat/`): scritta per questo progetto (codificatore OSC proprio, senza crate OSC). Solo idee — nessun codice — da ProjectGabriel-Remastered (AGPL-3.0). VRChat è un marchio di VRChat Inc.; questo progetto non è affiliato. Indirizzi OSC e chatbox dalla documentazione OSC pubblica di VRChat; gli endpoint dell'API web dalla documentazione della community [vrchatapi](https://vrchatapi.github.io).
 - Foglio sprite del **pet Chihiro**: di **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),
   adattato per l'app (sfondo rimosso, tinta verde CRT). Grazie, Ayari! 💚
