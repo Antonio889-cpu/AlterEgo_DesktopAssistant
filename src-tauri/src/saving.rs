@@ -24,7 +24,7 @@ pub const NEED_TOOLS: &str = "[[TOOLS]]";
 pub const NO_TOOLS_NOTE: &str = "\n\n## Tools\nTools were not sent with this message. If answering needs \
 an action (PC, app, web, music, files, screen, reminders, mouse or keyboard) reply ONLY with [[TOOLS]] and nothing else.";
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Route {
     /// La domanda probabilmente richiede uno strumento.
     pub needs_tools: bool,
@@ -32,7 +32,51 @@ pub struct Route {
     pub simple: bool,
     /// Compito lungo e autonomo: adatto a Hermes Agent (solo con Rizzo Flow).
     pub delegate: bool,
+    /// Quanto servono i ricordi sull'utente e le conversazioni passate (0..1): decide quanta memoria
+    /// entra nel prompt (vedi `memory_budget`).
+    pub memory: f32,
+    /// Gruppi di strumenti scelti da Rizzo Flow (vuoto = li sceglie `pick_groups` a parole chiave).
+    pub groups: Vec<&'static str>,
 }
+
+impl Route {
+    /// Nessun router: strumenti sempre, memoria media.
+    pub fn all() -> Self {
+        Self { needs_tools: true, simple: false, delegate: false, memory: 0.5, groups: Vec::new() }
+    }
+}
+
+/// Segnale con cui il modello chiede altri ricordi: `[[RECALL: parole]]` (come `[[TOOLS]]`, niente
+/// strumento in più: la lista degli strumenti resta uguale e in cache).
+pub const RECALL: &str = "[[RECALL";
+
+/// Le parole chieste con `[[RECALL: …]]` (None se il modello non le ha chieste).
+pub fn recall_request(text: &str) -> Option<String> {
+    let i = text.find(RECALL)?;
+    let rest = &text[i + RECALL.len()..];
+    let end = rest.find("]]")?;
+    let words = rest[..end].trim_start_matches([':', ' ']).trim();
+    Some(words.chars().take(200).collect())
+}
+
+/// Caratteri di ricordi da mettere nel prompt secondo quanto servono.
+pub fn memory_budget(memory: f32) -> usize {
+    if memory >= 0.6 {
+        1800
+    } else if memory >= 0.3 {
+        900
+    } else {
+        350
+    }
+}
+
+/// Parole che fanno pensare a ricordi personali (router a parole chiave).
+const MEMORY_WORDS: &[&str] = &[
+    "ricord", "ti ho detto", "ti avevo", "l'altra volta", "ieri", "la scorsa", "mio ", "mia ", "miei", "mie ", "sorell", "fratell",
+    "madre", "mamma", "padre", "papà", "amic", "ragazz", "fidanzat", "moglie", "marito", "lavoro", "progett", "chi sono", "di me",
+    "remember", "i told you", "last time", "yesterday", "my ", "sister", "brother", "mother", "mom", "father", "dad", "friend",
+    "girlfriend", "boyfriend", "wife", "husband", "my job", "project", "about me", "who am i",
+];
 
 const ACTION_WORDS: &[&str] = &[
     // italiano
@@ -94,7 +138,8 @@ pub fn heuristic(text: &str, prev_used_tools: bool) -> Route {
     let needs_tools = prev_used_tools || ACTION_WORDS.iter().any(|w| t.contains(w));
     let words = text.split_whitespace().count();
     let simple = !needs_tools && words <= 25 && !COMPLEX_WORDS.iter().any(|w| t.contains(w)) && !text.contains('\n');
-    Route { needs_tools, simple, delegate: false }
+    let memory = if MEMORY_WORDS.iter().any(|w| t.contains(w)) { 0.7 } else if simple { 0.2 } else { 0.4 };
+    Route { needs_tools, simple, delegate: false, memory, groups: Vec::new() }
 }
 
 /// Router con Rizzo Flow (API compatibile Jev, `POST /v1/systemone`): decisioni tipizzate in ~50 ms,
@@ -116,6 +161,15 @@ pub async fn rizzo(http: &reqwest::Client, url: &str, text: &str, prev_reply: &s
                 "type": "score",
                 "instructions": "How demanding is the answer the user expects?",
                 "criteria": ["Greeting, small talk or a very short simple answer", "A normal everyday question", "Complex: reasoning, code, long explanation or several steps"]
+            },
+            "needs_memory": {
+                "type": "noul",
+                "instructions": "Does a good answer need personal memories about the user or earlier conversations: their name, family, friends, pets, preferences, job, projects, plans, or something they said before? Generic questions and small talk are NO."
+            },
+            "tool_kind": {
+                "type": "choice",
+                "instructions": "If the user wants the assistant to DO something, which kind of tool does it need most?",
+                "options": rizzo_group_options()
             }
         }
     });
@@ -128,13 +182,46 @@ pub async fn rizzo(http: &reqwest::Client, url: &str, text: &str, prev_reply: &s
     parse_rizzo(&v, prev_used_tools)
 }
 
+/// Opzioni della domanda "che tipo di strumento?": i gruppi di actions::GROUPS (più "none").
+fn rizzo_group_options() -> Value {
+    let mut m = serde_json::Map::new();
+    for (g, d) in crate::actions::GROUPS {
+        m.insert((*g).to_string(), Value::String((*d).to_string()));
+    }
+    m.insert("none".into(), Value::String("no tool: just talk or answer from knowledge".into()));
+    Value::Object(m)
+}
+
 pub fn parse_rizzo(v: &Value, prev_used_tools: bool) -> Option<Route> {
     let p_action = v.pointer("/answers/needs_action/noul").and_then(Value::as_f64)?;
     let score = v.pointer("/answers/complexity/score").and_then(Value::as_f64).unwrap_or(1.0);
     // si sbaglia volentieri dalla parte degli strumenti: un'azione persa è peggio di qualche token
     let needs_tools = prev_used_tools || p_action >= 0.3;
     let delegate = v.pointer("/answers/long_task/noul").and_then(Value::as_f64).is_some_and(|p| p >= 0.6);
-    Some(Route { needs_tools: needs_tools || delegate, simple: !needs_tools && !delegate && score < 0.6, delegate })
+    let memory = v.pointer("/answers/needs_memory/noul").and_then(Value::as_f64).unwrap_or(0.4) as f32;
+    // gruppi: quelli con probabilità ≥ 15% (al massimo 3), solo se serve un'azione
+    let mut groups: Vec<&'static str> = Vec::new();
+    if needs_tools {
+        let probs = v.pointer("/answers/tool_kind/probabilities");
+        let mut ranked: Vec<(&'static str, f64)> = crate::actions::GROUPS
+            .iter()
+            .filter_map(|(g, _)| {
+                let p = match probs {
+                    Some(Value::Object(m)) => m.get(*g).and_then(Value::as_f64),
+                    Some(Value::Array(a)) => a.iter().find(|x| x.get("option").and_then(Value::as_str) == Some(g)).and_then(|x| x.get("p").or(x.get("probability"))).and_then(Value::as_f64),
+                    _ => None,
+                }
+                .or_else(|| (v.pointer("/answers/tool_kind/choice").and_then(Value::as_str) == Some(g)).then_some(1.0))?;
+                (p >= 0.15).then_some((*g, p))
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        groups = ranked.into_iter().take(3).map(|(g, _)| g).collect();
+        if !groups.is_empty() && !groups.contains(&"app") {
+            groups.insert(0, "app");
+        }
+    }
+    Some(Route { needs_tools: needs_tools || delegate, simple: !needs_tools && !delegate && score < 0.6, delegate, memory, groups })
 }
 
 /// Descrizioni degli strumenti ridotte alla prima frase, senza descrizioni dei parametri.
@@ -287,11 +374,31 @@ mod tests {
 
     #[test]
     fn rizzo_answer() {
-        let v = json!({"answers": {"needs_action": {"type": "noul", "noul": 0.92}, "complexity": {"type": "score", "score": 0.1}}});
-        assert_eq!(parse_rizzo(&v, false), Some(Route { needs_tools: true, simple: false, delegate: false }));
-        let v = json!({"answers": {"needs_action": {"type": "noul", "noul": 0.04}, "complexity": {"type": "score", "score": 0.2}}});
-        assert_eq!(parse_rizzo(&v, false), Some(Route { needs_tools: false, simple: true, delegate: false }));
+        let v = json!({"answers": {"needs_action": {"type": "noul", "noul": 0.92}, "complexity": {"type": "score", "score": 0.1},
+            "tool_kind": {"choice": "web", "probabilities": {"web": 0.7, "musica": 0.2, "file": 0.05, "none": 0.05}}}});
+        let r = parse_rizzo(&v, false).unwrap();
+        assert!(r.needs_tools && !r.simple && !r.delegate);
+        assert_eq!(r.groups, ["app", "web", "musica"], "gruppi sopra il 15%, app sempre");
+        assert!((r.memory - 0.4).abs() < 1e-6, "senza risposta: memoria media");
+        let v = json!({"answers": {"needs_action": {"type": "noul", "noul": 0.04}, "complexity": {"type": "score", "score": 0.2},
+            "needs_memory": {"noul": 0.9}, "tool_kind": {"choice": "web", "probabilities": {"web": 0.9}}}});
+        let r = parse_rizzo(&v, false).unwrap();
+        assert!(!r.needs_tools && r.simple && r.groups.is_empty(), "niente gruppi senza azione");
+        assert!((r.memory - 0.9).abs() < 1e-6);
+        // probabilità come elenco
+        let v = json!({"answers": {"needs_action": {"noul": 0.8}, "tool_kind": {"probabilities": [{"option": "schermo", "p": 0.6}]}}});
+        assert_eq!(parse_rizzo(&v, false).unwrap().groups, ["app", "schermo"]);
         assert_eq!(parse_rizzo(&json!({}), false), None);
+    }
+
+    #[test]
+    fn memory_signals() {
+        assert!(heuristic("ti ricordi come si chiama mia sorella?", false).memory >= 0.6);
+        assert!(heuristic("ciao!", false).memory < 0.3);
+        assert!(memory_budget(0.9) > memory_budget(0.4) && memory_budget(0.4) > memory_budget(0.1));
+        assert_eq!(recall_request("[[RECALL: Sayaka università]]").as_deref(), Some("Sayaka università"));
+        assert_eq!(recall_request("[happy]\n[[RECALL:viaggio Giappone]] ").as_deref(), Some("viaggio Giappone"));
+        assert_eq!(recall_request("niente"), None);
     }
 
     #[test]

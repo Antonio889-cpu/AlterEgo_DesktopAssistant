@@ -568,6 +568,9 @@ pub struct SavingConfig {
     pub tool_groups: bool,
     /// Nelle richieste lunghe i risultati vecchi degli strumenti (già usati) vengono accorciati.
     pub loop_compact: bool,
+    /// Memoria a grafo: nel prompt solo i ricordi che servono alla domanda (entro un budget), più
+    /// l'indice di quelli rimasti fuori che il modello può chiedere con [[RECALL: …]].
+    pub memory_graph: bool,
 }
 
 impl Default for SavingConfig {
@@ -585,6 +588,7 @@ impl Default for SavingConfig {
             economy_model: String::new(),
             tool_groups: true,
             loop_compact: true,
+            memory_graph: true,
         }
     }
 }

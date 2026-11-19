@@ -208,7 +208,8 @@ function memResult(text, cls = "") { const r = $("memory-result"); r.textContent
 async function refreshMemory() {
   try {
     const o = await invoke("memory_overview");
-    $("memory-stats").textContent = t("{n} messaggi salvati · file: {path}", { n: o.messages, path: o.db_path });
+    const g = await invoke("memory_graph_count").catch(() => null);
+    $("memory-stats").textContent = t("{n} messaggi salvati · file: {path}", { n: o.messages, path: o.db_path }) + (g ? t(" · {g} ricordi nel grafo", { g }) : "");
     listItems($("facts"), o.facts, async (it) => { await invoke("memory_delete_fact", { id: it.id }); refreshMemory(); });
     listItems($("summaries"), o.summaries);
   } catch (e) { $("memory-stats").textContent = String(e); }
@@ -223,6 +224,10 @@ $("add-fact").onclick = async () => {
 };
 $("export-memory").onclick = async () => {
   try { memResult(t("Esportata in {path}", { path: await invoke("memory_export") }), "ok"); }
+  catch (e) { memResult(String(e), "bad"); }
+};
+$("export-vault").onclick = async () => {
+  try { memResult(await invoke("memory_export_vault"), "ok"); }
   catch (e) { memResult(String(e), "bad"); }
 };
 $("compact-memory").onclick = async (e) => {
@@ -1067,6 +1072,7 @@ function fillSaving(cfg) {
   $("sv-compact").checked = saving.compact_tools;
   $("sv-groups").checked = saving.tool_groups !== false;
   $("sv-loop").checked = saving.loop_compact !== false;
+  $("sv-graph").checked = saving.memory_graph !== false;
   $("sv-trim").checked = saving.trim_history;
   $("sv-facts").value = String(saving.facts_limit);
   $("sv-shot").value = String(saving.screenshot_width);
@@ -1081,6 +1087,7 @@ $("sv-tools").onchange = (e) => { saving.tools_on_demand = e.target.checked; sav
 $("sv-compact").onchange = (e) => { saving.compact_tools = e.target.checked; saveSaving(); };
 $("sv-groups").onchange = (e) => { saving.tool_groups = e.target.checked; saveSaving(); };
 $("sv-loop").onchange = (e) => { saving.loop_compact = e.target.checked; saveSaving(); };
+$("sv-graph").onchange = (e) => { saving.memory_graph = e.target.checked; saveSaving(); };
 $("sv-trim").onchange = (e) => { saving.trim_history = e.target.checked; saveSaving(); };
 $("sv-facts").onchange = (e) => { saving.facts_limit = +e.target.value; saveSaving(); };
 $("sv-shot").onchange = (e) => { saving.screenshot_width = +e.target.value; saveSaving(); };

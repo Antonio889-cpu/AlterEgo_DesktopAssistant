@@ -3,6 +3,7 @@
 //! Punto di innesto per una memoria esterna (es. CyberAI): sostituisci questo modulo
 //! mantenendo gli stessi metodi pubblici.
 
+pub mod graph;
 pub mod summarize;
 
 use rusqlite::{params, Connection, OptionalExtension};
@@ -50,6 +51,8 @@ pub struct Overview {
 pub struct Memory {
     conn: Mutex<Connection>,
     pub path: PathBuf,
+    /// Fatti o riassunti cambiati: il grafo (graph.rs) va risincronizzato alla prossima ricerca.
+    graph_dirty: std::sync::atomic::AtomicBool,
 }
 
 type R<T> = Result<T, String>;
@@ -85,7 +88,8 @@ impl Memory {
                 done INTEGER NOT NULL DEFAULT 0);",
         )
         .map_err(e)?;
-        Ok(Self { conn: Mutex::new(conn), path: path.to_path_buf() })
+        conn.execute_batch(graph::SCHEMA).map_err(e)?;
+        Ok(Self { conn: Mutex::new(conn), path: path.to_path_buf(), graph_dirty: std::sync::atomic::AtomicBool::new(true) })
     }
 
     pub fn add_message(&self, role: &str, content: &str) -> R<i64> {
@@ -149,6 +153,7 @@ impl Memory {
     }
 
     pub fn add_summary(&self, upto_id: i64, content: &str) -> R<()> {
+        self.graph_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
         self.conn
             .lock()
             .unwrap()
@@ -178,6 +183,7 @@ impl Memory {
 
     /// Aggiunge un fatto; i duplicati (maiuscole ignorate) vengono scartati.
     pub fn add_fact(&self, content: &str) -> R<()> {
+        self.graph_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
         let content = content.trim().trim_start_matches(['-', '*', '•']).trim();
         if content.len() < 3 {
             return Ok(());
@@ -191,6 +197,7 @@ impl Memory {
     }
 
     pub fn delete_fact(&self, id: i64) -> R<()> {
+        self.graph_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
         self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner).execute("DELETE FROM facts WHERE id = ?1", [id]).map_err(e)?;
         Ok(())
     }
@@ -244,6 +251,7 @@ impl Memory {
 
     /// Sostituisce tutti i fatti (dopo la compattazione).
     pub fn replace_facts(&self, facts: &[String]) -> R<()> {
+        self.graph_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
         let mut c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let tx = c.transaction().map_err(e)?;
         tx.execute("DELETE FROM facts", []).map_err(e)?;
@@ -259,6 +267,7 @@ impl Memory {
     /// Toglie ciò che il riassunto più recente copre già: messaggi riassunti fuori dagli ultimi `keep`
     /// e riassunti vecchi. Poi compatta il file. Restituisce (messaggi, riassunti) eliminati.
     pub fn prune(&self, keep: usize) -> R<(usize, usize)> {
+        self.graph_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
         let Some((upto, _)) = self.latest_summary()? else { return Ok((0, 0)) };
         let c = self.conn.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let msgs = c
@@ -271,6 +280,7 @@ impl Memory {
 
     /// "Dimentica tutto": svuota ogni tabella e compatta il file.
     pub fn forget_all(&self) -> R<()> {
+        self.graph_dirty.store(true, std::sync::atomic::Ordering::Relaxed);
         self.conn
             .lock()
             .unwrap()

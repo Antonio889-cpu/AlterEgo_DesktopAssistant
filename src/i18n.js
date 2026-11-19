@@ -331,6 +331,12 @@ const I18N = (() => {
 
     // personalità
     "Personalità e lingua": "Personality and language", "Lingua delle risposte": "Answer language", "Solo italiano": "Italian only",
+    // 1.14: memoria a grafo
+    "Esporta come vault (Obsidian)": "Export as vault (Obsidian)",
+    "Una nota Markdown per ricordo, con i collegamenti: si apre con Obsidian": "One Markdown note per memory, with links: opens with Obsidian",
+    "Memoria a grafo": "Graph memory",
+    ": nel prompt vanno solo i ricordi che servono alla domanda (fatti, persone, partite collegati tra loro); gli altri Alter Ego li richiama quando servono": ": only the memories the question needs go into the prompt (facts, people, games linked together); Alter Ego recalls the others when needed",
+    " · {g} ricordi nel grafo": " · {g} memories in the graph",
     // 1.14: impostazioni in grande, giochi
     "Impostazioni app": "App settings",
     "Giochi": "Games",

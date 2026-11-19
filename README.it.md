@@ -346,6 +346,11 @@ In *Impostazioni → AI e chiavi* c'è la sezione **Risparmio token** (lunghezza
 - **Modello economico per le domande semplici**: saluti e domande brevi vanno a un provider/modello a tua scelta (model routing).
 - **Descrizioni degli strumenti compatte**, **risposte vecchie accorciate nella cronologia** (in modo deterministico: la cache del provider continua
   a funzionare), **solo i fatti più pertinenti**, **screenshot più piccoli** e **pagine web più corte**.
+- **Memoria a grafo** (accesa di default): invece di mandare tutti i fatti su di te a ogni messaggio, partono solo i ricordi che servono
+  alla domanda, attaccati in fondo alla domanda stessa: il prompt di sistema e la cronologia restano uguali e continuano a essere letti
+  dalla cache. Nella prova con 80 fatti la memoria inviata scende del 91–94%. Vedi *Personalità e memoria*.
+- **Rizzo Flow decide tutto in una chiamata**: serve un'azione, è complessa, servono ricordi personali, quali gruppi di strumenti mandare
+  (al posto delle parole chiave). Se non risponde si torna alle parole chiave.
 - **Massimo risparmio** accende tutto insieme; **Predefinite** torna indietro.
 
 Le **richieste complesse** (molti passaggi con gli strumenti) sono quelle che sprecano più token, quindi Alter Ego inoltre:
@@ -488,6 +493,11 @@ Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli te
   - in *Impostazioni → Memoria* vedi, aggiungi o cancelli i fatti, esporti tutto in JSON o premi *Dimentica tutto*;
   - **Compatta** unisce i fatti doppi, toglie quelli inutili ed elimina i messaggi vecchi già coperti da un riassunto (gli ultimi restano);
     parte anche da sola quando i fatti superano i 40.
+  - **memoria a grafo**, come un vault di Obsidian: fatti, persone e cose nominate, conversazioni passate e partite ai giochi
+    sono note collegate tra loro (un fatto che nomina "Sayaka" porta anche agli altri fatti su Sayaka). A ogni domanda si cercano
+    (ricerca full-text, poi i collegamenti) solo i ricordi utili, entro un budget deciso dal router; c'è sempre un piccolo nucleo
+    con le cose principali. Se manca qualcosa che ricorda, il modello risponde `[[RECALL: …]]` e la domanda si ripete con quei ricordi.
+    **Esporta come vault (Obsidian)** scrive tutto come cartella di note Markdown con i `[[collegamenti]]`.
 - **Personaggio**: la scheda segue più da vicino l'Alter Ego di Danganronpa (Chihiro, speranza e disperazione, modo di parlare);
   una copia mai modificata si aggiorna da sola con le nuove versioni.
 

@@ -41,6 +41,7 @@
     audio_devices: () => ({ outputs: ["Altoparlanti (Realtek)", long("Cuffie USB")], inputs: ["Microfono (Realtek)"], default_output: "Altoparlanti (Realtek)", default_input: "Microfono (Realtek)", cable_render: null, cable_capture: null }),
     audio_status: () => ({}),
     pet_active: () => false,
+    memory_graph_count: () => (MANY ? 4210 : 37),
     pet_assets: () => ({ name: "chihiro", longName: "Chihiro", author: "", sprites: {} }),
     load_user_sprites: () => ({}),
     log_list: () => [],

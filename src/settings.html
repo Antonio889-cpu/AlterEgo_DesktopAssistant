@@ -143,6 +143,7 @@
       <label class="inline"><input type="checkbox" id="sv-tools" /> <b>Strumenti solo quando servono</b>: le definizioni (1–3 mila token) partono solo se la domanda chiede un'azione</label>
       <p class="note sub">Se il modello si accorge che gli serviva uno strumento lo dice e la domanda si ripete subito con gli strumenti: nessuna azione persa.</p>
       <label class="inline"><input type="checkbox" id="sv-groups" /> <b>Strumenti a gruppi</b>: manda solo i gruppi che la domanda chiede (file, web, schermo…); gli altri li carica Alter Ego se servono</label>
+      <label class="inline"><input type="checkbox" id="sv-graph" /> <b>Memoria a grafo</b>: nel prompt vanno solo i ricordi che servono alla domanda (fatti, persone, partite collegati tra loro); gli altri Alter Ego li richiama quando servono</label>
       <label class="inline"><input type="checkbox" id="sv-loop" /> <b>Ragionamenti lunghi compatti</b>: nelle richieste con molti passaggi i risultati vecchi degli strumenti, già usati, vengono accorciati</label>
       <label class="inline"><input type="checkbox" id="sv-compact" /> Descrizioni degli strumenti compatte</label>
       <label class="inline"><input type="checkbox" id="sv-trim" /> Accorcia le risposte vecchie nella cronologia (le ultime restano intere; la cache del provider continua a funzionare)</label>
@@ -329,6 +330,7 @@
       <div class="actions">
         <button id="refresh-memory">Aggiorna</button>
         <button id="export-memory">Esporta (JSON)</button>
+        <button id="export-vault" title="Una nota Markdown per ricordo, con i collegamenti: si apre con Obsidian">Esporta come vault (Obsidian)</button>
         <button id="compact-memory" title="Unisce i doppioni, toglie i fatti inutili e i messaggi vecchi già riassunti">🗜 Compatta</button>
         <button id="forget-all" class="danger">Dimentica tutto</button>
         <span id="memory-result" class="result"></span>

@@ -705,6 +705,8 @@ fn main() {
             assistant::memory_forget_all,
             assistant::memory_compact,
             assistant::memory_export,
+            assistant::memory_export_vault,
+            assistant::memory_graph_count,
             assistant::open_data_dir,
             assistant::stt_test,
             assistant::set_permissions,

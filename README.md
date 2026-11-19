@@ -358,6 +358,11 @@ every search shows up in the Costs tab.
 - **project maps** ([Graphify](https://github.com/Graphify-Labs/graphify)): a folder of code becomes a knowledge graph that he/she queries instead of reading files one by one.
 
 Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini): the fixed part comes first, history moves in steps.
+- **Graph memory** (on by default): instead of sending every fact about you with each message, only the memories the question needs
+  are sent, attached to the end of the question itself: the system prompt and the history stay the same and keep being read from the
+  cache. In a test with 80 facts the memory sent drops by 91–94%. See *Personality and memory*.
+- **Rizzo Flow decides everything in one call**: does it need an action, is it complex, does it need personal memories, which tool
+  groups to send (instead of keywords). If it doesn't answer, keywords are used.
 
 ## Local models
 
@@ -486,6 +491,11 @@ Every action, even a denied one, goes to **Settings → Log**. Technical details
   - in *Settings → Memory* you can see, add or delete facts, export everything as JSON or press *Forget everything*;
   - **Compact** merges duplicate facts, drops useless ones and deletes old messages already covered by a summary (the latest ones stay);
     it also runs by itself when he/she knows more than 40 facts.
+  - **graph memory**, like an Obsidian vault: facts, people and things mentioned, past conversations and game sessions are linked
+    notes (a fact that mentions "Sayaka" also leads to the other facts about Sayaka). For each question only the useful memories are
+    searched (full-text search, then the links), within a budget chosen by the router; a small core of the main things is always there.
+    If something he/she remembers is missing, the model replies `[[RECALL: …]]` and the question is asked again with those memories.
+    **Export as vault (Obsidian)** writes everything as a folder of Markdown notes with `[[links]]`.
 - **Character**: the sheet follows Alter Ego from Danganronpa more closely (Chihiro, hope and despair, how he/she talks);
   an unmodified copy updates itself with new versions.
 

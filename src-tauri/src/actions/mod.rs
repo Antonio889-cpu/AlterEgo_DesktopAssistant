@@ -505,7 +505,7 @@ pub fn system_path(p: &Path) -> bool {
     }
 }
 
-fn open_with_system(target: &str) -> Result<(), String> {
+pub fn open_with_system(target: &str) -> Result<(), String> {
     #[cfg(windows)]
     let r = if target.to_lowercase().ends_with(".exe") && Path::new(target).exists() {
         std::process::Command::new(target).spawn()

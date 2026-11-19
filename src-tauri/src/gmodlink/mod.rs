@@ -293,12 +293,27 @@ fn data_dir(app: &AppHandle) -> PathBuf {
     app.state::<crate::assistant::Conversation>().data_dir.clone()
 }
 
+/// Una partita finita diventa un nodo "game" della memoria principale (memoria a grafo), collegato
+/// ai giocatori e alle cose nominate. Usata anche dalle altre integrazioni di gioco.
+pub fn game_to_graph(app: &AppHandle, game: &str, start: i64, place: &str, line: &str) {
+    let conv = app.state::<crate::assistant::Conversation>();
+    let Some(m) = conv.memory.as_ref() else { return };
+    let title = if place.is_empty() { format!("{game} {start}") } else { format!("{game}: {place} ({start})") };
+    if let Err(e) = m.remember_node(crate::memory::graph::GAME, &title, &format!("{game}: {line}")) {
+        crate::applog::warn("memoria", &format!("partita non salvata nel grafo: {e}"));
+    }
+}
+
 /// Chiude la partita in corso e la mette nell'archivio delle partite.
 fn end_session(app: &AppHandle) {
     let log = lock(app).session.take();
     if let Some(log) = log {
         if cfg_of(app).gmodlink.memory && log.finish(&data_dir(app), now_secs() as i64) {
             crate::applog::info("gmodlink", "partita salvata nella memoria delle partite");
+            // anche nella memoria a grafo: in chat "ti ricordi quella partita?" la ritrova
+            if let Some(last) = memory::load(&data_dir(app)).sessions.last() {
+                game_to_graph(app, "Garry's Mod", last.start, &last.map, &last.line);
+            }
         }
     }
 }
