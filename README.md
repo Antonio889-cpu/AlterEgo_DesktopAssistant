@@ -55,6 +55,7 @@ Interface in English and Italian.
 - [PC actions and permissions](#pc-actions-and-permissions)
 - [Personality and memory](#personality-and-memory)
 - [Sprites](#sprites)
+- [Minecraft: play together](#minecraft-play-together)
 - [Pet](#pet)
 - [Privacy and security](#privacy-and-security)
 - [Where the data lives](#where-the-data-lives)
@@ -583,6 +584,32 @@ simulated on your PC in real time with the leaky integrate-and-fire model of Shi
   Open it from the settings, from the in-game menu (C → Alter Ego → FruitFly Monitor) or automatically when he/she joins.
 - How the circuit was extracted: [`tools/flybrain/`](tools/flybrain/).
 
+## Minecraft: play together
+
+Alter Ego joins your **Minecraft Java Edition** world and plays with you. *Settings → Games → Minecraft*.
+
+- **Setup**: press *Install / update*. The app uses Node.js if it's already on your PC (18 or newer), otherwise it downloads the
+  portable Node.js LTS from nodejs.org (checked against `SHASUMS256.txt`), then installs [Mineflayer](https://github.com/PrismarineJS/mineflayer)
+  and its plugins (pathfinder, pvp, collectblock, tool; MIT) with `npm ci` from the bundled lockfile. Everything goes into the app's local data folder.
+- **Joining**: open your world to LAN (*Esc → Open to LAN*) and leave the port at 0: he/she finds it from the LAN broadcast (UDP 4445).
+  Or enter host and port of your own server. He/she uses an **offline account** (name configurable, default `AlterEgo`): vanilla LAN worlds
+  often require online-mode, and the settings explain the options when the server kicks him/her (a LAN mod that turns online-mode off,
+  or a local Paper server with `online-mode=false`).
+- **Chat and voice**: he/she writes and answers in the Minecraft chat and speaks with the usual voice on the PC. Push-to-talk goes to the
+  Minecraft brain while he/she is in the world. Simple commands ("follow me", "stop", "come here", "protect me", "get wood"…) cost no tokens.
+- **Body in Node, brain in the app** (`src-tauri/mc_bot/` ↔ `src-tauri/src/mclink/`): JSON lines over stdin/stdout. Following, looking at
+  friends, self-defense, eating, gathering and exploring run in the bot with zero tokens; the model is called only when someone talks
+  to him/her or something important happens, with a short cached prompt (Minecraft basics included) and the state in one line.
+- **Fruit-fly brain**: the same FlyWire connectome as in Garry's Mod gets Minecraft senses (damage, mobs and arrows approaching from a side,
+  creeper hiss, explosions, food, being hit by a player, falling, water, light) and its descending neurons become reflexes: flee, side-step,
+  back up, jump, flinch, eat.
+- **Learning while playing**: action sequences that work become named **skills** he/she can repeat without tokens; failures become **lessons**.
+  Only the relevant ones (keyword match) reach the prompt. Stored in `minecraft_skills.json`.
+- **Skin**: the included "Alter Ego (Chihiro)" skin or your own 64x64/64x32 PNG, with a preview. Offline accounts show a custom skin only with
+  [CustomSkinLoader](https://github.com/xfl03/MCCustomSkinLoader) (client mod: the app copies the skin to `.minecraft/CustomSkinLoader/LocalSkin/skins/`)
+  or the [SkinsRestorer](https://skinsrestorer.net) server plugin (upload the PNG at skinsrestorer.net/upload and paste the `/skin url` command:
+  he/she types it after joining).
+
 ## VRChat: hang out together
 
 > **Risk notice.** VRChat's [Terms of Service](https://hello.vrchat.com/legal) (13.2) forbid using the service "inconsistent with individual
@@ -821,6 +848,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **Lambda Players** by StarFrost: optional, not included; Alter Ego Link only uses its public hooks and functions.
 - **FlyWire connectome** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([data](https://zenodo.org/records/10676866), [annotations](https://github.com/flyconnectome/flywire_annotations)). Model parameters from Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` is a subset of the FlyWire data (active neurons only, synapse signs from the predicted neurotransmitters).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): written for this project; some ideas (NPC body, mouth movement, event log) come from [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) by SonnyTaylor (MIT).
+- **Minecraft bot** (`src-tauri/mc_bot/`): written for this project on top of [Mineflayer](https://github.com/PrismarineJS/mineflayer) and its plugins mineflayer-pathfinder, mineflayer-pvp, mineflayer-collectblock and mineflayer-tool (PrismarineJS and contributors, MIT); some ideas (small composable skills, always-on modes) come from [Mindcraft](https://github.com/mindcraft-bots/mindcraft) (MIT). The "Alter Ego (Chihiro)" skin is original pixel art made with `tools/make_mc_skin.py`. Minecraft is a trademark of Mojang/Microsoft; this project is not affiliated with them.
 - **VRChat integration** (`src-tauri/src/vrchat/`): written for this project (own small OSC encoder, no OSC crate). Ideas only — no code — from ProjectGabriel-Remastered (AGPL-3.0). VRChat is a trademark of VRChat Inc.; this project is not affiliated with it. OSC and chatbox addresses from VRChat's public OSC documentation; the web API endpoints from the community [vrchatapi](https://vrchatapi.github.io) documentation.
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),

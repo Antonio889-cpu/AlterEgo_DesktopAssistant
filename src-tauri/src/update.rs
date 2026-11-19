@@ -205,6 +205,8 @@ pub fn open_link(which: &str) -> Result<(), String> {
         "lfm3" => "https://www.liquid.ai/blog/lfm3".to_string(),
         // Lambda Players nel Workshop (si apre nel client di Steam, dove ci si iscrive)
         "lambda_players" => "steam://url/CommunityFilePage/2947828836".to_string(),
+        // Minecraft: caricamento della skin per SkinsRestorer
+        "skinsrestorer_upload" => "https://skinsrestorer.net/upload".to_string(),
         _ => return Err("link sconosciuto".into()),
     };
     #[cfg(windows)]

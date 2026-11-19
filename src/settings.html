@@ -400,26 +400,57 @@
       <label class="inline"><input type="checkbox" id="gl-monitor-auto" /> Apri il monitor quando entra in partita</label>
     </section>
 
-    <section data-tab="games" data-game="minecraft" class="game-mc preview">
-      <h2>Minecraft: gioca con me <span class="soon">Anteprima · in arrivo</span></h2>
+    <section data-tab="games" data-game="minecraft" class="game-mc">
+      <h2>Minecraft: gioca con me</h2>
       <div class="mc-grid">
         <div class="mc-skin">
           <canvas id="mc-skin-view" width="96" height="192" aria-label="Anteprima della skin"></canvas>
-          <select id="mc-skin" disabled><option>Alter Ego (Chihiro)</option><option>Skin da file PNG…</option></select>
+          <select id="mc-skin"><option value="alterego">Alter Ego (Chihiro)</option><option value="file">Skin da file PNG…</option></select>
+          <input type="file" id="mc-skin-file" accept="image/png" hidden />
+          <span id="mc-skin-msg" class="result"></span>
         </div>
         <div class="mc-body">
-          <div class="status-line"><i class="dot"></i> <b>Non collegato</b> · Java Edition, mondo aperto in LAN</div>
-          <label>Iniziativa <input type="range" min="0" max="100" value="75" disabled /> <span class="note">più iniziativa, più sorprese</span></label>
+          <div class="status-line"><i class="dot" id="mc-dot"></i> <b id="mc-state">Non collegato</b> <span id="mc-where">· Java Edition, mondo aperto in LAN</span></div>
+          <p id="mc-kick" class="note sub mc-kick" hidden></p>
+          <div class="actions"><button class="main" id="mc-join">▶ Entra nel mondo</button><button id="mc-leave">■ Scollega</button></div>
+          <label>Iniziativa <input type="range" id="mc-initiative" min="0" max="100" step="5" /> <span id="mc-initiative-val"></span> <span class="note">più iniziativa, più sorprese</span></label>
           <div class="checks">
-            <label class="inline"><input type="checkbox" checked disabled /> Seguimi</label>
-            <label class="inline"><input type="checkbox" disabled /> Raccogli risorse</label>
-            <label class="inline"><input type="checkbox" checked disabled /> Costruisci con me</label>
-            <label class="inline"><input type="checkbox" disabled /> Esplora per conto suo</label>
+            <label class="inline"><input type="checkbox" id="mc-follow" /> Seguimi</label>
+            <label class="inline"><input type="checkbox" id="mc-gather" /> Raccogli risorse</label>
+            <label class="inline"><input type="checkbox" id="mc-build" /> Costruisci con me</label>
+            <label class="inline"><input type="checkbox" id="mc-explore" /> Esplora per conto suo</label>
           </div>
           <p class="note">Entra nel tuo mondo, scrive e risponde nella chat di Minecraft, impara giocando. Riflessi ed emozioni dal cervello di moscerino; ragiona con il provider AI predefinito.</p>
-          <div class="actions"><button class="main" disabled>▶ Entra nel mondo</button><button disabled>■ Scollega</button></div>
         </div>
       </div>
+      <h3>Mondo</h3>
+      <p class="note sub">Apri il mondo in LAN (Esc → Apri in LAN) e lascia la porta a 0: viene trovata da sola. Oppure indica il tuo server (consigliato: Paper con online-mode=false).</p>
+      <div class="mc-row">
+        <label>Indirizzo <input id="mc-host" placeholder="127.0.0.1" maxlength="253" /></label>
+        <label>Porta <input id="mc-port" type="number" min="0" max="65535" placeholder="0 = LAN" /></label>
+        <button id="mc-scan">Cerca mondo LAN</button>
+      </div>
+      <p id="mc-lan" class="note sub"></p>
+      <div class="mc-row">
+        <label>Nome dell'account (offline) <input id="mc-username" maxlength="16" placeholder="AlterEgo" /></label>
+        <label>Il tuo nome in Minecraft <input id="mc-player" maxlength="16" placeholder="il giocatore più vicino" /></label>
+        <label>Versione <input id="mc-version" maxlength="12" placeholder="automatica" /></label>
+      </div>
+      <label class="inline"><input type="checkbox" id="mc-fly" /> Riflessi ed emozioni dal cervello di moscerino (zero token)</label>
+      <label class="inline"><input type="checkbox" id="mc-learn" /> Impara giocando: le sequenze riuscite diventano abilità, gli errori lezioni</label>
+      <div class="actions"><button id="mc-forget">Dimentica abilità e lezioni</button> <span id="mc-learned" class="result"></span></div>
+      <h3>Installazione</h3>
+      <p class="note sub">Serve Node.js (quello del sistema se c'è, altrimenti una versione portatile da nodejs.org) e Mineflayer con i suoi plugin (licenza MIT, circa 650 MB).</p>
+      <div class="actions"><button id="mc-install">Installa / aggiorna</button> <span id="mc-node" class="result"></span></div>
+      <p id="mc-progress" class="result"></p>
+      <h3>Skin</h3>
+      <p class="note sub">Con un account offline la skin la vede solo chi ha uno di questi due:</p>
+      <label class="inline"><input type="checkbox" id="mc-csl" /> CustomSkinLoader (mod sul tuo Minecraft): copia la skin quando entra nel mondo</label>
+      <div class="actions"><button id="mc-csl-now">Copia adesso</button> <span id="mc-csl-msg" class="result"></span></div>
+      <label>SkinsRestorer (plugin del server): comando, URL o nome <input id="mc-skin-cmd" maxlength="250" placeholder="/skin url &quot;…&quot; oppure un nome premium" /></label>
+      <label class="inline"><input type="checkbox" id="mc-slim" /> Braccia sottili (slim)</label>
+      <p class="note sub">SkinsRestorer vuole un URL pubblico: salva il PNG, caricalo su <a href="#" id="mc-sr-link">skinsrestorer.net/upload</a> e incolla qui il comando che ti dà. Lo scrive in chat appena entra.</p>
+      <div class="actions"><button id="mc-skin-export">Salva il PNG della skin</button></div>
     </section>
 
     <section data-tab="games" data-game="vrchat" class="game-vrc">
@@ -816,5 +847,6 @@
   <script src="settings.js"></script>
   <script src="wide.js"></script>
   <script src="vrchat.js"></script>
+  <script src="minecraft.js"></script>
 </body>
 </html>

@@ -347,5 +347,25 @@
     "asked": false
   },
   "last_monitor": null,
-  "geometry": {}
+  "geometry": {},
+  "minecraft": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 0,
+    "username": "AlterEgo",
+    "player": "",
+    "version": "",
+    "initiative": 60,
+    "follow": true,
+    "gather": false,
+    "build": true,
+    "explore": false,
+    "fly": true,
+    "learn": true,
+    "skin": "alterego",
+    "skin_cmd": "",
+    "slim": false,
+    "csl": true,
+    "node": ""
+  }
 }

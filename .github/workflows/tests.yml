@@ -44,3 +44,7 @@ jobs:
         run: |
           pip install lupa
           for f in run_*.py; do echo "== $f"; python "$f"; done
+
+      - name: Test bot Minecraft (logica pura, senza server)
+        working-directory: src-tauri/mc_bot
+        run: node --test test/lib.test.js

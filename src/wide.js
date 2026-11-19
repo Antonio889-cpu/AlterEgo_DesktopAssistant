@@ -70,7 +70,7 @@
   hero.id = "w-games";
   hero.innerHTML = `<h2>Integrazioni</h2><div class="w-games">
     <button class="w-game gm on" data-game="gmod"><span class="w-game-art"></span><b>Garry's Mod</b><small id="w-gm-state">…</small></button>
-    <button class="w-game mc" data-game="minecraft"><span class="w-game-art"></span><b>Minecraft</b><small>Anteprima · in arrivo</small></button>
+    <button class="w-game mc" data-game="minecraft"><span class="w-game-art"></span><b>Minecraft</b><small id="w-mc-state">…</small></button>
     <button class="w-game vrc" data-game="vrchat"><span class="w-game-art"></span><b>VRChat</b><small id="w-vrc-state">Account dedicato via OSC</small></button></div>`;
   const firstGame = document.querySelector('main section[data-tab="games"]');
   firstGame.parentNode.insertBefore(hero, firstGame);
@@ -177,6 +177,7 @@
       invoke("memory_overview").catch(() => null),
       invoke("costs_list", { limit: 5000 }).catch(() => null),
     ]);
+    const mcs = await invoke("minecraft_status").catch(() => null);
     const cards = [];
     const first = cfg?.ai?.order?.find((id) => cfg.ai.providers?.[id]?.enabled);
     const model = first ? cfg.ai.providers[first].model : "";
@@ -184,7 +185,7 @@
     cards.push(card("local", "Ollama", local?.running ? "● " + t("Online") : local?.installed ? t("Fermo") : t("Non installato"),
       local ? t("{n} modelli installati", { n: local.models?.length || 0 }) + (local.version ? " · v" + esc(local.version) : "") : "", !!local?.running));
     cards.push(card("games", "Garry's Mod", gm?.in_game ? "● " + t("In partita") : gm?.linked ? t("Collegato") : gm?.installed ? t("Addon pronto") : t("Non collegato"),
-      gm?.games ? t("{n} partite ricordate", { n: gm.games }) : t("Anche VRChat, via OSC"), gm?.in_game ? true : undefined));
+      gm?.games ? t("{n} partite ricordate", { n: gm.games }) : (mcs?.in_game ? t("Minecraft: nel mondo") : t("Anche Minecraft e VRChat")), gm?.in_game ? true : undefined));
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const rows = (costs || []).filter((r) => r.ts * 1000 >= today.getTime());
     const tok = rows.reduce((a, r) => a + (r.input || 0) + (r.cached || 0), 0);
@@ -194,6 +195,7 @@
     const pr = { she: t("Lei"), he: t("Lui"), they: t("Neutri") }[cfg?.personality?.pronouns || "she"];
     cards.push(card("ai", t("Personalità"), esc(pr), cfg?.personality?.unfiltered ? t("Senza filtri attivo") : t("timidezza {c}% · affetto {w}%", { c: Math.round((1 - (cfg?.personality?.confidence ?? 0.3)) * 100), w: Math.round((cfg?.personality?.warmth ?? 0.7) * 100) }), undefined));
     $("w-gm-state").textContent = gm?.in_game ? t("In partita") : gm?.linked ? t("Collegato") : t("Non collegato");
+    $("w-mc-state").textContent = mcs?.in_game ? t("Nel mondo") : mcs?.running ? t("Collegamento…") : mcs?.installed ? t("Non collegato") : t("Da installare");
     // attività recente (ultime richieste)
     const fmtT = (ts) => new Date(ts * 1000).toLocaleTimeString(I18N.lang(), { hour: "2-digit", minute: "2-digit" });
     const recent = (costs || []).slice().sort((a, b) => b.ts - a.ts).slice(0, 7);

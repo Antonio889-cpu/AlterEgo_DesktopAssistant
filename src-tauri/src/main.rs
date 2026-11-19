@@ -14,6 +14,7 @@ mod extras;
 mod form;
 mod gmod;
 mod gmodlink;
+mod mclink;
 mod graphify;
 mod hermes;
 mod hotkeys;
@@ -118,6 +119,7 @@ pub struct FrontConfig {
     pet: config::PetConfig,
     gmodlink: config::GmodLinkConfig,
     vrchat: config::VrchatConfig,
+    minecraft: config::MinecraftConfig,
     extras: config::ExtrasConfig,
 }
 
@@ -166,6 +168,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         pet: cfg.pet.clone(),
         gmodlink: cfg.gmodlink.clone(),
         vrchat: cfg.vrchat.clone(),
+        minecraft: cfg.minecraft.clone(),
         extras: cfg.extras.clone(),
     }
 }
@@ -512,6 +515,7 @@ fn main() {
             app.manage(extras::Extras::default());
             app.manage(gmodlink::Link::default());
             app.manage(vrchat::Vrc::default());
+            app.manage(mclink::Mc::default());
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
@@ -559,6 +563,7 @@ fn main() {
                     *ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
                 }
             }
+            *app.state::<mclink::Mc>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             voicestudio::autostart(&handle);
@@ -584,6 +589,7 @@ fn main() {
             music::spawn_analyzer(handle.clone());
             gmod::spawn(handle.clone());
             gmodlink::spawn(handle.clone());
+            mclink::spawn(handle.clone());
             pet::spawn(handle.clone());
             extras::spawn(handle.clone());
             window::spawn_handle_poller(handle);
@@ -705,6 +711,16 @@ fn main() {
             vrchat::vrchat_login,
             vrchat::vrchat_logout,
             vrchat::vrchat_select_avatar,
+            mclink::minecraft_status,
+            mclink::minecraft_settings,
+            mclink::minecraft_install,
+            mclink::minecraft_join,
+            mclink::minecraft_scan_lan,
+            mclink::minecraft_skin_set,
+            mclink::minecraft_skin_get,
+            mclink::minecraft_skin_csl,
+            mclink::minecraft_skin_export,
+            mclink::minecraft_forget,
             rizzo::rizzo_set_dir,
             localai::local_catalog_open,
             hermes::hermes_status,
