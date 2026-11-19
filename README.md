@@ -19,7 +19,7 @@
 > who cooked up this beautiful franchise: this project exists because of you. ♥
 
 A desktop assistant for **Windows 10/11** and **Linux** inspired by *Alter Ego* from Danganronpa: a small CRT-laptop-style window,
-always on top, that you talk to by voice or text. She answers with her own personality, remembers who you are,
+always on top, that you talk to by voice or text. He/She answers with his/her own personality, remembers who you are,
 saves game clips with a phrase, plays music, searches the web and, if you allow it, performs actions on your PC.
 
 Interface in English and Italian.
@@ -78,13 +78,13 @@ Interface in English and Italian.
 - **Choice of audio devices**: speakers/headphones for the voice, microphone for push-to-talk.
 - **Mic-Link**: a virtual microphone, **AlterEgo Link Audio**, with your voice + Alter Ego's, for Discord, OBS and games.
 - **Music**: "play *title*" → Alter Ego searches YouTube and plays it in a CRT-style player with a spectrum, synced lyrics
-  and her face changing to the beat. While music plays, Alter Ego's window shrinks and she puts on her headphones.
+  and his/her face changing to the beat. While music plays, Alter Ego's window shrinks and he/she puts on his/her headphones.
 - **Music Venue**: a small library with recently played tracks and favorites, search and replay.
-- **Talk to the app**: "open music venue", "close the audio player", "open the website", "check for updates"… everything about the app can be done by asking her.
+- **Talk to the app**: "open music venue", "close the audio player", "open the website", "check for updates"… everything about the app can be done by asking him/her.
 - **Mouse and keyboard**: if you allow it, Alter Ego moves the cursor, clicks, types and presses keys (with confirmation and an emergency stop).
   Precise clicks: screenshots with numbered rulers and the cursor marked, zoom on small targets, a check screenshot after each click and, on Windows, the exact position of buttons and fields (UI Automation).
-- **SQL Server** on your PC: when needed she asks for the connection details in a small form (the password never goes to the AI model), reads data, and with your permission changes it; results also show up in a SQL window where you can write your own queries. **LocalDB** works too: server `(localdb)\MSSQLLocalDB`.
-- **Complex requests**: she chains tools by herself (terminal, files, web, screen, database) for up to 12 steps (adjustable), checks each result and changes approach when something fails.
+- **SQL Server** on your PC: when needed he/she asks for the connection details in a small form (the password never goes to the AI model), reads data, and with your permission changes it; results also show up in a SQL window where you can write your own queries. **LocalDB** works too: server `(localdb)\MSSQLLocalDB`.
+- **Complex requests**: he/she chains tools by himself/herself (terminal, files, web, screen, database) for up to 12 steps (adjustable), checks each result and changes approach when something fails.
 - **Noise suppression** for the Mic-Link microphone (RNNoise, adjustable).
 - **Updates**: website and GitHub links in the app and a button to update to the latest release.
 - **Web search** with your choice of engine: DeepSeek, Google (via Gemini), Tavily, Brave or DuckDuckGo (free), with fallback.
@@ -95,14 +95,14 @@ Interface in English and Italian.
   download from Hugging Face or any `.gguf` address, Ollama installed for you, **AMD Radeon** support (RX 6600 and newer, Vulkan) also on PCs with an Intel iGPU.
 - **Fewer tokens in complex reasoning**: tools in groups loaded on demand, old tool results compacted, automatic thinking, project maps with Graphify.
 - **Knows which apps are open** (names only), without breaking the provider cache.
-- **Terminal**: Alter Ego can run PowerShell or cmd commands (bash on Linux), with confirmation or autonomously; she keeps the working folder between commands.
-- **Full log** in Settings → Log: model requests, fallbacks, tools with result and duration, errors. **Silent start**: at login she starts hidden in the tray.
+- **Terminal**: Alter Ego can run PowerShell or cmd commands (bash on Linux), with confirmation or autonomously; he/she keeps the working folder between commands.
+- **Full log** in Settings → Log: model requests, fallbacks, tools with result and duration, errors. **Silent start**: at login he/she starts hidden in the tray.
 - **Voice clips**: "Alter Ego clip that" → saves the clip with AMD Adrenalin, NVIDIA App or Medal, **without going through the AI**.
 - **PC actions** through tool calling, all off by default, with confirmation for sensitive ones (can be turned off) and a browsable log.
 - **Local memory** (SQLite): remembers conversations, writes summaries, learns facts about you.
-- **Adjustable personality** (shy ↔ confident, formal ↔ affectionate), imitation mode, answers in Italian, English or both.
+- **Adjustable personality** (shy ↔ confident, formal ↔ affectionate), **pronouns** (she, he or they), imitation mode, answers in Italian, English or both.
 - Facial expressions driven by the answers (happy, surprised, embarrassed, sad, worried, thinking, error).
-- **Pet mode**: in quiet moments Alter Ego comes out of the TV as a little pixel sprite and lives on your desktop: she walks, jumps, stands on open windows and on the taskbar, and you can grab and throw her. She goes back in when you talk to her.
+- **Pet mode**: in quiet moments Alter Ego comes out of the TV as a little pixel sprite and lives on your desktop: he/she walks, jumps, stands on open windows and on the taskbar, and you can grab and throw him/her. He/She goes back in when you talk to him/her.
 - Lightweight: Tauri 2 (Rust) + vanilla HTML/CSS/JS, installer of about 6 MB.
 
 ## Screenshots
@@ -121,7 +121,7 @@ Interface in English and Italian.
 | | |
 |---|---|
 | ![Alter Ego with headphones while music plays](docs/screenshots/en/main-music.png) | ![Music player: spectrum, title, controls, favorite, Venue button, synced lyrics](docs/screenshots/en/player.png) |
-| While music plays she wears headphones (sprite by [Ayari](https://www.instagram.com/xxayariii/)) | Player: favorite ♥, Music Venue button, resizable corner |
+| While music plays he/she wears headphones (sprite by [Ayari](https://www.instagram.com/xxayariii/)) | Player: favorite ♥, Music Venue button, resizable corner |
 | ![Music Venue: recent tracks, favorites and now playing](docs/screenshots/en/venue.png) | ![Music Venue: search in the library or on YouTube](docs/screenshots/en/venue-search.png) |
 | Music Venue: recent tracks, favorites, now playing | Search in the library or on YouTube |
 
@@ -217,7 +217,7 @@ From the tray you can also change opacity, background (scanlines, circuits, both
 - **Several keys per service**: if a key answers 401, 402, 403, 429 or "quota", the next one is used right away.
   Next time it starts from the last one that worked.
 - **Fallback**: change the order of the services with ▲▼. If one doesn't answer (network, server error, no valid key), the next one is tried.
-- Timeouts and 2 retries with increasing waits on temporary errors. If nobody answers, Alter Ego says so with her error expression.
+- Timeouts and 2 retries with increasing waits on temporary errors. If nobody answers, Alter Ego says so with his/her error expression.
   **Esc** stops an answer that is taking too long; a tool that hangs is stopped after a while, and the same call repeated over and over is blocked.
 - **Advanced settings** (Settings → AI & keys): max tokens per answer, top P, max wait for the answer, max tool steps.
   For **Ollama**: context window (`num_ctx`), how long the model stays loaded and GPU layers (these use Ollama's native API).
@@ -249,14 +249,14 @@ that start exactly like a previous request. That's why:
   - **[VoiceStudio](https://github.com/debpalash/VoiceStudio)** (AGPL-3.0, local voices and voice cloning): *Use VoiceStudio* installs it
     with the official script if missing (with confirmation), starts it, points the voice at `http://127.0.0.1:3900/v1` and can start it together with Alter Ego.
 
-  Sentences are synthesized one at a time: the first one plays right away, the others are prepared while she talks. Her face moves while the voice plays.
+  Sentences are synthesized one at a time: the first one plays right away, the others are prepared while he/she talks. His/her face moves while the voice plays.
 - **Devices**: choose the output for voice and sounds and the push-to-talk microphone (or keep the Windows defaults).
 - **Dialogue blips**: Danganronpa style (recreated with audio synthesis, no original files), soft blips, or muted.
 
 ## Mic-Link
 
-Mic-Link creates a virtual microphone, **AlterEgo Link Audio**, that carries **your microphone + Alter Ego's voice** (and, optionally, the blips and the music).
-Pick it as the microphone in Discord, OBS, Teams or a game and other people hear her too.
+Mic-Link creates a virtual microphone, **AlterEgo Link Audio**, that carries **your microphone + Alter Ego's voice** (and, optionally, the blips and the music). Guest characters of the extra content are never sent into it: they only play on your speakers.
+Pick it as the microphone in Discord, OBS, Teams or a game and other people hear him/her too.
 
 Windows doesn't let an app create an audio device on its own: a driver is needed. Alter Ego uses the free virtual cable
 **[VB-CABLE](https://vb-audio.com/Cable/)** by VB-Audio (donationware, not bundled: download it from their website).
@@ -268,7 +268,7 @@ Windows doesn't let an app create an audio device on its own: a driver is needed
 3. Turn on **Mic-Link** and pick your real microphone. Adjust the microphone and voice volumes.
 4. In other apps pick **AlterEgo Link Audio** as the microphone.
 
-How it works: Alter Ego reads your microphone and writes the microphone mixed with her voice to the output side of the cable
+How it works: Alter Ego reads your microphone and writes the microphone mixed with his/her voice to the output side of the cable
 (maximum microphone latency ~150 ms). You still hear the voice from your speakers.
 If you hear nothing after installing VB-CABLE, Windows made it the default output: switch back to your speakers
 in *Windows Settings → System → Sound* (Alter Ego's settings warn you about it).
@@ -289,18 +289,18 @@ You can also say "add … to the queue", "pause", "next", "previous", "volume to
   (lots of Japanese and anime songs), the subtitles uploaded to the YouTube video and, if nothing else exists, plain lyrics with estimated timing.
   Hover the lyrics to see where they come from.
 - **Compact mode**: while a track plays, Alter Ego's window shrinks (anchored to the nearest screen corner);
-  it grows back when she talks, thinks, listens or you open the text box. It can be turned off in *Voice & audio → Music*.
+  it grows back when he/she talks, thinks, listens or you open the text box. It can be turned off in *Voice & audio → Music*.
 - The **player** is a separate always-on-top window that turns on and off like an old TV. It shows:
   the frequency spectrum, title and artist, progress (click or drag to seek), shuffle / previous / play-pause /
   next / repeat (off, whole queue, one track), volume and **synced lyrics**.
-  On the right, **Alter Ego's face changes to the beat**: on bass hits she switches expression
+  On the right, **Alter Ego's face changes to the beat**: on bass hits he/she switches expression
   based on the track's energy (calmer → thinking/sad, livelier → happy/surprised).
 - Drag it wherever you like; it remembers its position. Space = play/pause, arrows = ±5 seconds. ✕ stops the music.
 - Music plays on the same device as the voice and gets quieter by itself while Alter Ego talks. With Mic-Link you can also
   send it to the virtual microphone (*The player's music too*).
-- **Headphones**: while music plays and nobody is talking to her, Alter Ego wears headphones and sways to the music;
-  when you ask her something she goes back to her usual expressions. Can be turned off in *Voice & audio → Music*.
-- The player **resizes** from its bottom-right corner (or Ctrl + wheel) and opens **next to Alter Ego without covering her**.
+- **Headphones**: while music plays and nobody is talking to him/her, Alter Ego wears headphones and sways to the music;
+  when you ask him/her something he/she goes back to his/her usual expressions. Can be turned off in *Voice & audio → Music*.
+- The player **resizes** from its bottom-right corner (or Ctrl + wheel) and opens **next to Alter Ego without covering him/her**.
   Volume follows a curve (half way ≈ normal listening volume, maximum lower than before) and moves in 2% steps with the wheel or ↑ ↓.
 - **Music Venue** (button in the player, the tray menu, or "open music venue"): recent tracks and favorites with covers,
   search in your library or on YouTube, play or queue with one click, heart to add to favorites. Saved in `music_library.json`.
@@ -355,7 +355,7 @@ every search shows up in the Costs tab.
   without long comments in between and to ask only for the data it needs;
 - **automatic thinking**: off for simple questions, hidden for the others;
 - the list of **open applications** goes at the end of the question, never in the system prompt, so the prefix cache keeps working;
-- **project maps** ([Graphify](https://github.com/Graphify-Labs/graphify)): a folder of code becomes a knowledge graph that she queries instead of reading files one by one.
+- **project maps** ([Graphify](https://github.com/Graphify-Labs/graphify)): a folder of code becomes a knowledge graph that he/she queries instead of reading files one by one.
 
 Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini): the fixed part comes first, history moves in steps.
 
@@ -476,17 +476,17 @@ Every action, even a denied one, goes to **Settings → Log**. Technical details
 
 - **Character sheet**: `%APPDATA%\AlterEgo\persona\alter_ego.md` (in Italian; the model answers in the chosen language).
   Edit it as you like: it applies from the next message. Lines starting with `>` are notes and are not sent to the model.
-- **Personality**: shy ↔ confident and formal ↔ affectionate sliders, **imitation mode** (write who to imitate),
+- **Personality**: shy ↔ confident and formal ↔ affectionate sliders, **pronouns** (she, he or they: in the series Alter Ego is neither a he nor a she), **imitation mode** (write who to imitate),
   answer language: automatic (same as the interface), Italian only, Italian + English, English only.
-- **Unfiltered** (off by default): she does what you ask even if she disagrees, without lectures. PC actions still go through
+- **Unfiltered** (off by default): he/she does what you ask even if he/she disagrees, without lectures. PC actions still go through
   permissions and confirmations, and your AI provider's own rules still apply.
 - **Memory** (SQLite, only on your PC):
-  - every message sends the latest messages, a summary and the facts she knows about you;
-  - from time to time she summarizes old conversations and learns lasting facts about you;
+  - every message sends the latest messages, a summary and the facts he/she knows about you;
+  - from time to time he/she summarizes old conversations and learns lasting facts about you;
   - in *Settings → Memory* you can see, add or delete facts, export everything as JSON or press *Forget everything*;
   - **Compact** merges duplicate facts, drops useless ones and deletes old messages already covered by a summary (the latest ones stay);
-    it also runs by itself when she knows more than 40 facts.
-- **Character**: the sheet follows Alter Ego from Danganronpa more closely (Chihiro, hope and despair, how she talks);
+    it also runs by itself when he/she knows more than 40 facts.
+- **Character**: the sheet follows Alter Ego from Danganronpa more closely (Chihiro, hope and despair, how he/she talks);
   an unmodified copy updates itself with new versions.
 
 ## Sprites
@@ -519,74 +519,74 @@ python tools/process_sprites.py
 With the **Alter Ego Link** addon (written for this app, installed by it into `garrysmod/addons/alterego_link`)
 Alter Ego joins **Garry's Mod** (Sandbox) as a character and plays with you. *Settings → Voice & audio → Garry's Mod: play with me*.
 
-- She **follows** you, waits, comes where you look, jumps, waves, dances, **spawns** props (melon, crate, barrel, chair…),
+- He/She **follows** you, waits, comes where you look, jumps, waves, dances, **spawns** props (melon, crate, barrel, chair…),
   **picks them up and throws** them with a physgun-like beam, takes a weapon and **fights** by your side.
-- **Talk to her** with push-to-talk or in the **game chat**; she also answers other players when they call her by name.
-  She speaks with her voice on the PC and her lines appear in the chat.
-- **Long jobs become small Lua scripts** she writes herself ("when you see chickens around, shoot them",
-  "bring me that vehicle"): they run inside the game with no more tokens. They live in a sandbox: only her actions
+- **Talk to him/her** with push-to-talk or in the **game chat**; he/she also answers other players when they call him/her by name.
+  He/She speaks with his/her voice on the PC and his/her lines appear in the chat.
+- **Long jobs become small Lua scripts** he/she writes himself/herself ("when you see chickens around, shoot them",
+  "bring me that vehicle"): they run inside the game with no more tokens. They live in a sandbox: only his/her actions
   (find, go, grab, attack, say…), no files, network or console, a CPU limit between waits, max 3 at a time, 30 minutes each.
 - **Few tokens**: following and looking around run in the game; simple commands ("follow me", "stop", "come here", "jump")
   are keywords with no AI call; otherwise a short fixed prompt (cached) plus the game state in one line (~100 tokens),
-  only when someone talks to her or something important happens. Requests for the PC (music, web, files) still go to the usual Alter Ego.
+  only when someone talks to him/her or something important happens. Requests for the PC (music, web, files) still go to the usual Alter Ego.
 - The app and the game talk through two files in `garrysmod/data/alterego/`: no launch options, no binary modules.
   Single player and servers you host (the addon has to run on the server).
 - Use the **borderless window** video mode: an exclusive full-screen game hides every other window.
-- **Body**: with [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (Workshop addon by StarFrost, not included: subscribe to it on Steam) she is a Lambda Player and moves like a real player (running, jumping, player weapons, a real physgun); its own decisions, chat and voice are switched off, Alter Ego is in charge. Without it she's a citizen NPC. *Automatic* picks Lambda when it's installed; you can choose in the settings or in the C menu.
-- **She plays like a friend in the match**: if you throw something at her she dodges, jumps or catches it with her physgun (and sometimes
-  sends it back), and she remembers who did it. She laughs, banters ("gg", "you'll pay for that!") and sooner or later gets even with a prank
-  she invents herself, with quick actions or a Lua script she writes on the spot, or a ready-made one: throwing the prop back,
+- **Body**: with [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (Workshop addon by StarFrost, not included: subscribe to it on Steam) he/she is a Lambda Player and moves like a real player (running, jumping, player weapons, a real physgun); its own decisions, chat and voice are switched off, Alter Ego is in charge. Without it he/she's a citizen NPC. *Automatic* picks Lambda when it's installed; you can choose in the settings or in the C menu.
+- **He/She plays like a friend in the match**: if you throw something at him/her he/she dodges, jumps or catches it with his/her physgun (and sometimes
+  sends it back), and he/she remembers who did it. He/She laughs, banters ("gg", "you'll pay for that!") and sooner or later gets even with a prank
+  he/she invents himself/herself, with quick actions or a Lua script he/she writes on the spot, or a ready-made one: throwing the prop back,
   a watermelon on your head, a crate in your way, a few shots or an exploding barrel (*Pranks*: all, light, none). When nothing is happening
-  she plays on her own (stacks props, target practice, emotes) or comes up with something new. Quick one-liners are instant and cost no tokens.
-- **Vehicles and sitting**: she spawns a jeep, an airboat or a seat; she sits on chairs, couches, seats or on the floor ("sit", "stand up");
-  if you get into a car while she's nearby, she hops in as a passenger, rides along and gets out with you.
-- **Game memory**: each match becomes one line in a separate archive (`gmod_memory.json`, not in her main memory), written without AI.
+  he/she plays on his/her own (stacks props, target practice, emotes) or comes up with something new. Quick one-liners are instant and cost no tokens.
+- **Vehicles and sitting**: he/she spawns a jeep, an airboat or a seat; he/she sits on chairs, couches, seats or on the floor ("sit", "stand up");
+  if you get into a car while he/she's nearby, he/she hops in as a passenger, rides along and gets out with you.
+- **Game memory**: each match becomes one line in a separate archive (`gmod_memory.json`, not in his/her main memory), written without AI.
   It's only looked up when needed: one line about the last game with the same friends at the start, and the full memories
   when you ask ("do you remember…", "last time…"; for doubtful cases Rizzo Flow decides, if it's your router).
-- **A personality that grows**: the pranks and games she invents become *habits* (the Lua script or the actions are kept, so she can redo them
-  without tokens). After each one she watches your chat for 25 s: if you laugh it becomes a favorite, if you get annoyed she drops it
-  (Rizzo Flow judges the reaction if it's your router, otherwise keywords). Her traits (curious, mischievous, bold, warm) shift slowly with
-  experience. *Unpredictability* (0-100) sets how often she invents something new instead of repeating her favorites. Separate archive
+- **A personality that grows**: the pranks and games he/she invents become *habits* (the Lua script or the actions are kept, so he/she can redo them
+  without tokens). After each one he/she watches your chat for 25 s: if you laugh it becomes a favorite, if you get annoyed he/she drops it
+  (Rizzo Flow judges the reaction if it's your router, otherwise keywords). His/her traits (curious, mischievous, bold, warm) shift slowly with
+  experience. *Unpredictability* (0-100) sets how often he/she invents something new instead of repeating his/her favorites. Separate archive
   `gmod_persona.json`; *Reset personality* in the settings.
-- **Long goals**: "explore the map and find a car", "fill the map with watermelons", "build a tower of couches" — she sets herself a goal
-  and works on it step by step (spawns the props, then places them with the physgun), asking herself for the next step each time the
+- **Long goals**: "explore the map and find a car", "fill the map with watermelons", "build a tower of couches" — he/she sets himself/herself a goal
+  and works on it step by step (spawns the props, then places them with the physgun), asking himself/herself for the next step each time the
   previous one finishes, until it's done (max 40 steps / 90 min; "stop" ends it). If Rizzo Flow is your router it checks, without tokens, whether the goal is already reached.
-- **Impact resistance**: props and cars flying at her hurt less (*High* by default, or *Normal* / *Very high*).
-- Menu in game: hold **C** → **Alter Ego** in the top bar or the *Alter Ego* icon, right-click on her → *Alter Ego…*, or the console command `alterego_menu`.
-- Character model: from that menu pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default she's a Half-Life 2 citizen.
+- **Impact resistance**: props and cars flying at him/her hurt less (*High* by default, or *Normal* / *Very high*).
+- Menu in game: hold **C** → **Alter Ego** in the top bar or the *Alter Ego* icon, right-click on him/her → *Alter Ego…*, or the console command `alterego_menu`.
+- Character model: from that menu pick any installed playermodel (with preview), or "same as mine". Playermodels are bonemerged onto an invisible NPC body, so they animate properly; NPC models work too. By default he/she's a Half-Life 2 citizen.
 
 ### Fruit-fly brain (reflexes)
 
-Her body also runs a **real fruit-fly brain**: part of the *Drosophila melanogaster* connectome mapped neuron by neuron
+His/her body also runs a **real fruit-fly brain**: part of the *Drosophila melanogaster* connectome mapped neuron by neuron
 by [FlyWire](https://flywire.ai) (~9,500 neurons and ~690,000 synapses, the ones that respond to the senses used in the game),
 simulated on your PC in real time with the leaky integrate-and-fire model of Shiu et al. (Nature 2024). On by default; no tokens.
 
-- **Senses** (always on): pain (hits, fire), *looming* objects (a prop or a car flying at her, left or right), sweetness (a watermelon nearby), touch (physgun, *use*).
-  Extra senses in the settings: smell (food, smoke, explosions), temperature and water, hearing (gunshots, loud noises), light (a flashlight in her face), wind (when you throw her).
-- **Reflexes**: they come from the real descending neurons (something flying at her fires the **Giant Fiber**, the turning neurons pick the side),
-  but they're expressed **like a player, not like an insect**: she side-steps, flees only from explosive barrels and cars,
-  and **gets used to it** (the tenth barrel gets a dirty look, not a jump). Sweetness makes her want to play with the watermelon.
-- **Adrenaline**: hits and dodges build up adrenaline that fades in about 40 s and reaches the AI in one short line, together with her "rivals".
-  You can turn off the reflexes, the adrenaline, or show the neuron activity above her head.
-- **FruitFly Monitor**: a green CRT window with her mood (curious, calm, anxious, playful, resting), a wireframe brain whose regions light up
-  when they fire (eyes, antennae, mushroom bodies, central brain, taste, nerve cord), her current goal and favorite habit.
-  Open it from the settings, from the in-game menu (C → Alter Ego → FruitFly Monitor) or automatically when she joins.
+- **Senses** (always on): pain (hits, fire), *looming* objects (a prop or a car flying at him/her, left or right), sweetness (a watermelon nearby), touch (physgun, *use*).
+  Extra senses in the settings: smell (food, smoke, explosions), temperature and water, hearing (gunshots, loud noises), light (a flashlight in his/her face), wind (when you throw him/her).
+- **Reflexes**: they come from the real descending neurons (something flying at him/her fires the **Giant Fiber**, the turning neurons pick the side),
+  but they're expressed **like a player, not like an insect**: he/she side-steps, flees only from explosive barrels and cars,
+  and **gets used to it** (the tenth barrel gets a dirty look, not a jump). Sweetness makes him/her want to play with the watermelon.
+- **Adrenaline**: hits and dodges build up adrenaline that fades in about 40 s and reaches the AI in one short line, together with his/her "rivals".
+  You can turn off the reflexes, the adrenaline, or show the neuron activity above his/her head.
+- **FruitFly Monitor**: a green CRT window with his/her mood (curious, calm, anxious, playful, resting), a wireframe brain whose regions light up
+  when they fire (eyes, antennae, mushroom bodies, central brain, taste, nerve cord), his/her current goal and favorite habit.
+  Open it from the settings, from the in-game menu (C → Alter Ego → FruitFly Monitor) or automatically when he/she joins.
 - How the circuit was extracted: [`tools/flybrain/`](tools/flybrain/).
 
 ## Pet
 
-When nothing is happening, Alter Ego goes out to explore: the TV switches off and she jumps out
-as a small pixel-art sprite (the built-in one is **Chihiro**). Then she lives on your desktop by herself:
+When nothing is happening, Alter Ego goes out to explore: the TV switches off and he/she jumps out
+as a small pixel-art sprite (the built-in one is **Chihiro**). Then he/she lives on your desktop by himself/herself:
 
-- she walks, stops, jumps, and lets herself drop off the edges;
-- she stands **on top of open windows** (only the visible part of their top edge) and on the **taskbar**; if you move the window she's on, she rides along; if you close or minimize it, she falls;
-- the screen edges are walls, and she can walk from one monitor to another;
-- **drag** her with the mouse and **throw** her (she bounces off the walls); a **click** makes her jump; a **double-click** sends her back into the TV.
+- he/she walks, stops, jumps, and lets himself/herself drop off the edges;
+- he/she stands **on top of open windows** (only the visible part of their top edge) and on the **taskbar**; if you move the window he/she's on, he/she rides along; if you close or minimize it, he/she falls;
+- the screen edges are walls, and he/she can walk from one monitor to another;
+- **drag** him/her with the mouse and **throw** him/her (he/she bounces off the walls); a **click** makes him/her jump; a **double-click** sends him/her back into the TV.
 
-She goes back into the TV when you talk to her (push-to-talk, text box), when she has something to say (answers, reminders, confirmations),
-with *Show / hide* or the tray icon, and by herself after a while. She doesn't go out while music is playing, and she hides while a game or a video is full screen.
+He/She goes back into the TV when you talk to him/her (push-to-talk, text box), when he/she has something to say (answers, reminders, confirmations),
+with *Show / hide* or the tray icon, and by himself/herself after a while. He/She doesn't go out while music is playing, and he/she hides while a game or a video is full screen.
 
-*Settings → Pet*: on/off, how many quiet minutes before she can go out, how often, how long she stays out, size, and *Explore now*.
+*Settings → Pet*: on/off, how many quiet minutes before he/she can go out, how often, how long he/she stays out, size, and *Explore now*.
 The tray menu has *Explore the desktop* / *Call Alter Ego back into the TV*.
 
 **Other pets**: you can import a pet from a `.json` file like this (the "c2dictionary" format). Only the pixel-art
@@ -599,9 +599,9 @@ sprite sheet is used; any other image in the file (`urlFront`, `urlStart`, stick
 ```
 
 The sheet is downloaded once into `%APPDATA%\AlterEgo\pets\<name>\`. It has **2 rows of square frames**:
-row 1 *still A, still B, jump, fall*, row 2 the *run* (`runFrames` frames); the character looks to the right (she's mirrored when going left).
+row 1 *still A, still B, jump, fall*, row 2 the *run* (`runFrames` frames); the character looks to the right (he/she's mirrored when going left).
 
-On Linux she only uses the bottom of the screen and the taskbar: windows are read only on Windows.
+On Linux he/she only uses the bottom of the screen and the taskbar: windows are read only on Windows.
 
 ## Privacy and security
 
@@ -757,7 +757,7 @@ The version comes from `src-tauri/tauri.conf.json`.
 - Kokoro on CPU takes about half a second per sentence on a recent PC; the first sentence after startup waits for the model to load.
 - The character sheet was written without access to the wiki pages: feel free to enrich it.
 - Unsigned build: SmartScreen may show a warning.
-- The pet reads open windows only on Windows (still to be verified on a real PC); on Linux she uses only the bottom of the screen.
+- The pet reads open windows only on Windows (still to be verified on a real PC); on Linux he/she uses only the bottom of the screen.
 
 ## Credits and licenses
 

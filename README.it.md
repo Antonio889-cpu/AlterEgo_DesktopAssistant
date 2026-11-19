@@ -78,13 +78,13 @@ Interfaccia in italiano e in inglese.
 - **Dispositivi audio a scelta**: altoparlanti/cuffie per la voce, microfono per il push-to-talk.
 - **Mic-Link**: microfono virtuale **AlterEgo Link Audio** con la tua voce + quella di Alter Ego, da usare in Discord, OBS, giochi.
 - **Musica**: "metti *titolo*" → Alter Ego cerca su YouTube e suona in un lettore in stile CRT con spettro, testo sincronizzato
-  e il suo volto che cambia a tempo di musica. Mentre suona, la finestra di Alter Ego si rimpicciolisce e lei mette le cuffie.
+  e il suo volto che cambia a tempo di musica. Mentre suona, la finestra di Alter Ego si rimpicciolisce e lui/lei mette le cuffie.
 - **Music Venue**: piccola libreria con i brani ascoltati di recente e i preferiti, ricerca e riascolto.
-- **Parla con l'app**: "apri music venue", "chiudi il lettore audio", "apri il sito", "controlla gli aggiornamenti"… tutto ciò che riguarda l'app si fa chiedendolo a lei.
+- **Parla con l'app**: "apri music venue", "chiudi il lettore audio", "apri il sito", "controlla gli aggiornamenti"… tutto ciò che riguarda l'app si fa chiedendolo a lui/lei.
 - **Mouse e tastiera**: se lo permetti, Alter Ego muove il cursore, clicca, scrive e preme tasti (con conferma e stop d'emergenza).
   Clic precisi: screenshot con righelli numerati e cursore segnato, zoom sui punti piccoli, screenshot di controllo dopo ogni clic e, su Windows, la posizione esatta di pulsanti e campi (UI Automation).
 - **SQL Server** sul tuo PC: quando serve chiede i dati di connessione in un piccolo modulo (la password non va mai al modello AI), legge i dati e, se lo permetti, li modifica; i risultati si vedono anche in una finestra SQL dove puoi scrivere le tue query. Funziona anche **LocalDB**: server `(localdb)\MSSQLLocalDB`.
-- **Richieste complesse**: concatena da sola gli strumenti (terminale, file, web, schermo, database) fino a 12 passaggi (regolabili), controlla ogni risultato e cambia strada se qualcosa non va.
+- **Richieste complesse**: concatena da solo/a gli strumenti (terminale, file, web, schermo, database) fino a 12 passaggi (regolabili), controlla ogni risultato e cambia strada se qualcosa non va.
 - **Riduzione del rumore** del microfono di Mic-Link (RNNoise, regolabile).
 - **Aggiornamenti**: link al sito e a GitHub nell'app e un tasto per aggiornare all'ultima release.
 - **Ricerca web** con il motore che preferisci: DeepSeek, Google (tramite Gemini), Tavily, Brave o DuckDuckGo (gratis), con fallback.
@@ -100,9 +100,9 @@ Interfaccia in italiano e in inglese.
 - **Clip vocali**: "Alter Ego clippa" → salva la clip con AMD Adrenalin, NVIDIA App o Medal, **senza passare dall'AI**.
 - **Azioni sul PC** tramite tool calling, tutte spente di default, con conferma per quelle sensibili (disattivabile) e registro consultabile.
 - **Memoria locale** (SQLite): ricorda le conversazioni, fa riassunti, impara fatti su di te.
-- **Personalità regolabile** (timida ↔ sicura, formale ↔ affettuosa), modalità imitazione, risposte in italiano, inglese o entrambe.
+- **Personalità regolabile** (timidezza ↔ sicurezza, formalità ↔ affetto), **pronomi** (lei, lui o neutri), modalità imitazione, risposte in italiano, inglese o entrambe.
 - Espressioni del volto pilotate dalle risposte (felice, sorpresa, imbarazzata, triste, preoccupata, pensierosa, errore).
-- **Modalità pet**: nei momenti di calma Alter Ego esce dalla TV come un piccolo sprite in pixel art e vive sul tuo desktop: cammina, salta, sta in piedi sulle finestre aperte e sulla barra delle applicazioni, e puoi prenderla e lanciarla. Rientra quando le parli.
+- **Modalità pet**: nei momenti di calma Alter Ego esce dalla TV come un piccolo sprite in pixel art e vive sul tuo desktop: cammina, salta, sta in piedi sulle finestre aperte e sulla barra delle applicazioni, e puoi prenderlo/a e lanciarlo/a. Rientra quando gli/le parli.
 - Leggera: Tauri 2 (Rust) + HTML/CSS/JS vanilla, installer di circa 6 MB.
 
 ## Screenshot
@@ -257,7 +257,8 @@ che iniziano esattamente come una richiesta precedente. Per questo:
 ## Mic-Link
 
 Mic-Link crea un microfono virtuale, **AlterEgo Link Audio**, che contiene **il tuo microfono + la voce di Alter Ego** (e, se vuoi, i blip).
-Scegliendolo come microfono in Discord, OBS, Teams o in un gioco, gli altri sentono anche lei.
+Scegliendolo come microfono in Discord, OBS, Teams o in un gioco, gli altri sentono anche lui/lei.
+I personaggi ospiti dei contenuti aggiuntivi non ci finiscono mai: si sentono solo dai tuoi altoparlanti.
 
 Windows non permette a un'app di creare da sola un dispositivo audio: serve un driver. Alter Ego usa il cavo virtuale gratuito
 **[VB-CABLE](https://vb-audio.com/Cable/)** di VB-Audio (donationware, non incluso: si scarica dal loro sito).
@@ -300,7 +301,7 @@ Puoi anche dire "metti in coda…", "pausa", "avanti", "indietro", "volume al 40
 - La musica esce dallo stesso dispositivo della voce e si abbassa da sola mentre Alter Ego parla. Con Mic-Link puoi mandarla
   anche nel microfono virtuale (*Anche la musica del lettore*).
 - **Cuffie**: mentre suona la musica e nessuno le parla, Alter Ego mette le cuffie e dondola a tempo;
-  quando le chiedi qualcosa torna alle solite espressioni. Si disattiva in *Voce e audio → Musica*.
+  quando gli/le chiedi qualcosa torna alle solite espressioni. Si disattiva in *Voce e audio → Musica*.
 - Il lettore si **ridimensiona** dall'angolo in basso a destra (o con Ctrl + rotella) e si apre **accanto ad Alter Ego senza coprirla**.
   Il volume segue una curva (a metà ≈ volume d'ascolto normale, massimo più basso di prima) e si muove a passi del 2% con rotella o ↑ ↓.
 - **Music Venue** (tasto nel lettore, menu della tray, oppure "apri music venue"): brani recenti e preferiti con copertina,
@@ -356,7 +357,7 @@ Le **richieste complesse** (molti passaggi con gli strumenti) sono quelle che sp
   senza lunghi commenti in mezzo e di chiedere solo i dati che servono;
 - **ragionamento automatico**: spento per le domande semplici, nascosto per le altre;
 - l'elenco delle **applicazioni aperte** va in fondo alla domanda, mai nel prompt di sistema, così la cache del prefisso continua a funzionare;
-- **mappe dei progetti** ([Graphify](https://github.com/Graphify-Labs/graphify)): una cartella di codice diventa un grafo di conoscenza che lei interroga invece di leggere i file uno per uno.
+- **mappe dei progetti** ([Graphify](https://github.com/Graphify-Labs/graphify)): una cartella di codice diventa un grafo di conoscenza che lui/lei interroga invece di leggere i file uno per uno.
 
 I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSeek, Gemini): prima la parte fissa, la cronologia si sposta a scatti.
 
@@ -375,7 +376,7 @@ I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSee
 - **Modelli consigliati**: LFM3, **Gemma 4** (strumenti, visione, ragionamento) e **Gemma 3** (chat e visione; su Ollama niente strumenti).
 - **Catalogo** in una finestra a parte, nello stile di Alter Ego: libreria ufficiale di Ollama, modelli della community e GGUF su Hugging Face, con ricerca e filtri
   (abliterated, uncensored, heretic, strumenti, visione, ragionamento, dimensione massima), scelta della quantizzazione per Hugging Face, avanzamento e annulla.
-- **Strumenti con i modelli locali**: Alter Ego usa l'API nativa di Ollama e sceglie da sola un contesto di 16K o 32K, così prompt
+- **Strumenti con i modelli locali**: Alter Ego usa l'API nativa di Ollama e sceglie da solo/a un contesto di 16K o 32K, così prompt
   e lista degli strumenti non vengono più tagliati dal contesto predefinito di Ollama (4K).
 
 ![Catalogo dei modelli](docs/screenshots/models-catalog.png)
@@ -405,7 +406,7 @@ non è supportata da Ollama: con le Radeon la strada stabile e veloce è Vulkan.
 
 Il gioco multiplayer **Alter Net** si apre dentro Alter Ego: «apri Alter Net», la voce nella tray o Impostazioni → Generale.
 Finestra a schermo intero senza bordi: **F11** alterna schermo intero e finestra, **Esc due volte** chiude.
-Se il server non risponde si apre la versione offline in giocatore singolo: Alter Ego la scarica da sola dal server la prima volta che giochi online (in `%APPDATA%\AlterNet\offline`, su Linux `~/.local/share/AlterNet/offline`).
+Se il server non risponde si apre la versione offline in giocatore singolo: Alter Ego la scarica da solo/a dal server la prima volta che giochi online (in `%APPDATA%\AlterNet\offline`, su Linux `~/.local/share/AlterNet/offline`).
 «Cambia server…» permette di usare un altro indirizzo.
 
 | | |
@@ -469,7 +470,7 @@ un'azione senza che tu la veda prima, quindi attivalo solo con azioni e cartelle
 | **Mouse e tastiera**: sposta, clicca, scorre, scrive, preme tasti, legge i controlli di una finestra (Windows) | ⚠ ogni azione, oppure **in autonomia**; mouse nell'angolo in alto a sinistra = stop |
 | **Database SQL Server** su questo PC: connessione (modulo), lettura; **modifiche** solo se le permetti | modifiche ⚠ sempre; DROP/TRUNCATE e DELETE/UPDATE senza WHERE sempre |
 | **Mappa dei progetti** (Graphify) delle cartelle consentite: crea la mappa, poi la interroga | ⚠ per creare una mappa |
-| **Comandi dell'app** ("apri music venue", "chiudi il lettore"…), solo Alter Ego stessa, **acceso di default** | no (l'aggiornamento chiede sempre) |
+| **Comandi dell'app** ("apri music venue", "chiudi il lettore"…), solo Alter Ego stesso/a, **acceso di default** | no (l'aggiornamento chiede sempre) |
 
 Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli tecnici in [docs/PERMESSI.md](docs/PERMESSI.md).
 
@@ -477,7 +478,7 @@ Ogni azione, anche negata, finisce in **Impostazioni → Registro**. Dettagli te
 
 - **Scheda del personaggio**: `%APPDATA%\AlterEgo\persona\alter_ego.md`. Modificala come vuoi: vale dal messaggio successivo.
   Le righe che iniziano con `>` sono note e non vengono inviate al modello.
-- **Personalità**: cursori timida ↔ sicura e formale ↔ affettuosa, **modalità imitazione** (scrivi chi imitare),
+- **Personalità**: cursori timidezza ↔ sicurezza e formalità ↔ affetto, **pronomi** (lei, lui o neutri: nella serie Alter Ego non è né un lui né una lei), **modalità imitazione** (scrivi chi imitare),
   lingua delle risposte: solo italiano, italiano + inglese, solo inglese.
 - **Senza filtri** (spento di default): fa quello che chiedi anche se non è d'accordo, senza prediche. Le azioni sul PC passano
   comunque da permessi e conferme, e restano le regole del provider AI che usi.
@@ -524,7 +525,7 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
   **li prende e li lancia** con un raggio tipo physgun, prende un'arma e **combatte** al tuo fianco.
 - **Le parli** con il push-to-talk o nella **chat del gioco**; risponde anche agli altri giocatori quando la chiamano per nome.
   Parla con la sua voce sul PC e le sue frasi compaiono in chat.
-- **I compiti lunghi diventano piccoli script Lua** che scrive lei («quando vedi delle galline in giro sparale»,
+- **I compiti lunghi diventano piccoli script Lua** che scrive lui/lei («quando vedi delle galline in giro sparale»,
   «portami quel veicolo»): girano nel gioco senza altri token. Stanno in una sandbox: solo le sue azioni
   (cerca, vai, prendi, attacca, parla…), niente file, rete o console, un limite di calcolo tra un'attesa e l'altra, al massimo 3 insieme, 30 minuti ciascuno.
 - **Pochi token**: seguirti e guardarsi intorno gira nel gioco; i comandi semplici («seguimi», «fermati», «vieni qui», «salta»)
@@ -534,10 +535,10 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
   Single player e server che ospiti tu (l'addon deve girare sul server).
 - Usa la modalità video **finestra senza bordi**: un gioco a schermo intero esclusivo copre ogni altra finestra.
 - **Corpo**: con [Lambda Players](https://steamcommunity.com/sharedfiles/filedetails/?id=2947828836) (addon del Workshop di StarFrost, non incluso: iscriviti da Steam) è un Lambda Player e si muove come un giocatore vero (corsa, salto, armi da giocatore, physgun vera); le sue decisioni, la sua chat e la sua voce sono spente, comanda Alter Ego. Senza, è un NPC cittadino. *Automatico* sceglie Lambda quando è installato; si sceglie nelle impostazioni o nel menu C.
-- **Gioca come un'amica in partita**: se le lanci qualcosa schiva, salta o lo prende al volo con la physgun (e a volte te lo rimanda),
-  e si ricorda chi è stato. Ride, scherza («gg», «me la paghi!») e prima o poi si vendica con uno scherzo che si inventa lei, con azioni
+- **Gioca come un amico/a in partita**: se gli/le lanci qualcosa schiva, salta o lo prende al volo con la physgun (e a volte te lo rimanda),
+  e si ricorda chi è stato. Ride, scherza («gg», «me la paghi!») e prima o poi si vendica con uno scherzo che si inventa lui/lei, con azioni
   rapide o uno script Lua scritto al momento, oppure uno pronto: ti rilancia il prop, un'anguria in testa, una cassa davanti, qualche colpo
-  o un barile che esplode (*Dispetti*: tutti, leggeri, nessuno). Quando non succede niente gioca da sola (impila prop, tiro al bersaglio,
+  o un barile che esplode (*Dispetti*: tutti, leggeri, nessuno). Quando non succede niente gioca da solo/a (impila prop, tiro al bersaglio,
   emote) o si inventa qualcosa di nuovo. Le battute rapide sono immediate e non costano token.
 - **Veicoli e sedersi**: spawna una jeep, un airboat o un sedile; si siede su sedie, divani, sedili o per terra («siediti», «alzati»);
   se sali in macchina mentre è vicina, sale come passeggera, viaggia con te e scende con te.
@@ -553,7 +554,7 @@ Alter Ego entra in **Garry's Mod** (Sandbox) come personaggio e gioca con te. *I
   e ci lavora passo passo (spawna i prop, poi li sistema con la physgun), chiedendosi il passo successivo ogni volta che il precedente finisce,
   fino alla fine (massimo 40 passi / 90 minuti; «basta» lo ferma). Se Rizzo Flow è il router controlla, senza token, se l'obiettivo è già raggiunto.
 - **Resistenza agli urti**: prop e macchine che le volano addosso fanno meno male (*Alta* di default, oppure *Normale* / *Altissima*).
-- Menu nel gioco: tieni premuto **C** → **Alter Ego** nella barra in alto o l'icona *Alter Ego*, tasto destro su di lei → *Alter Ego…*, oppure il comando `alterego_menu` in console.
+- Menu nel gioco: tieni premuto **C** → **Alter Ego** nella barra in alto o l'icona *Alter Ego*, tasto destro su di lui/lei → *Alter Ego…*, oppure il comando `alterego_menu` in console.
 - Modello del personaggio: da quel menu scegli uno dei playermodel installati (con anteprima), oppure «come il mio». Il playermodel viene incollato (bonemerge) su un corpo NPC invisibile, così si anima bene; vanno bene anche i modelli NPC. Di base è una cittadina di Half-Life 2.
 
 ### Cervello di moscerino (riflessi)
@@ -563,9 +564,9 @@ da [FlyWire](https://flywire.ai) (~9.500 neuroni e ~690.000 sinapsi, quelli che 
 simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu et al. (Nature 2024). Attivo di base; zero token.
 
 - **Sensi** (sempre attivi): dolore (colpi, fuoco), oggetti in arrivo (*looming*: un prop o una macchina che le vola addosso, da sinistra o da destra), dolce (un'anguria vicina), tocco (physgun, *usa*).
-  Sensi in più nelle impostazioni: olfatto (cibo, fumo, esplosioni), temperatura e acqua, udito (spari, rumori forti), luce (torcia in faccia), vento (quando la lanci).
+  Sensi in più nelle impostazioni: olfatto (cibo, fumo, esplosioni), temperatura e acqua, udito (spari, rumori forti), luce (torcia in faccia), vento (quando lo/la lanci).
 - **Riflessi**: vengono dai veri neuroni discendenti (qualcosa che le vola addosso accende la **Giant Fiber**, i neuroni di svolta scelgono il lato),
-  ma si esprimono **da giocatrice, non da insetto**: fa un passo di lato, scappa solo da barili esplosivi e macchine,
+  ma si esprimono **da giocatore/giocatrice, non da insetto**: fa un passo di lato, scappa solo da barili esplosivi e macchine,
   e **si abitua** (al decimo barile ti guarda storto invece di saltare). Il dolce le fa venire voglia di giocare con l'anguria.
 - **Adrenalina**: colpi e schivate accumulano adrenalina che svanisce in circa 40 s e arriva al modello in una riga corta, insieme ai suoi "rivali".
   Si possono spegnere i riflessi, l'adrenalina, o mostrare l'attività dei neuroni sopra la sua testa.
@@ -576,16 +577,16 @@ simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu e
 
 ## Pet
 
-Quando non succede niente, Alter Ego esce a esplorare: la TV si spegne e lei salta fuori
-come un piccolo sprite in pixel art (quello incluso è **Chihiro**). Poi vive sul tuo desktop da sola:
+Quando non succede niente, Alter Ego esce a esplorare: la TV si spegne e lui/lei salta fuori
+come un piccolo sprite in pixel art (quello incluso è **Chihiro**). Poi vive sul tuo desktop da solo/a:
 
 - cammina, si ferma, salta e si lascia cadere dai bordi;
-- sta in piedi **sopra le finestre aperte** (solo sulla parte visibile del bordo in alto) e sulla **barra delle applicazioni**; se sposti la finestra su cui sta, viaggia con lei; se la chiudi o la riduci a icona, cade;
+- sta in piedi **sopra le finestre aperte** (solo sulla parte visibile del bordo in alto) e sulla **barra delle applicazioni**; se sposti la finestra su cui sta, viaggia con lui/lei; se la chiudi o la riduci a icona, cade;
 - i bordi dello schermo sono muri, e può passare da un monitor all'altro;
 - **trascinala** col mouse e **lanciala** (rimbalza sui bordi); un **click** la fa saltare; un **doppio click** la rimanda nella TV.
 
-Rientra nella TV quando le parli (push-to-talk, box di testo), quando deve dirti qualcosa (risposte, promemoria, conferme),
-con *Mostra / nascondi* o l'icona nella tray, e da sola dopo un po'. Non esce mentre suona la musica, e si nasconde mentre un gioco o un video è a schermo intero.
+Rientra nella TV quando gli/le parli (push-to-talk, box di testo), quando deve dirti qualcosa (risposte, promemoria, conferme),
+con *Mostra / nascondi* o l'icona nella tray, e da solo/a dopo un po'. Non esce mentre suona la musica, e si nasconde mentre un gioco o un video è a schermo intero.
 
 *Impostazioni → Pet*: acceso/spento, dopo quanti minuti di calma può uscire, quanto spesso, quanto resta fuori, dimensione ed *Esplora adesso*.
 Nel menu della tray ci sono *Esplora il desktop* / *Richiama Alter Ego nella TV*.
