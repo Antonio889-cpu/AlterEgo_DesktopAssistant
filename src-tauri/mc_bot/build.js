@@ -424,10 +424,13 @@ function attach(ctx) {
   // "build house 5x5 [materiale]": prima la schematica mentale, poi la costruzione
   SKILLS.build = async (o, c) => {
     const kind = String(o.shape || o.kind || "house").toLowerCase().replace("shelter", "hut");
-    const w = Number(o.w || o.size) || 0, l = Number(o.l) || w;
+    // "build tower 8": per torri e pilastri la misura è l'altezza, per il resto la larghezza
+    const tall = kind === "tower" || kind === "pillar";
+    const w = Number(o.w || (tall ? 0 : o.size)) || 0, l = Number(o.l) || w;
+    const hh = Number(o.h || (tall ? o.size : 0)) || 0;
     const blocks = (n) => Math.max(10, n);
     const wall = S.pickMaterial(String(o.block || "").toLowerCase() || null, bot().inventory.items(), blocks((w || 5) * 10), !!o.block);
-    const s = S.generate({ kind: kind === "house" || kind === "hut" || kind === "tower" || kind === "wall" || kind === "platform" || kind === "pillar" || kind === "bridge" ? kind : "house", w, l, h: Number(o.h) || 0, wall, roof: o.roof, peaked: !!o.peaked });
+    const s = S.generate({ kind: kind === "house" || kind === "hut" || kind === "tower" || kind === "wall" || kind === "platform" || kind === "pillar" || kind === "bridge" ? kind : "house", w, l, h: hh, wall, roof: o.roof, peaked: !!o.peaked });
     last = s;
     return run(s, o, c);
   };
