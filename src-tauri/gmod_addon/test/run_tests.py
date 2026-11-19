@@ -103,7 +103,8 @@ check(L.eval("AELink.bot.nw.AEName") == "Chihiro", "nome dal menu")
 
 # comandi
 send([{"id": 1, "op": "say", "text": "Ciao!"}, {"id": 2, "op": "spawn", "what": "crate", "n": 2}, {"id": 3, "op": "gesture", "name": "wave"}])
-L.execute("MOCK.advance(0.5)")
+# in chat la scrive come una giocatrice: tempo di reazione + battitura
+L.execute("MOCK.advance(2)")
 check(len(list(G.MOCK.net.values())) >= 1, "riga di chat inviata ai giocatori")
 crates = L.eval('(function() local n = 0 for _, e in pairs(MOCK.ents) do if e.model == "models/props_junk/wood_crate001a.mdl" then n = n + 1 end end return n end)()')
 check(crates == 2, f"spawn di 2 casse ({crates})")

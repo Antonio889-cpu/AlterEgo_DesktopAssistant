@@ -61,7 +61,8 @@ function E:SetSchedule(s)
 end
 for _, n in ipairs({ "Activate", "SetKeyValue", "SetName", "SetMaxHealth",
   "SetIdealYawAndUpdate", "SetEyeTarget", "AddEntityRelationship", "SetEnemy", "UpdateEnemyMemory", "AddGestureSequence",
-  "SetFlexWeight", "EmitSound", "SetRenderMode", "SetColor", "DrawShadow", "AddEffects", "SetNotSolid", "SetOwner", "Fire" }) do E[n] = rec(n) end
+  "SetFlexWeight", "EmitSound", "SetRenderMode", "SetColor", "DrawShadow", "AddEffects", "SetNotSolid", "SetOwner", "Fire",
+  "SetCurrentWeaponProficiency" }) do E[n] = rec(n) end
 function E:SetParent(p) self.parent = p if not p then self.localPos = nil end end
 function E:SetLocalPos(p) self.localPos = p end
 function E:SetLocalAngles(a) self.localAng = a end
@@ -136,6 +137,7 @@ end
 function E:Nick() return self.name end
 function E:IsListenServerHost() return self.host end
 function E:IsSuperAdmin() return false end
+function E:IsSpeaking() return self.speaking == true end
 function E:Alive() return self.hp > 0 end
 function E:GetEyeTrace() return { HitPos = self.pos + Vector(300, 0, 0), Entity = self.lookAt } end
 
@@ -196,7 +198,13 @@ player_manager = { AllValidModels = function() return { chihiro = "models/dr/chi
 RENDERMODE_NORMAL, RENDERMODE_TRANSALPHA, EF_BONEMERGE = 0, 4, 1
 util = {
   AddNetworkString = function() end, Effect = function() end, IsValidModel = function() return true end,
-  TraceLine = function(t) return { HitPos = t.endpos } end,
+  -- muri finti: MOCK.wall(start, endpos) → true se c'è un muro in mezzo
+  TraceLine = function(t)
+    if MOCK.wall and MOCK.wall(t.start, t.endpos) then
+      return { HitPos = t.start + (t.endpos - t.start) * 0.5, Fraction = 0.5, Hit = true, HitWorld = true }
+    end
+    return { HitPos = t.endpos, Fraction = 1 }
+  end,
   TableToJSON = function(t) return MOCK.tojson(t) end, JSONToTable = function(s) return MOCK.fromjson(s) end,
 }
 function EffectData() return { SetOrigin = function() end } end

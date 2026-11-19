@@ -4,7 +4,8 @@
 --   * schiva invece di scappare, e si abitua (al decimo barile non sobbalza più);
 --   * si ricorda chi la bersaglia (rivalità che sfuma) e prima o poi si vendica con uno scherzo;
 --   * quando non succede niente gioca per conto suo (costruisce, tira ai barili, emote, saltelli);
---   * battute brevi immediate senza modello AI (voce e chat), il modello resta per le frasi vere.
+--   * battute brevi immediate senza modello AI (voce e chat): le scrive il modello una volta ogni tanto
+--     (un pacchetto per categoria, nella lingua e coi pronomi giusti); le tabelle qui sotto sono la riserva.
 -- Tutto qui gira nel gioco: zero token.
 
 local L = AELink
@@ -20,11 +21,17 @@ P.lastQuip = 0
 P.lastAction = 0              -- ultimo riflesso/scherzo (per non fare attività nel mezzo dell'azione)
 P.nextIdle = 0
 P.chaos = P.chaos or 0.5       -- imprevedibilità (dall'app, 0..1)
+P.pron = P.pron or "she"        -- she | he | they (per le frasi di riserva che parlano di lei)
+P.gen = P.gen or nil            -- battute generate dal modello: tipo → righe
+P.used = {}                     -- righe già dette (niente ripetizioni)
+P.lastLine = {}
 
 -- ---------- battute immediate (niente modello) ----------
+-- Riserva quando il modello non c'è. Niente frasi al femminile o al maschile su di lei:
+-- dove servirebbe c'è una riga per pronome ({ she, he, they }).
 local Q = {
   it = {
-    dodge = { "Whoa!", "Mancata!", "Eheh, troppo lento!", "Ehi!" },
+    dodge = { "Whoa!", "Mancato!", "Eheh, troppo lento!", "Ehi!" },
     flee = { "Aiuto!", "Nonono!", "Scappo!" },
     annoyed = { "Di nuovo?!", "Ancora…?", "Sì sì, ho capito.", "Che originalità…" },
     hit = { "Ahia!", "Ehi! Fa male!", "Ma dai!", "Ahi!" },
@@ -40,6 +47,11 @@ local Q = {
     wheee = { "Wheee!", "Sto volando!" },
     ride = { "Passaggio!", "Vengo anch'io!", "Allaccio la cintura!" },
     boom = { "Bum!", "Che botto!" },
+    greet = { "Ciao!", "Ehi, ciao!", "Yo!", "Ciaooo" },
+    laugh = { "Ahahah!", "LOL", "Ahah, scusa…", "Pfff ahah" },
+    oops = { "Ops!", "Ehm… volevo farlo.", { she = "Che imbranata…", he = "Che imbranato…", they = "Che disastro…" }, "Non è successo niente." },
+    bored = { "Mi annoio…", "Facciamo qualcosa?", "C'è nessuno?" },
+    tired = { "Che sonno…", "Pausa caffè?", "Ho le mani a pezzi…" },
   },
   en = {
     dodge = { "Whoa!", "Missed!", "Hehe, too slow!", "Hey!" },
@@ -58,21 +70,90 @@ local Q = {
     wheee = { "Wheee!", "I'm flying!" },
     ride = { "Free ride!", "I'm coming too!", "Buckling up!" },
     boom = { "Boom!", "What a blast!" },
+    greet = { "Hi!", "Hey!", "Yo!", "Heyyy" },
+    laugh = { "Hahaha!", "LOL", "Haha, sorry…", "Pfft haha" },
+    oops = { "Oops!", "Um… I meant to do that.", "Wow, smooth…", "That didn't happen." },
+    bored = { "I'm bored…", "Let's do something?", "Anyone?" },
+    tired = { "So sleepy…", "Coffee break?", "My hands are dead…" },
   },
 }
+P.Q = Q
 local EMO = { dodge = "surprised", flee = "worried", annoyed = "embarrassed", hit = "surprised", died = "sad", prank = "happy",
   melon = "happy", juggle = "happy", build = "happy", target = "happy", light = "surprised", wheee = "happy", ride = "happy", boom = "surprised",
-  catch = "happy", back = "happy" }
+  catch = "happy", back = "happy", greet = "happy", laugh = "happy", oops = "embarrassed", bored = "idle", tired = "sad" }
+
+--- Frase di riserva secondo i pronomi.
+function P.g(x)
+  if type(x) == "table" then return x[P.pron] or x.they end
+  return x
+end
+
+--- Una riga per `kind`: generata se ce ne sono, se no di riserva; mai la stessa finché ce ne sono altre.
+function P.line(kind)
+  local gen = P.gen and P.gen[kind]
+  local generated = gen ~= nil and #gen >= 2
+  local pool = generated and gen or (Q[P.lang] or Q.it)[kind]
+  if not pool then return nil end
+  local used = P.used[kind] or {}
+  P.used[kind] = used
+  local fresh = {}
+  for _, x in ipairs(pool) do
+    local l = P.g(x)
+    if not used[l] then fresh[#fresh + 1] = l end
+  end
+  if #fresh == 0 then
+    -- tutte già dette: si ricomincia, ma non con l'ultima
+    used = {}
+    P.used[kind] = used
+    for _, x in ipairs(pool) do
+      local l = P.g(x)
+      if l ~= P.lastLine[kind] then fresh[#fresh + 1] = l end
+    end
+    if #fresh == 0 then fresh = { P.g(pool[1]) } end
+  end
+  local line = fresh[math.min(#fresh, 1 + math.floor(math.random() * #fresh))]
+  used[line] = true
+  P.lastLine[kind] = line
+  -- quasi finite: lo dice all'app (ne fa scrivere di nuove), al massimo ogni 2 minuti per tipo
+  local now = CurTime()
+  if generated and #fresh <= 2 and now >= (P.cool["low_" .. kind] or 0) then
+    P.cool["low_" .. kind] = now + 120
+    L.event("quips_low", { kind = kind })
+  end
+  return line
+end
+
+--- Battute nuove dall'app (versione `v`): si ricomincia a pescare da capo.
+function P.setQuips(t, v)
+  local gen = {}
+  for k, list in pairs(t) do
+    if type(list) == "table" then
+      local out = {}
+      for _, x in ipairs(list) do
+        if type(x) == "string" and x ~= "" then out[#out + 1] = x:sub(1, 80) end
+      end
+      if #out > 0 then gen[tostring(k)] = out end
+    end
+  end
+  P.gen = gen
+  P.genV = v
+  P.used = {}
+end
 
 --- Battuta breve (voce e chat). prob: probabilità; gap minimo 6 s tra una e l'altra.
+-- Esce dopo un tempo di reazione, e non sopra a chi sta parlando in voce.
 function P.quip(kind, prob)
   local now = CurTime()
   if now - P.lastQuip < 6 then return false end
   if prob and math.random() > prob then return false end
-  local lines = (Q[P.lang] or Q.it)[kind]
-  if not lines then return false end
+  local H = L.human
+  if H and H.realism > 0 and H.anyTalking() then return false end
+  local text = P.line(kind)
+  if not text then return false end
   P.lastQuip = now
-  L.event("say", { text = lines[math.random(#lines)], emotion = EMO[kind] or "happy", quick = true })
+  local function emit() L.event("say", { text = text, emotion = EMO[kind] or "happy", quick = true }) end
+  local d = H and H.reaction() or 0
+  if d > 0 then timer.Simple(d, emit) else emit() end
   return true
 end
 
@@ -137,7 +218,14 @@ end
 
 --- La prende con la physgun; a volte la rimanda a chi l'ha lanciata. Ritorna "caught" o "returned".
 function P.catch(e, culprit)
+  local H = L.human
+  if H and H.oops("catch") then
+    -- le sfugge: la physgun arriva tardi
+    H.tried("catch", false)
+    return "fumbled"
+  end
   if not L.grab(e) then return "dodged" end
+  if H then H.tried("catch", true) end
   local ph = e:GetPhysicsObject()
   if IsValid(ph) then ph:SetVelocity(Vector()) end
   if IsValid(culprit) then L.look(culprit) end
@@ -145,8 +233,14 @@ function P.catch(e, culprit)
   timer.Simple(back and 0.9 or 2.5, function()
     if L.held ~= e or not IsValid(e) then return end
     if back and IsValid(culprit) then
-      L.throw(culprit)
-      P.quip("back", 0.8)
+      if H and H.oops("throw") then
+        L.drop() -- le scivola
+        H.tried("throw", false)
+      else
+        L.throw(culprit)
+        P.quip("back", 0.8)
+        if H then H.tried("throw", true) end
+      end
     else
       L.drop()
     end
@@ -192,6 +286,7 @@ function P.react(o, F)
   local esc = o.escape or 0
   if esc >= 0.5 and ready("escape", 1.2) then
     P.lastAction = now
+    if L.human then L.human.excite(esc) end
     local g = gain("escape")
     local culprit = thrower(threat)
     if culprit then P.offend(culprit, 0.7, "keeps throwing things at you") end
@@ -266,6 +361,7 @@ end
 function P.onHurt(attacker, inflictor, dmg)
   local culprit = (IsValid(attacker) and attacker:IsPlayer()) and attacker or thrower(inflictor) or thrower(attacker)
   if culprit then P.offend(culprit, 0.5 + math.min(dmg or 0, 60) / 30, "hurt you") end
+  if L.human then L.human.excite(0.6) end
   P.lastAction = CurTime()
   P.quip("hit", 0.6)
 end
@@ -281,6 +377,12 @@ hook.Add("PhysgunDrop", "AELinkPlay", function(ply, e)
 end)
 hook.Add("GravGunPunt", "AELinkPlay", function(ply, e)
   if IsValid(e) then e.AEThrower, e.AEThrownAt = ply, CurTime() end
+end)
+-- qualcuno muore in modo buffo (schiacciato, caduto, esploso da solo) davanti a lei: ride
+hook.Add("PlayerDeath", "AELinkPlay", function(victim, _, attacker)
+  if not IsValid(L.bot) or not IsValid(victim) or (IsValid(attacker) and (attacker:IsPlayer() and attacker ~= victim or attacker == L.bot)) then return end
+  if L.human and not L.human.sees(victim) then return end
+  if P.quip("laugh", 0.4) then L.gesture("laugh") end
 end)
 
 -- ---------- oggetti ----------
@@ -305,12 +407,23 @@ P.spawnAt = spawnAt
 --- Prende un oggetto con la physgun e ci gioca: lo lancia a un rivale vicino o in aria.
 function P.playWith(e)
   if not L.grab(e) then return end
+  -- prima guarda a chi la tirerà (la mira si assesta)
+  local r0 = P.mischief ~= "off" and P.topRival(700)
+  if r0 then timer.Simple(0.4, function() if IsValid(r0) then L.look(r0) end end) end
   timer.Simple(1.3, function()
     if L.held ~= e or not IsValid(e) then return end
     local rival = P.topRival(700)
+    local H = L.human
     if rival and P.mischief ~= "off" then
-      L.throw(rival)
-      P.quip("melon", 0.8)
+      L.look(rival)
+      if H and H.oops("throw") then
+        L.drop()
+        H.tried("throw", false)
+      else
+        L.throw(rival)
+        P.quip("melon", 0.8)
+        if H then H.tried("throw", true) end
+      end
     else
       L.drop()
       local ph = e:GetPhysicsObject()
@@ -433,10 +546,12 @@ function P.prank(ply, kind)
 end
 
 -- ---------- attività quando non succede niente ----------
-P.IDLE = { "stack", "target", "emote", "hop", "watch", "juggle" }
+P.IDLE = { "stack", "target", "emote", "hop", "watch", "juggle", "flashlight", "browse", "fiddle" }
+local BROWSE = { "ball", "crate", "chair", "cone", "bucket", "tire", "box", "melon", "lamp" }
 function P.idleAct(kind)
   local b = bot()
   if not IsValid(b) then return nil end
+  local H = L.human
   kind = kind or P.IDLE[math.random(#P.IDLE)]
   local fwd = b:GetForward()
   fwd.z = 0
@@ -444,21 +559,38 @@ function P.idleAct(kind)
   if kind == "stack" then
     local base = b:GetPos() + fwd * 90
     local m = math.random() < 0.5 and L.ITEMS.crate or L.ITEMS.barrel
-    for i = 1, 3 do spawnAt(m, base + Vector(0, 0, 25 + 42 * (i - 1))) end
-    P.quip("build", 0.6)
+    -- a volte l'ultima la mette storta e cade
+    local bad = H and H.oops("build")
+    for i = 1, 3 do spawnAt(m, base + Vector((bad and i == 3) and 22 or 0, 0, 25 + 42 * (i - 1))) end
+    if H then H.tried("build", not bad) end
+    if not bad then P.quip("build", 0.6) end
   elseif kind == "target" then
     if P.mischief == "off" then return P.idleAct("emote") end
     local barrel = spawnAt(L.ITEMS.barrel, b:GetPos() + fwd * 260 + Vector(0, 0, 20))
     if not barrel then return nil end
-    L.give("pistol")
-    L.attack(barrel)
-    timer.Simple(3, function() if L.goal == barrel then L.mode = "follow" L.goal = nil L.target = L.host() end end)
-    P.quip("target", 0.5)
+    local function shoot()
+      if not IsValid(barrel) or not IsValid(L.bot) then return end
+      L.give("pistol")
+      L.attack(barrel)
+      timer.Simple(3, function() if L.goal == barrel then L.mode = "follow" L.goal = nil L.target = L.host() end end)
+    end
+    if H and H.oops("tool") then
+      -- prende l'arma sbagliata, se ne accorge e cambia
+      L.give("crowbar")
+      H.tried("tool", false)
+      timer.Simple(H.rnd(0.8, 1.3), shoot)
+    else
+      shoot()
+      P.quip("target", 0.5)
+    end
   elseif kind == "emote" then
     local g = ({ "cheer", "laugh", "wave", "dance" })[math.random(4)]
     if g == "dance" then L.dance() else L.gesture(g) end
   elseif kind == "hop" then
-    for i = 0, 2 do timer.Simple(i * 0.7, function() if IsValid(L.bot) and L.mode ~= "sit" then L.jump() end end) end
+    -- a volte un salto le viene moscio
+    local bad = H and H.oops("jump")
+    for i = 0, 2 do timer.Simple(i * 0.7, function() if IsValid(L.bot) and L.mode ~= "sit" then L.jump(bad and i == 2) end end) end
+    if H then timer.Simple(1.6, function() if IsValid(L.bot) then H.tried("jump", not bad) end end) end
   elseif kind == "watch" then
     local h = L.host()
     local tr = IsValid(h) and h:GetEyeTrace()
@@ -466,6 +598,48 @@ function P.idleAct(kind)
   elseif kind == "juggle" then
     local m = spawnAt(L.ITEMS.melon, L.eye() + fwd * 60)
     if m then P.playWith(m) end
+  elseif kind == "flashlight" then
+    if not H then return nil end
+    -- accende e spegne la torcia un paio di volte, come chi non ha niente da fare
+    local t = 0
+    for _ = 1, H.int(2, 4) do
+      timer.Simple(t, function() if IsValid(L.bot) then H.flashlight() end end)
+      t = t + H.rnd(0.25, 0.6)
+    end
+    timer.Simple(t + 12, function() if H.flash and IsValid(L.bot) then H.flashlight(false) end end)
+  elseif kind == "browse" then
+    if not H then return nil end
+    -- ferma a "sfogliare il menu degli oggetti", guarda in basso, poi spawna qualcosa
+    local secs = H.rnd(2.5, 5)
+    H.pauseUntil = CurTime() + secs
+    H.look(L.eye() + fwd * 60 - Vector(0, 0, 45), 2, secs)
+    timer.Simple(secs, function()
+      if not IsValid(L.bot) then return end
+      local f = L.bot:GetForward()
+      f.z = 0
+      spawnAt(L.ITEMS[H.pick(BROWSE)], L.eye() + f:GetNormalized() * 70)
+      L.bot:EmitSound("ui/buttonclickrelease.wav", 50, 110)
+    end)
+  elseif kind == "fiddle" then
+    -- giocherella con la physgun con una sua cosa vicina (o una palla nuova)
+    local it
+    for i = #L.spawned, 1, -1 do
+      local e = L.spawned[i]
+      if IsValid(e) and e:GetClass() == "prop_physics" and e:GetPos():Distance(b:GetPos()) < 400 then it = e break end
+    end
+    it = it or spawnAt(L.ITEMS.ball, L.eye() + fwd * 70)
+    if not it or not L.grab(it) then return nil end
+    local t0 = CurTime()
+    timer.Create("AELinkFiddle", 0.1, 25, function()
+      if L.held ~= it or not IsValid(L.bot) then L.holdAt = nil return end
+      local k = CurTime() - t0
+      if k > 2.3 then
+        L.holdAt = nil
+        L.drop()
+        return
+      end
+      L.holdAt = L.eye() + fwd * 90 + Vector(0, math.sin(k * 4) * 30, math.cos(k * 3) * 20)
+    end)
   end
   P.lastAction = CurTime()
   return kind
@@ -495,7 +669,9 @@ function P.tick()
     end
   end
   -- gioca da sola
-  if P.idle and P.free() and now >= P.nextIdle and now - P.lastAction > 20 then
+  -- annoiata: ha voglia di fare qualcosa prima
+  local bored = L.human and L.human.bored or 0
+  if P.idle and P.free() and now >= P.nextIdle and now - P.lastAction > 20 * (1 - 0.6 * bored) then
     -- più imprevedibile = intervalli più irregolari
     P.nextIdle = now + math.random(30, 60) * (1.2 - P.chaos * 0.5) + (math.random() - 0.5) * 30 * P.chaos
     local h = L.host()
@@ -517,6 +693,9 @@ function P.config(c)
   if c.lang == "it" or c.lang == "en" then P.lang = c.lang end
   if tonumber(c.chaos) then P.chaos = math.Clamp(tonumber(c.chaos), 0, 1) end
   if c.tough == "normal" or c.tough == "high" or c.tough == "tough" then L.tough = c.tough end
+  if c.pronouns == "she" or c.pronouns == "he" or c.pronouns == "they" then P.pron = c.pronouns end
+  if type(c.quips) == "table" and c.quips_v ~= nil and c.quips_v ~= P.genV then P.setQuips(c.quips, c.quips_v) end
+  if L.human then L.human.config(c) end
 end
 
 return P
