@@ -62,7 +62,7 @@
         <button id="an-change">Cambia server…</button>
       </div>
       <p class="note sub">F11 alterna schermo intero e finestra, Esc due volte chiude. Se il server non risponde si apre la versione offline (giocatore singolo).
-        Puoi anche dirlo a lei: «apri Alter Net», «chiudi Alter Net».</p>
+        Puoi anche chiederlo ad Alter Ego: «apri Alter Net», «chiudi Alter Net».</p>
       <h3>Info e aggiornamenti</h3>
       <p class="note">Versione installata: <b id="app-version">…</b></p>
       <div class="actions">
@@ -73,7 +73,7 @@
       </div>
       <div class="actions"><span id="update-result" class="result"></span></div>
       <p class="note">L'aggiornamento scarica l'installer dell'ultima release da GitHub, ne controlla lo SHA-256, chiede conferma e chiude
-        Alter Ego. Impostazioni, chiavi e memoria restano. Puoi anche dirlo a lei: «controlla gli aggiornamenti».</p>
+        Alter Ego. Impostazioni, chiavi e memoria restano. Puoi anche chiederlo ad Alter Ego: «controlla gli aggiornamenti».</p>
       <h3>Contenuti aggiuntivi</h3>
       <p class="note">Immagini, musica e suoni extra per Alter Ego, scaricati una volta da un link diretto (file .zip).</p>
       <p id="ex-status" class="note"></p>
@@ -140,7 +140,7 @@
       <div class="actions"><button id="saving-max">Massimo risparmio</button> <button id="saving-default">Predefinite</button></div>
       <label class="inline"><input type="checkbox" id="sv-tools" /> <b>Strumenti solo quando servono</b>: le definizioni (1–3 mila token) partono solo se la domanda chiede un'azione</label>
       <p class="note sub">Se il modello si accorge che gli serviva uno strumento lo dice e la domanda si ripete subito con gli strumenti: nessuna azione persa.</p>
-      <label class="inline"><input type="checkbox" id="sv-groups" /> <b>Strumenti a gruppi</b>: manda solo i gruppi che la domanda chiede (file, web, schermo…); gli altri li carica lei se servono</label>
+      <label class="inline"><input type="checkbox" id="sv-groups" /> <b>Strumenti a gruppi</b>: manda solo i gruppi che la domanda chiede (file, web, schermo…); gli altri li carica Alter Ego se servono</label>
       <label class="inline"><input type="checkbox" id="sv-loop" /> <b>Ragionamenti lunghi compatti</b>: nelle richieste con molti passaggi i risultati vecchi degli strumenti, già usati, vengono accorciati</label>
       <label class="inline"><input type="checkbox" id="sv-compact" /> Descrizioni degli strumenti compatte</label>
       <label class="inline"><input type="checkbox" id="sv-trim" /> Accorcia le risposte vecchie nella cronologia (le ultime restano intere; la cache del provider continua a funzionare)</label>
@@ -244,8 +244,16 @@
           <option value="en">Solo inglese</option>
         </select>
       </label>
-      <label>Timida <input id="confidence" type="range" min="0" max="1" step="0.05" /> Sicura</label>
-      <label>Formale <input id="warmth" type="range" min="0" max="1" step="0.05" /> Affettuosa</label>
+      <label>Pronomi di Alter Ego
+        <select id="pronouns">
+          <option value="she">Lei (femminile)</option>
+          <option value="he">Lui (maschile)</option>
+          <option value="they">Neutri (né lei né lui)</option>
+        </select>
+      </label>
+      <p class="note sub">Nella serie Alter Ego non è né un lui né una lei: scegli tu come parla di sé.</p>
+      <label>Timidezza <input id="confidence" type="range" min="0" max="1" step="0.05" /> Sicurezza</label>
+      <label>Formalità <input id="warmth" type="range" min="0" max="1" step="0.05" /> Affetto</label>
       <label>Modalità imitazione <input id="imitate" maxlength="60" placeholder="vuoto = spenta (es. Mondo Owada)" /></label>
       <div class="perm danger-zone"><label class="inline"><input type="checkbox" id="unfiltered" /> <b>Senza filtri</b>: fa quello che chiedi anche se non è d'accordo</label>
         <p class="note">Niente rifiuti per gusto personale, niente prediche: al massimo un dubbio in mezza frase, poi esegue.
@@ -275,21 +283,21 @@
         <canvas id="pet-preview" width="128" height="128" aria-hidden="true"></canvas>
         <div>
           <p class="note">Nei momenti di calma Alter Ego esce dalla TV e vive sul tuo desktop: cammina, salta,
-            si siede sopra le finestre aperte e sulla barra delle applicazioni. Prendila col mouse per spostarla o lanciarla;
-            un click la fa saltare, un <b>doppio click</b> la riporta nella TV.</p>
-          <p class="note">Torna nella TV da sola quando le parli (push-to-talk o box di testo), quando deve dirti qualcosa,
+            si siede sopra le finestre aperte e sulla barra delle applicazioni. Col mouse si prende, si sposta e si lancia;
+            un click fa saltare, un <b>doppio click</b> fa tornare nella TV.</p>
+          <p class="note">Torna nella TV in automatico quando parli con Alter Ego (push-to-talk o box di testo), quando deve dirti qualcosa,
             con <b>Mostra / nascondi</b> o dopo il tempo scelto qui sotto. Non esce mentre suona la musica,
             e si nasconde quando un gioco o un video è a schermo intero.</p>
           <p class="note sub" data-os="linux">Su Linux sta in piedi solo sulla barra e sul fondo dello schermo (le finestre si leggono solo su Windows).</p>
         </div>
       </div>
-      <label class="inline"><input type="checkbox" id="pet-enabled" /> Esce da sola nei momenti di calma</label>
+      <label class="inline"><input type="checkbox" id="pet-enabled" /> Esce in automatico nei momenti di calma</label>
       <label>Dopo quanti minuti di calma <input id="pet-idle" type="number" min="1" max="120" step="1" /></label>
       <label>Quanto spesso
         <select id="pet-frequency"><option value="rare">Raramente</option><option value="normal">A volte</option><option value="often">Spesso</option></select>
       </label>
-      <label>Torna nella TV da sola dopo
-        <select id="pet-stay"><option value="5">5 minuti</option><option value="10">10 minuti</option><option value="20">20 minuti</option><option value="45">45 minuti</option><option value="0">Mai (finché non la chiami)</option></select>
+      <label>Torna nella TV in automatico dopo
+        <select id="pet-stay"><option value="5">5 minuti</option><option value="10">10 minuti</option><option value="20">20 minuti</option><option value="45">45 minuti</option><option value="0">Mai (finché non chiami Alter Ego)</option></select>
       </label>
       <label>Dimensione <input id="pet-size" type="range" min="0.5" max="2.5" step="0.25" /> <span id="pet-size-val"></span></label>
       <div class="actions"><button id="pet-go">Esplora adesso</button> <button id="pet-back">Richiama nella TV</button> <span id="pet-state" class="result"></span></div>
@@ -345,7 +353,7 @@
       <p class="note">Alter Ego entra nel gioco come personaggio e gioca con te: ti segue, parla in chat e con la sua voce, crea e lancia oggetti, combatte al tuo fianco. Le parli con il push-to-talk o scrivendo nella chat del gioco (anche gli altri giocatori). Per i compiti lunghi («quando vedi una gallina sparale») scrive un piccolo script che gira nel gioco senza consumare altri token. Funziona in single player e nei server che ospiti tu; usa la modalità video «finestra senza bordi» per vedere Alter Ego sopra il gioco.</p>
       <label class="inline"><input type="checkbox" id="gl-enabled" /> Attiva (installa l'addon Alter Ego Link nella cartella di Garry's Mod)</label>
       <div class="actions"><button id="gl-install">Installa / aggiorna addon</button> <button id="gl-join">Entra nel gioco</button> <button id="gl-leave">Esci dal gioco</button> <span id="gl-status" class="result"></span></div>
-      <label class="inline"><input type="checkbox" id="gl-auto" /> Entra da sola quando carichi una mappa</label>
+      <label class="inline"><input type="checkbox" id="gl-auto" /> Entra in automatico quando carichi una mappa</label>
       <label class="inline"><input type="checkbox" id="gl-tasks" /> Può scrivere script Lua per i compiti lunghi (girano in una sandbox: solo le sue azioni, niente file né console)</label>
       <label>Commenti spontanei <select id="gl-chatter"><option value="off">Mai</option><option value="low">Pochi</option><option value="normal">Normali</option><option value="often">Tanti</option></select></label>
       <label>Corpo <select id="gl-body"><option value="auto">Automatico (Lambda Player se installato)</option><option value="citizen">NPC cittadino (sempre disponibile)</option><option value="lambda">Lambda Player</option></select></label>
@@ -356,8 +364,8 @@
       <label>Cartella di Garry's Mod <input id="gl-dir" placeholder="trovata da sola (gioco aperto o libreria Steam)" /></label>
       <h3>Come gioca</h3>
       <label>Dispetti <select id="gl-mischief"><option value="full">Tutti (anche spari ed esplosioni)</option><option value="light">Leggeri (lanci, angurie, casse)</option><option value="off">Nessuno</option></select></label>
-      <p class="note sub">Gioca come un'amica in partita: schiva, ride, si ricorda chi la bersaglia e prima o poi si vendica con uno scherzo. Tu puoi sempre fermarla con «basta».</p>
-      <label class="inline"><input type="checkbox" id="gl-idle" /> Quando non succede niente gioca da sola (costruisce, tira ai barili, emote)</label>
+      <p class="note sub">Gioca come chi gioca con gli amici: schiva, ride, si ricorda chi prende di mira Alter Ego e prima o poi si vendica con uno scherzo. Puoi sempre dire «basta».</p>
+      <label class="inline"><input type="checkbox" id="gl-idle" /> Quando non succede niente gioca per conto suo (costruisce, tira ai barili, emote)</label>
       <label class="inline"><input type="checkbox" id="gl-memory" /> Ricorda le partite (archivio separato, consultato solo quando serve)</label>
       <div class="actions"><button id="gl-forget">Dimentica le partite</button> <span id="gl-games" class="result"></span></div>
       <label>Resistenza agli urti <select id="gl-tough"><option value="normal">Normale</option><option value="high">Alta (gli oggetti lanciati fanno poco male)</option><option value="tough">Altissima</option></select></label>
@@ -371,7 +379,7 @@
       <div class="actions"><button id="gl-persona-forget">Azzera la personalità</button></div>
       <h3>Cervello di moscerino</h3>
       <label class="inline"><input type="checkbox" id="gl-fly" /> Riflessi e istinto da un vero cervello di moscerino</label>
-      <p class="note sub">Un pezzo del cervello reale di Drosophila, mappato neurone per neurone dal progetto FlyWire, simulato sul PC in tempo reale. Sente dolore, oggetti che le arrivano addosso, il dolce e il tocco, e reagisce d'istinto come una giocatrice: schiva, salta via, sobbalza, e si abitua se le fai sempre lo stesso scherzo. Non consuma token.</p>
+      <p class="note sub">Un pezzo del cervello reale di Drosophila, mappato neurone per neurone dal progetto FlyWire, simulato sul PC in tempo reale. Sente dolore, oggetti in arrivo, il dolce e il tocco, e reagisce d'istinto come chi gioca davvero: schiva, salta via, sobbalza, e si abitua se ripeti sempre lo stesso scherzo. Non consuma token.</p>
       <p class="note sub" id="gl-fly-size"></p>
       <label class="inline"><input type="checkbox" id="gl-fly-reflex" /> Il corpo reagisce da solo</label>
       <label class="inline"><input type="checkbox" id="gl-fly-mood" /> Alter Ego sente l'adrenalina dei riflessi (pochi token in più)</label>
@@ -382,7 +390,7 @@
         <label class="inline"><input type="checkbox" data-sense="thermo" /> Temperatura e acqua: fuoco, freddo, bagnato</label>
         <label class="inline"><input type="checkbox" data-sense="hearing" /> Udito: spari e rumori forti</label>
         <label class="inline"><input type="checkbox" data-sense="light" /> Luce: torcia puntata in faccia</label>
-        <label class="inline"><input type="checkbox" data-sense="wind" /> Vento: quando la lanci o vola</label>
+        <label class="inline"><input type="checkbox" data-sense="wind" /> Vento: lanci e voli</label>
       </div>
       <div id="gl-fly-live" class="fly-live"></div>
       <div class="actions"><button id="gl-monitor">Apri FruitFly Monitor</button></div>
@@ -475,9 +483,9 @@
         Mentre parla, la musica si abbassa da sola.</p>
       <label class="inline"><input type="checkbox" id="music-lyrics" /> Testi sincronizzati (LRCLIB)</label>
       <label class="inline"><input type="checkbox" id="music-reactive" /> Il volto di Alter Ego nel lettore cambia a tempo di musica</label>
-      <label class="inline"><input type="checkbox" id="music-compact" /> Durante la musica rimpicciolisci Alter Ego (torna grande quando parla o le scrivi)</label>
-      <label class="inline"><input type="checkbox" id="music-sprite" /> Durante la musica Alter Ego mette le cuffie (torna normale quando le parli)</label>
-      <p class="note">Il lettore si ridimensiona dall'angolo in basso a destra (o con Ctrl + rotella) e si apre accanto ad Alter Ego senza coprirla.
+      <label class="inline"><input type="checkbox" id="music-compact" /> Durante la musica rimpicciolisci Alter Ego (torna grande quando parla o quando scrivi)</label>
+      <label class="inline"><input type="checkbox" id="music-sprite" /> Durante la musica Alter Ego mette le cuffie (torna normale quando parli con Alter Ego)</label>
+      <p class="note">Il lettore si ridimensiona dall'angolo in basso a destra (o con Ctrl + rotella) e si apre di fianco ad Alter Ego, senza coprire lo schermo.
         Volume: rotella del mouse o frecce ↑ ↓ sul lettore, a passi del 2%.</p>
       <div class="actions"><button id="open-venue">♫ Apri la Music Venue</button></div>
       <div class="actions"><input id="music-query" placeholder="Prova: titolo e artista" /> <button id="music-go">Cerca e suona</button> <span id="music-result" class="result"></span></div>
@@ -494,7 +502,7 @@
     <section data-tab="voice">
       <h2>Mic-Link</h2>
       <p class="note">Crea un microfono virtuale, <b>AlterEgo Link Audio</b>, che contiene <b>il tuo microfono + la voce di Alter Ego</b>.
-        Sceglilo come microfono in Discord, OBS, giochi… e gli altri sentiranno anche lei.</p>
+        Sceglilo come microfono in Discord, OBS, giochi… e gli altri sentiranno anche Alter Ego.</p>
       <ol class="steps" data-os="linux">
         <li>Crea un cavo virtuale con PipeWire/PulseAudio (resta fino al riavvio; per renderlo fisso aggiungi i comandi al tuo avvio):<br />
           <code>pactl load-module module-null-sink sink_name=alterego_link sink_properties=device.description=AlterEgo_Link_Audio</code><br />

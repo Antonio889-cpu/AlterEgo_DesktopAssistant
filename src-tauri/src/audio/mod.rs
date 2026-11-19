@@ -188,13 +188,23 @@ impl AudioEngine {
 
     /// Riproduce campioni mono. Restituisce la durata in secondi.
     pub fn play(&self, samples: &[f32], rate: u32, kind: Kind) -> f32 {
+        self.play_to(samples, rate, kind, true)
+    }
+
+    /// Solo sugli altoparlanti, mai nel cavo di Mic-Link: voci e suoni che non sono di Alter Ego
+    /// (l'ospite dei contenuti aggiuntivi).
+    pub fn play_local(&self, samples: &[f32], rate: u32, kind: Kind) -> f32 {
+        self.play_to(samples, rate, kind, false)
+    }
+
+    fn play_to(&self, samples: &[f32], rate: u32, kind: Kind, to_link: bool) -> f32 {
         if samples.is_empty() || rate == 0 {
             return 0.0;
         }
         let gains = *self.shared.gains.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         for (sink, gain, is_link) in [(&self.shared.speaker, 1.0, false), (&self.shared.link, gains.voice, true)] {
             let mut s = sink.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            if !s.active || (is_link && kind == Kind::Fx && !gains.blips) {
+            if !s.active || (is_link && (!to_link || (kind == Kind::Fx && !gains.blips))) {
                 continue;
             }
             let mut data = crate::stt::resample(samples, rate, s.rate);
@@ -718,6 +728,25 @@ mod tests {
         assert!(is_cable_capture("AlterEgo Link Audio (VB-Audio Virtual Cable)"));
         assert!(!is_cable_render("AlterEgo Link Audio (VB-Audio Virtual Cable)"));
         assert!(!is_cable_render("Altoparlanti (Realtek)"));
+    }
+
+    #[test]
+    fn guest_audio_never_reaches_the_link() {
+        let e = AudioEngine::new();
+        for sink in [&e.shared.speaker, &e.shared.link] {
+            let mut s = sink.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            s.rate = 48_000;
+            s.active = true;
+        }
+        e.shared.gains.lock().unwrap_or_else(std::sync::PoisonError::into_inner).blips = true;
+        e.play_local(&[0.5; 2_400], 24_000, Kind::Voice);
+        e.play_local(&[0.5; 2_400], 24_000, Kind::Fx);
+        let link = e.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(link.voice.is_empty() && link.fx.is_empty(), "l'ospite non va nel microfono virtuale");
+        drop(link);
+        assert!(e.voice_remaining() > 0.0, "ma si sente dagli altoparlanti");
+        e.play(&[0.5; 2_400], 24_000, Kind::Voice);
+        assert!(!e.shared.link.lock().unwrap_or_else(std::sync::PoisonError::into_inner).voice.is_empty(), "la voce di Alter Ego sì");
     }
 
     #[test]

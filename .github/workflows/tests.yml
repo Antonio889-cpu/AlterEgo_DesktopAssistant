@@ -1,0 +1,46 @@
+# Test a ogni push e pull request (e prima di ogni release, vedi release.yml):
+# test Rust del backend e test dell'addon di Garry's Mod (Lua con l'API finta).
+name: Test
+
+on:
+  push:
+    branches-ignore: [release]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Librerie di sistema
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev \
+            libssl-dev libasound2-dev libdbus-1-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test Rust
+        run: |
+          python tools/mock_openai.py &
+          sleep 1
+          cd src-tauri && cargo test
+
+      - name: Test addon Garry's Mod
+        working-directory: src-tauri/gmod_addon/test
+        run: |
+          pip install lupa
+          for f in run_*.py; do echo "== $f"; python "$f"; done

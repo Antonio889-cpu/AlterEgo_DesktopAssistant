@@ -258,6 +258,23 @@ mod tests {
     }
 
     #[test]
+    fn pronouns_follow_settings() {
+        let mut cfg = Config::default();
+        assert_eq!(cfg.personality.pronouns(), "she", "lei è il predefinito");
+        assert!(system(&cfg, "P", &MemoryContext { summary: None, facts: &[] }).contains("she/her"));
+        cfg.personality.pronouns = "he".into();
+        assert!(system(&cfg, "P", &MemoryContext { summary: None, facts: &[] }).contains("he/him"));
+        cfg.personality.pronouns = "they".into();
+        let p = system(&cfg, "P", &MemoryContext { summary: None, facts: &[] });
+        assert!(p.contains("they/them") && p.contains("eccomi"));
+        cfg.personality.pronouns = "???".into();
+        assert_eq!(cfg.personality.pronouns(), "she");
+        // vecchi file di configurazione senza il campo
+        let old: crate::config::Personality = serde_json::from_str(r#"{"confidence":0.5}"#).unwrap();
+        assert_eq!(old.pronouns(), "she");
+    }
+
+    #[test]
     fn english_prompt_with_reply_language() {
         let mut cfg = Config::default();
         cfg.language = "it".into();

@@ -170,12 +170,14 @@ function fillPersona(cfg) {
   $("warmth").value = cfg.personality.warmth;
   $("imitate").value = cfg.personality.imitate;
   $("unfiltered").checked = !!cfg.personality.unfiltered;
+  $("pronouns").value = cfg.personality.pronouns || "she";
   $("memory-enabled").checked = cfg.memory_enabled;
 }
 $("language").onchange = (e) => { persona.language = e.target.value; savePersona(); };
 $("confidence").oninput = (e) => { persona.personality.confidence = +e.target.value; savePersona(); };
 $("warmth").oninput = (e) => { persona.personality.warmth = +e.target.value; savePersona(); };
 $("imitate").oninput = (e) => { persona.personality.imitate = e.target.value; savePersona(); };
+$("pronouns").onchange = (e) => { persona.personality.pronouns = e.target.value; savePersona(); };
 $("unfiltered").onchange = (e) => { persona.personality.unfiltered = e.target.checked; savePersona(); };
 $("memory-enabled").onchange = (e) => { persona.memoryEnabled = e.target.checked; savePersona(); };
 $("open-data").onclick = () => invoke("open_data_dir").catch((e) => alert(e));
@@ -1378,7 +1380,7 @@ async function gmodLinkStatus() {
     ls.className = s.lambda === true ? "ok" : "";
     if (!s.dir) { el.textContent = t("Garry's Mod non trovato: indica la cartella qui sotto"); el.className = "result bad"; return; }
     if (s.in_game) { el.textContent = t("Alter Ego è nel gioco ✓"); el.className = "result ok"; }
-    else if (s.linked) { el.textContent = t("Gioco collegato ✓ (lei non è ancora entrata)"); el.className = "result ok"; }
+    else if (s.linked) { el.textContent = t("Gioco collegato ✓ (Alter Ego non è ancora in partita)"); el.className = "result ok"; }
     else if (s.installed) { el.textContent = s.game_running ? t("Addon installato: ricarica la mappa per attivarlo") : t("Addon installato ✓"); el.className = "result"; }
     else { el.textContent = t("Addon non installato"); el.className = "result"; }
   } catch (e) { el.textContent = String(e); el.className = "result bad"; }

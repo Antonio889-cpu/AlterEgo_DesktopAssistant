@@ -417,7 +417,7 @@ pub async fn extras_line(app: AppHandle, mood: String) -> f32 {
     let Ok(Some((s, r))) = tauri::async_runtime::spawn_blocking(move || clip(&dir, &line.file)).await else { return 0.0 };
     let engine = app.state::<AudioEngine>();
     engine.stop(); // una Line alla volta, come nel gioco
-    engine.play(&scaled(&s, LINE_GAIN), r, Kind::Voice)
+    engine.play_local(&scaled(&s, LINE_GAIN), r, Kind::Voice)
 }
 
 /// Effetto del pacchetto ("intro", "outro").
@@ -426,7 +426,7 @@ pub async fn extras_sfx(app: AppHandle, name: String) {
     let dir = pack_dir(&app);
     let Some(rel) = load(&dir).and_then(|p| p.sfx.get(&name).cloned()) else { return };
     if let Ok(Some((s, r))) = tauri::async_runtime::spawn_blocking(move || clip(&dir, &rel)).await {
-        app.state::<AudioEngine>().play(&scaled(&s, SFX_GAIN), r, Kind::Fx);
+        app.state::<AudioEngine>().play_local(&scaled(&s, SFX_GAIN), r, Kind::Fx);
     }
 }
 
@@ -515,10 +515,10 @@ pub async fn extras_prepare(app: AppHandle, game: Option<String>) -> Vec<Page> {
     let game = game.or_else(|| games::detect().map(|g| g.to_string()));
     match ask(&app, &pack, game.as_deref(), en).await {
         Ok(p) if !p.is_empty() => p,
-        Ok(_) => prompt::fallback(&moods, en),
+        Ok(_) => spare_or_fallback(&pack_dir(&app), &moods, en),
         Err(e) => {
             crate::applog::warn("extras", &format!("testo di riserva: {e}"));
-            prompt::fallback(&moods, en)
+            spare_or_fallback(&pack_dir(&app), &moods, en)
         }
     }
 }
@@ -529,7 +529,8 @@ async fn ask(app: &AppHandle, pack: &Pack, game: Option<&str>, en: bool) -> Resu
     // risposta breve, niente ragionamento: pochi token
     cfg.thinking = "off".into();
     cfg.max_tokens = 420;
-    cfg.temperature = 1.0;
+    // più creativo del solito: ogni evento deve sorprendere
+    cfg.temperature = 1.15;
     cfg.top_p = 1.0;
     let vision = cfg.order.iter().any(|id| cfg.providers.get(id).is_some_and(|p| p.enabled && p.vision));
     let image = if vision {
@@ -540,8 +541,8 @@ async fn ask(app: &AppHandle, pack: &Pack, game: Option<&str>, en: bool) -> Resu
     let moods = pack.moods();
     let dir = pack_dir(app);
     let recent = recent_load(&dir);
-    let (angle, tone) = prompt::twist(seed());
-    let mut msg = crate::providers::ChatMessage::new("user", &prompt::user(game, image.is_some(), angle, tone, &recent));
+    let spark = prompt::spark(seed(), en);
+    let mut msg = crate::providers::ChatMessage::new("user", &prompt::user(game, image.is_some(), &spark, &recent));
     msg.image = image;
     let ai = &app.state::<Extras>().ai;
     let ch = tauri::ipc::Channel::new(|_| Ok(()));
@@ -550,6 +551,7 @@ async fn ask(app: &AppHandle, pack: &Pack, game: Option<&str>, en: bool) -> Resu
     if let Some(p) = pages.iter().max_by_key(|p| p.text.len()) {
         recent_add(&dir, &p.text);
     }
+    spare_add(&dir, &pages, en);
     Ok(pages)
 }
 
@@ -564,10 +566,55 @@ fn recent_add(dir: &Path, text: &str) {
     let mut r = recent_load(dir);
     r.push(text.chars().take(140).collect());
     let n = r.len();
-    let r: Vec<String> = r.into_iter().skip(n.saturating_sub(4)).collect();
+    let r: Vec<String> = r.into_iter().skip(n.saturating_sub(6)).collect();
     if let Ok(s) = serde_json::to_string(&r) {
         let _ = std::fs::write(dir.join(RECENT), s);
     }
+}
+
+/// Scorta di eventi già generati dal modello, per quando non risponde (al posto delle frasi fisse).
+const SPARE: &str = "spare.json";
+const SPARE_MAX: usize = 16;
+
+#[derive(Serialize, Deserialize, Default)]
+struct Spare {
+    it: Vec<Vec<Page>>,
+    en: Vec<Vec<Page>>,
+}
+
+fn spare_load(dir: &Path) -> Spare {
+    std::fs::read_to_string(dir.join(SPARE)).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+fn spare_add(dir: &Path, pages: &[Page], en: bool) {
+    if pages.len() < 2 {
+        return;
+    }
+    let mut s = spare_load(dir);
+    let v = if en { &mut s.en } else { &mut s.it };
+    v.push(pages.to_vec());
+    let n = v.len();
+    v.drain(..n.saturating_sub(SPARE_MAX));
+    if let Ok(t) = serde_json::to_string(&s) {
+        let _ = std::fs::write(dir.join(SPARE), t);
+    }
+}
+
+/// Un evento della scorta (mai lo stesso due volte di fila), altrimenti le frasi di riserva fisse.
+fn spare_or_fallback(dir: &Path, moods: &[String], en: bool) -> Vec<Page> {
+    let s = spare_load(dir);
+    let v = if en { &s.en } else { &s.it };
+    let recent = recent_load(dir);
+    let fresh: Vec<&Vec<Page>> = v.iter().filter(|p| !p.iter().any(|x| recent.iter().any(|r| r == &x.text.chars().take(140).collect::<String>()))).collect();
+    let pool: Vec<&Vec<Page>> = if fresh.is_empty() { v.iter().collect() } else { fresh };
+    if pool.is_empty() {
+        return prompt::fallback(moods, en);
+    }
+    let pages = pool[(seed() % pool.len() as u64) as usize].clone();
+    if let Some(p) = pages.iter().max_by_key(|p| p.text.len()) {
+        recent_add(dir, &p.text);
+    }
+    pages
 }
 
 // ---------- quando succede ----------
@@ -707,6 +754,29 @@ mod tests {
         extract(&evil, &tmp.join("e")).unwrap();
         assert!(!tmp.join("evil.txt").exists());
         let _ = std::fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn spare_events_replace_fixed_lines() {
+        let dir = std::env::temp_dir().join(format!("ae-spare-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let moods = vec!["laugh".to_string(), "smug".to_string()];
+        let page = |t: &str| Page { mood: "laugh".into(), text: t.into() };
+        // vuota: frasi fisse
+        assert!(!spare_or_fallback(&dir, &moods, false).is_empty());
+        spare_add(&dir, &[page("Primo evento generato, lungo")], false); // una pagina sola: non si tiene
+        spare_add(&dir, &[page("A1 generato"), page("A2 generato e più lungo")], false);
+        spare_add(&dir, &[page("B1 generato"), page("B2 generato e più lungo")], false);
+        let first = spare_or_fallback(&dir, &moods, false);
+        assert!(first[0].text.ends_with("generato"));
+        let second = spare_or_fallback(&dir, &moods, false);
+        assert_ne!(first, second, "non lo stesso evento due volte di fila");
+        assert!(spare_load(&dir).en.is_empty(), "lingue separate");
+        for i in 0..40 {
+            spare_add(&dir, &[page(&format!("x{i}")), page("y")], false);
+        }
+        assert_eq!(spare_load(&dir).it.len(), SPARE_MAX);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

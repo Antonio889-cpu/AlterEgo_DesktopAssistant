@@ -177,9 +177,10 @@ pub fn decode_mono(path: &Path, max_secs: f64) -> Result<(Vec<f32>, u32), String
     Ok((out, rate))
 }
 
-/// Suona un file completo (musiche dei contenuti aggiuntivi).
+/// Suona un file completo (musiche dei contenuti aggiuntivi). Solo sugli altoparlanti: non è
+/// la voce di Alter Ego, quindi non va nel microfono virtuale di Mic-Link.
 pub fn play_file(engine: &AudioEngine, path: &Path, start: f64, rx: &Receiver<Ctl>, on_seek: &dyn Fn(f64)) -> Result<End, String> {
-    play(engine, &Download::finished(path.to_path_buf()), start, rx, on_seek, Arc::new(|| true))
+    play_to(engine, &Download::finished(path.to_path_buf()), start, rx, on_seek, Arc::new(|| true), false)
 }
 
 /// Suona il brano da `start` secondi finché finisce o arriva `Ctl::Stop`. Se il download è ancora
@@ -193,6 +194,19 @@ pub fn play(
     rx: &Receiver<Ctl>,
     on_seek: &dyn Fn(f64),
     alive: Arc<dyn Fn() -> bool + Send + Sync>,
+) -> Result<End, String> {
+    play_to(engine, dl, start, rx, on_seek, alive, true)
+}
+
+/// Come `play`; `link` = false non manda mai la musica al cavo di Mic-Link.
+fn play_to(
+    engine: &AudioEngine,
+    dl: &Arc<Download>,
+    start: f64,
+    rx: &Receiver<Ctl>,
+    on_seek: &dyn Fn(f64),
+    alive: Arc<dyn Fn() -> bool + Send + Sync>,
+    link: bool,
 ) -> Result<End, String> {
     let mut streaming = false;
     let mut format = if dl.is_done() {
@@ -285,7 +299,10 @@ pub fn play(
             std::thread::sleep(Duration::from_millis(20));
             continue;
         }
-        let now = engine.music_rates();
+        let mut now = engine.music_rates();
+        if !link {
+            now.1 = None;
+        }
         if now != rates {
             rates = now;
             sp = Stereo::new(src_rate, if now.0 == 0 { FALLBACK_RATE } else { now.0 });

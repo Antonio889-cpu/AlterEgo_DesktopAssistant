@@ -13,7 +13,11 @@ permissions:
   contents: write
 
 jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   windows:
+    needs: tests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +53,7 @@ jobs:
           path: out/*
 
   linux:
+    needs: tests
     # 22.04: l'AppImage funziona anche sulle distribuzioni con glibc meno recente
     runs-on: ubuntu-22.04
     steps:

@@ -160,9 +160,10 @@ pub async fn chat(
     let result = if cfg.hermes_brain && crate::hermes::find().is_some() {
         // Hermes come cervello: risponde lui, Alter Ego mette voce e faccia
         let prompt = format!(
-            "{}\n\nReply in character as Alter Ego. First line: only the emotion in square brackets, one of [{}]; then 2-4 short sentences, no markdown.\n{}\nUser's message:\n{text}",
+            "{}\n\nReply in character as Alter Ego. First line: only the emotion in square brackets, one of [{}]; then 2-4 short sentences, no markdown.\n{}{}\nUser's message:\n{text}",
             persona.lines().filter(|l| !l.trim_start().starts_with('>')).collect::<Vec<_>>().join("\n"),
             providers::prompt::EMOTIONS.join("|"),
+            providers::prompt::pronoun_rule(&cfg),
             providers::prompt::language_rule(&cfg)
         );
         crate::hermes::ask(&prompt, std::time::Duration::from_secs(15 * 60))
