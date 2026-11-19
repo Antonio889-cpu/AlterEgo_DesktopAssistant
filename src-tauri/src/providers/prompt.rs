@@ -55,6 +55,17 @@ fn personality(cfg: &Config) -> String {
     format!("{conf} {warm}")
 }
 
+/// Genere grammaticale con cui Alter Ego parla di sé (scelto nelle impostazioni).
+/// Corto e fisso per ogni scelta: resta nel prefisso in cache.
+pub fn pronoun_rule(cfg: &Config) -> &'static str {
+    match cfg.personality.pronouns() {
+        "he" => "\n## Your pronouns\nYou use he/him. In gendered languages (Italian) use masculine forms about yourself (\"sono pronto\", \"sono contento\").\n",
+        "they" => "\n## Your pronouns\nYou use they/them: you're neither a girl nor a boy. In gendered languages (Italian) never use gendered forms about yourself: \
+rephrase naturally (\"eccomi\" not \"sono pronta/o\", \"che gioia\" not \"sono contenta/o\", \"ho fatto\" not \"sono stata/o\"), no schwa or asterisks.\n",
+        _ => "\n## Your pronouns\nYou use she/her. In gendered languages (Italian) use feminine forms about yourself (\"sono pronta\", \"sono contenta\").\n",
+    }
+}
+
 /// Lingua delle risposte: "it", "en" o "it_en" ("auto" = come l'interfaccia).
 pub fn reply_lang(cfg: &Config) -> &str {
     match cfg.language.as_str() {
@@ -157,6 +168,7 @@ pub fn system(cfg: &Config, persona: &str, mem: &MemoryContext) -> String {
 - After using a tool always reply in the mandatory format.\n",
     );
     s.push_str(&tool_guide(cfg));
+    s.push_str(pronoun_rule(cfg));
     // lingua in fondo al prefisso fisso: è l'ultima istruzione prima delle parti che cambiano
     s.push_str(language_rule(cfg));
 

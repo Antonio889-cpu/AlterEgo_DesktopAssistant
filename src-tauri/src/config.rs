@@ -183,11 +183,24 @@ pub struct Personality {
     pub imitate: String,
     /// "Senza filtri": fa ciò che le chiedi anche se non è d'accordo (permessi e conferme restano).
     pub unfiltered: bool,
+    /// Pronomi con cui Alter Ego parla di sé e con cui l'app ne parla: "she", "he" o "they".
+    pub pronouns: String,
+}
+
+impl Personality {
+    /// Pronomi validi ("she" se il valore è sconosciuto).
+    pub fn pronouns(&self) -> &'static str {
+        match self.pronouns.as_str() {
+            "he" => "he",
+            "they" => "they",
+            _ => "she",
+        }
+    }
 }
 
 impl Default for Personality {
     fn default() -> Self {
-        Self { confidence: 0.3, warmth: 0.7, imitate: String::new(), unfiltered: false }
+        Self { confidence: 0.3, warmth: 0.7, imitate: String::new(), unfiltered: false, pronouns: "she".into() }
     }
 }
 
