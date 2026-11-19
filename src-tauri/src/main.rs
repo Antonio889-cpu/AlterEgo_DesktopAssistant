@@ -751,6 +751,8 @@ fn main() {
             localai::local_start,
             localai::local_stop,
             localai::local_delete,
+            localai::local_show,
+            localai::local_open_page,
             localai::local_use,
             localai::local_pull,
             localai::local_cancel,

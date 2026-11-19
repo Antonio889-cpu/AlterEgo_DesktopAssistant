@@ -483,6 +483,74 @@ pub async fn local_delete(app: AppHandle, name: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Dettagli di un modello installato (`POST /api/show`), per la scheda della Libreria LLM.
+#[derive(Serialize, Clone, Default, Debug, PartialEq)]
+pub struct ShowInfo {
+    pub family: String,
+    pub params: String,
+    pub quant: String,
+    pub format: String,
+    /// Token di contesto massimi del modello (0 = sconosciuto).
+    pub context: u64,
+    /// Prima riga della licenza (es. "Apache License").
+    pub license: String,
+    /// "completion", "tools", "vision", "thinking"… (Ollama recenti).
+    pub capabilities: Vec<String>,
+}
+
+pub fn parse_show(v: &Value) -> ShowInfo {
+    let d = v.get("details").cloned().unwrap_or(json!({}));
+    let s = |k: &str| d.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+    // model_info: "<architettura>.context_length"
+    let context = v
+        .get("model_info")
+        .and_then(Value::as_object)
+        .and_then(|m| m.iter().find(|(k, _)| k.ends_with(".context_length")).and_then(|(_, x)| x.as_u64()))
+        .unwrap_or(0);
+    let license = v
+        .get("license")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("")
+        .chars()
+        .take(80)
+        .collect();
+    let capabilities = v.get("capabilities").and_then(Value::as_array).into_iter().flatten().filter_map(|c| c.as_str().map(str::to_string)).collect();
+    ShowInfo { family: s("family"), params: s("parameter_size"), quant: s("quantization_level"), format: s("format"), context, license, capabilities }
+}
+
+#[tauri::command]
+pub async fn local_show(app: AppHandle, name: String) -> Result<ShowInfo, String> {
+    let r = http(&app).post(format!("{}/api/show", base(&app))).json(&json!({ "model": name })).timeout(Duration::from_secs(10)).send().await.map_err(|e| e.to_string())?;
+    if !r.status().is_success() {
+        return Err(r.text().await.unwrap_or_default());
+    }
+    Ok(parse_show(&r.json::<Value>().await.map_err(|e| e.to_string())?))
+}
+
+/// Pagina web di un modello: ollama.com per i nomi di Ollama, huggingface.co per hf.co/….
+pub fn page_url(name: &str) -> Option<String> {
+    let n = normalize(name).ok()?;
+    if let Some(rest) = n.strip_prefix("hf.co/") {
+        return Some(format!("https://huggingface.co/{}", rest.split(':').next()?));
+    }
+    let base = n.split(':').next()?;
+    Some(if base.contains('/') { format!("https://ollama.com/{base}") } else { format!("https://ollama.com/library/{base}") })
+}
+
+#[tauri::command]
+pub fn local_open_page(name: String) -> Result<(), String> {
+    let url = page_url(&name).ok_or_else(|| crate::i18n::tr("nome del modello non valido", "invalid model name").to_string())?;
+    #[cfg(windows)]
+    let r = Command::new("explorer").arg(&url).spawn();
+    #[cfg(not(windows))]
+    let r = Command::new("xdg-open").arg(&url).spawn();
+    r.map(|_| ()).map_err(|e| e.to_string())
+}
+
 /// Usa il modello con Alter Ego: provider Ollama attivo (e primo, se `primary`), modello scelto,
 /// parametri consigliati per LFM3 (temperatura 0.1, top_k 50, repeat penalty 1.1, contesto 32K).
 #[tauri::command]
@@ -958,8 +1026,8 @@ pub async fn local_catalog_open(app: AppHandle) -> Result<(), String> {
         return w.set_focus().map_err(|e| e.to_string());
     }
     WebviewWindowBuilder::new(&app, "models", WebviewUrl::App("models.html".into()))
-        .title(crate::i18n::tr("Alter Ego – Catalogo modelli", "Alter Ego – Model catalog"))
-        .inner_size(860.0, 760.0)
+        .title(crate::i18n::tr("Alter Ego – Libreria LLM", "Alter Ego – LLM Library"))
+        .inner_size(1180.0, 780.0)
         .min_inner_size(560.0, 480.0)
         .center()
         .build()
@@ -1225,11 +1293,14 @@ pub struct GpuInfo {
     pub settings: LocalConfig,
     /// Su Windows con l'app di Ollama le impostazioni vanno nelle variabili dell'utente (riavvio di Ollama).
     pub user_env: bool,
+    /// MB di RAM del PC (0 = sconosciuta) e thread della CPU: per la Libreria LLM (cosa gira sul PC).
+    pub ram_mb: u64,
+    pub cpu_threads: u32,
 }
 
 #[tauri::command]
 pub async fn local_gpu(app: AppHandle) -> GpuInfo {
-    let gpus = tauri::async_runtime::spawn_blocking(list_gpus).await.unwrap_or_default();
+    let (gpus, ram_mb) = tauri::async_runtime::spawn_blocking(|| (list_gpus(), total_ram_mb())).await.unwrap_or_default();
     let log_path = ollama_log_path(&app);
     // il log può contenere byte non UTF-8 (barre di avanzamento): lettura tollerante
     let devices = log_path.as_ref().and_then(|p| std::fs::read(p).ok()).map(|b| parse_ollama_log(&String::from_utf8_lossy(&b))).unwrap_or_default();
@@ -1242,6 +1313,35 @@ pub async fn local_gpu(app: AppHandle) -> GpuInfo {
         log: log_path.map(|p| p.display().to_string()).unwrap_or_default(),
         settings: app.state::<AppState>().cfg.lock().unwrap_or_else(std::sync::PoisonError::into_inner).local.clone(),
         user_env: managed_env_is_user(&app),
+        ram_mb,
+        cpu_threads: std::thread::available_parallelism().map(|n| n.get() as u32).unwrap_or(0),
+    }
+}
+
+/// "MemTotal:       16318412 kB" di /proc/meminfo → MB.
+pub fn parse_meminfo(s: &str) -> u64 {
+    s.lines()
+        .find_map(|l| l.strip_prefix("MemTotal:"))
+        .and_then(|v| v.split_whitespace().next()?.parse::<u64>().ok())
+        .map(|kb| kb / 1024)
+        .unwrap_or(0)
+}
+
+/// RAM totale del PC in MB (0 se non si riesce a leggerla).
+pub fn total_ram_mb() -> u64 {
+    #[cfg(windows)]
+    {
+        let out = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"])
+            .stdin(Stdio::null())
+            .output_hidden()
+            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+            .unwrap_or_default();
+        out.trim().parse::<u64>().map(|b| b / (1024 * 1024)).unwrap_or(0)
+    }
+    #[cfg(not(windows))]
+    {
+        parse_meminfo(&std::fs::read_to_string("/proc/meminfo").unwrap_or_default())
     }
 }
 
@@ -1420,6 +1520,26 @@ time=2026-11-02T10:00:00 level=INFO source=types.go:42 msg="inference compute" i
         assert_eq!(b, "vulkan");
         assert!(a.contains("RX 6600") && a.contains("integrata"), "{a}");
         assert!(classify("AMD Radeon(TM) Graphics".into(), 512).integrated);
+    }
+
+    #[test]
+    fn show_meminfo_and_pages() {
+        let v = json!({
+            "license": "\n  Apache License\n  Version 2.0, January 2004\n",
+            "details": { "format": "gguf", "family": "qwen3", "parameter_size": "8.2B", "quantization_level": "Q4_K_M" },
+            "model_info": { "general.architecture": "qwen3", "qwen3.context_length": 40960, "qwen3.block_count": 36 },
+            "capabilities": ["completion", "tools", "thinking"]
+        });
+        let s = parse_show(&v);
+        assert_eq!((s.context, s.license.as_str(), s.format.as_str(), s.params.as_str()), (40960, "Apache License", "gguf", "8.2B"));
+        assert_eq!(s.capabilities, ["completion", "tools", "thinking"]);
+        assert_eq!(parse_show(&json!({})), ShowInfo::default());
+        assert_eq!(parse_meminfo("MemTotal:       16318412 kB\nMemFree:  100 kB\n"), 15935);
+        assert_eq!(parse_meminfo("niente"), 0);
+        assert_eq!(page_url("gemma3:4b").unwrap(), "https://ollama.com/library/gemma3");
+        assert_eq!(page_url("orcarouter/LFM3-1.7B-abliterated").unwrap(), "https://ollama.com/orcarouter/LFM3-1.7B-abliterated");
+        assert_eq!(page_url("hf.co/LiquidAI/LFM3-VL-2B-GGUF:Q4_K_M").unwrap(), "https://huggingface.co/LiquidAI/LFM3-VL-2B-GGUF");
+        assert!(page_url("rm -rf /").is_none());
     }
 
     #[test]
