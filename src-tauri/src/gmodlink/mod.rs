@@ -304,6 +304,25 @@ pub fn game_to_graph(app: &AppHandle, game: &str, start: i64, place: &str, line:
     }
 }
 
+/// Fine di una sessione di Minecraft o VRChat: le ultime battute diventano un nodo del grafo
+/// (zero token: niente riassunto del modello, solo le frasi tagliate).
+pub fn session_to_graph(app: &AppHandle, game: &str, place: &str, history: &[(String, String)]) {
+    let line = session_line(history);
+    if !line.is_empty() {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+        game_to_graph(app, game, now, place, &line);
+    }
+}
+
+fn session_line(history: &[(String, String)]) -> String {
+    let cut = |t: &str, n: usize| t.chars().take(n).collect::<String>();
+    let mut line = history.iter().filter(|(u, _)| !u.trim().is_empty()).map(|(u, a)| format!("«{}» → «{}»", cut(u.trim(), 90), cut(a.trim(), 90))).collect::<Vec<_>>().join(" · ");
+    if line.chars().count() > 480 {
+        line = cut(&line, 480) + "…";
+    }
+    line
+}
+
 /// Chiude la partita in corso e la mette nell'archivio delle partite.
 fn end_session(app: &AppHandle) {
     let log = lock(app).session.take();
@@ -1240,6 +1259,15 @@ pub fn gmodlink_join(app: AppHandle, join: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn session_line_is_short_and_skips_empty() {
+        assert_eq!(session_line(&[]), "");
+        let h = vec![("".to_string(), "battuta".to_string()), ("ciao".to_string(), "ehi!".to_string())];
+        assert_eq!(session_line(&h), "«ciao» → «ehi!»");
+        let long = vec![("x".repeat(500), "y".repeat(500)); 8];
+        assert!(session_line(&long).chars().count() <= 481);
+    }
 
     #[test]
     fn state_with_lua_empty_tables() {

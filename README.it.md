@@ -140,6 +140,8 @@ Interfaccia in italiano e in inglese.
 
 **Impostazioni**
 
+![Impostazioni in finestra grande: la dashboard con Home, Integrazioni e Libreria LLM](docs/screenshots/settings-dashboard.png)
+
 | | |
 |---|---|
 | ![AI e chiavi](docs/screenshots/settings-ai.png) | ![Tasti](docs/screenshots/settings-hotkeys.png) |
@@ -385,7 +387,7 @@ I prompt sono già costruiti per la **cache del prefisso** dei provider (DeepSee
 - **Strumenti con i modelli locali**: Alter Ego usa l'API nativa di Ollama e sceglie da solo/a un contesto di 16K o 32K, così prompt
   e lista degli strumenti non vengono più tagliati dal contesto predefinito di Ollama (4K).
 
-![Catalogo dei modelli](docs/screenshots/models-catalog.png)
+![Libreria LLM: modelli consigliati, cosa gira sul tuo PC, coda dei download](docs/screenshots/models-catalog.png)
 - **Da un indirizzo**: `hf.co/utente/modello-GGUF:Q4_K_M`, qualsiasi link di Hugging Face (anche a un singolo `.gguf`), `ollama.com/…`,
   oppure un `.gguf` da qualsiasi sito (scaricato, controllato con SHA-256 e importato in Ollama).
 - **Modelli installati**: dimensione, quantizzazione, quanto sta sulla GPU; *Usa* (diventa il modello di Alter Ego) ed *Elimina*.
@@ -590,6 +592,8 @@ simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu e
 
 Alter Ego entra nel tuo mondo di **Minecraft Java Edition** e gioca con te. *Impostazioni → Giochi → Minecraft*.
 
+![Impostazioni di Minecraft: skin, iniziativa, mondo e apprendimento](docs/screenshots/settings-minecraft.png)
+
 - **Installazione**: premi *Installa / aggiorna*. L'app usa Node.js se è già sul PC (18 o più recente), altrimenti scarica Node.js LTS
   portatile da nodejs.org (controllato con `SHASUMS256.txt`), poi installa [Mineflayer](https://github.com/PrismarineJS/mineflayer)
   e i suoi plugin (pathfinder, pvp, collectblock, tool; MIT) con `npm ci` dal lockfile incluso. Tutto nella cartella dei dati locali dell'app.
@@ -613,6 +617,8 @@ Alter Ego entra nel tuo mondo di **Minecraft Java Edition** e gioca con te. *Imp
   lo scrive appena entra).
 
 ## VRChat: stiamo insieme
+
+![Impostazioni di VRChat: avviso sul rischio, stato OSC, avatar e sensi](docs/screenshots/settings-vrchat.png)
 
 > **Avviso sul rischio.** I [Termini di servizio](https://hello.vrchat.com/legal) di VRChat (13.2) vietano l'uso «non coerente con l'uso
 > individuale umano» e i mezzi automatizzati, e le [Linee guida della community](https://hello.vrchat.com/community-guidelines) vietano i bot

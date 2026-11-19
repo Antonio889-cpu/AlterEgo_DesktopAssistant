@@ -1,3 +1,11 @@
+## Alter Ego 1.14.0
+
+- Minecraft and VRChat: Alter Ego joins and plays with you.
+- LLM Library redesigned; large-window settings dashboard.
+- Pronoun choice; layered graph memory to save tokens.
+
+`AlterEgo_1.14.0_setup.exe` / `AlterEgo_1.14.0_portable.zip` Windows · `AlterEgo_1.14.0_amd64.AppImage` / `AlterEgo_1.14.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.13.0
 
 - Garry's Mod: her personality grows: she invents pranks and games, keeps the ones that make you laugh and drops the others (adjustable unpredictability).

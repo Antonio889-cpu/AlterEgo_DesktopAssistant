@@ -295,6 +295,12 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
 
 /// Esce dal mondo e chiude il bot.
 pub fn stop(app: &AppHandle) {
+    let (history, place) = {
+        let mut i = lock(app);
+        let h: Vec<(String, String)> = std::mem::take(&mut i.history).into();
+        (h, i.world["host"].as_str().unwrap_or_default().to_string())
+    };
+    crate::gmodlink::session_to_graph(app, "Minecraft", &place, &history);
     send(app, vec![json!({ "op": "leave" })]);
     let app = app.clone();
     std::thread::spawn(move || {

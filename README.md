@@ -140,6 +140,8 @@ Interface in English and Italian.
 
 **Settings**
 
+![Settings in a large window: the dashboard with Home, Integrations and LLM Library](docs/screenshots/en/settings-dashboard.png)
+
 | | |
 |---|---|
 | ![AI & keys](docs/screenshots/en/settings-ai.png) | ![Hotkeys](docs/screenshots/en/settings-hotkeys.png) |
@@ -383,7 +385,7 @@ Prompts are already built for the providers' **prefix cache** (DeepSeek, Gemini)
 - **Tools with local models**: Alter Ego talks to Ollama's native API and picks a 16K or 32K context by itself, so the system prompt
   and the tool list are no longer cut off by Ollama's 4K default.
 
-![Model catalog](docs/screenshots/en/models-catalog.png)
+![LLM Library: recommended models, what runs on your PC, download queue](docs/screenshots/en/models-catalog.png)
 - **From an address**: `hf.co/user/model-GGUF:Q4_K_M`, any Hugging Face link (also to a single `.gguf`), `ollama.com/…`,
   or a `.gguf` from any site (downloaded, checked with SHA-256 and imported into Ollama).
 - **Installed models**: size, quantization, how much is on the GPU; *Use* (sets it as Alter Ego's model) and *Delete*.
@@ -588,6 +590,8 @@ simulated on your PC in real time with the leaky integrate-and-fire model of Shi
 
 Alter Ego joins your **Minecraft Java Edition** world and plays with you. *Settings → Games → Minecraft*.
 
+![Minecraft settings: skin, initiative, world and learning](docs/screenshots/en/settings-minecraft.png)
+
 - **Setup**: press *Install / update*. The app uses Node.js if it's already on your PC (18 or newer), otherwise it downloads the
   portable Node.js LTS from nodejs.org (checked against `SHASUMS256.txt`), then installs [Mineflayer](https://github.com/PrismarineJS/mineflayer)
   and its plugins (pathfinder, pvp, collectblock, tool; MIT) with `npm ci` from the bundled lockfile. Everything goes into the app's local data folder.
@@ -611,6 +615,8 @@ Alter Ego joins your **Minecraft Java Edition** world and plays with you. *Setti
   he/she types it after joining).
 
 ## VRChat: hang out together
+
+![VRChat settings: risk notice, OSC status, avatar and senses](docs/screenshots/en/settings-vrchat.png)
 
 > **Risk notice.** VRChat's [Terms of Service](https://hello.vrchat.com/legal) (13.2) forbid using the service "inconsistent with individual
 > human usage" or through automated means, and the [Community Guidelines](https://hello.vrchat.com/community-guidelines) forbid bots that

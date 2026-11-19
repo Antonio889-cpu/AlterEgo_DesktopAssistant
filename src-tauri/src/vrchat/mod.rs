@@ -938,6 +938,8 @@ pub fn start(app: &AppHandle) -> Result<(), String> {
 
 /// Esce: ferma corpo, udito e occhi (ingressi a zero).
 pub fn stop(app: &AppHandle) {
+    let history: Vec<(String, String)> = std::mem::take(&mut lock(app).history).into();
+    crate::gmodlink::session_to_graph(app, "VRChat", "", &history);
     let v = vrc(app);
     send_cmd(app, Cmd::Stop);
     v.ears.stop.store(true, Ordering::SeqCst);
