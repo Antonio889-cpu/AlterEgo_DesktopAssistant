@@ -953,6 +953,21 @@ const I18N = (() => {
     "Nessun mondo a questo indirizzo: apri il mondo in LAN oppure controlla indirizzo e porta.": "No world at this address: open your world to LAN or check address and port.",
     "Nessun mondo in LAN trovato: in Minecraft premi Esc → Apri in LAN, oppure scrivi la porta.": "No LAN world found: in Minecraft press Esc → Open to LAN, or enter the port.",
     "Disconnessione dal server: {reason}": "Disconnected from the server: {reason}",
+    // 1.15: Minecraft gioco
+    "Costruzioni e schematiche": "Builds and schematics",
+    "Prima di costruire Alter Ego immagina la costruzione (anche a parole: «fammi una casetta 5x5»), conta i blocchi, toglie quello che c'è in mezzo e poi costruisce dal basso. Puoi darle anche un file di schematica (.schem, .schematic, .litematic, .nbt): in chat «costruisci la schematica …».":
+      "Before building, Alter Ego pictures the build (even from words: \"build me a 5x5 house\"), counts the blocks, clears what's in the way and then builds from the bottom up. You can also give a schematic file (.schem, .schematic, .litematic, .nbt): in chat \"build the schematic …\".",
+    "Scegli un file…": "Choose a file…", "Schematica": "Schematic", "Costruisci": "Build", "Anteprima della costruzione": "Build preview",
+    "Visuale": "View", "Isometrica": "Isometric", "Per piani": "Layer by layer", "Piano": "Layer",
+    "Nessuna anteprima: scegli un file o chiedile una costruzione.": "No preview: choose a file or ask Alter Ego to build something.", "nessuna anteprima": "no preview",
+    "Impara da te": "Learns from you", "Impara guardandoti": "Learns by watching you", "Duelli su richiesta": "Duels on request",
+    "Chiede quando ha un dubbio": "Asks when unsure", "Inventario in ordine da sola": "Keeps the inventory tidy", "Decisioni rapide con Rizzo Flow": "Quick decisions with Rizzo Flow",
+    "Da un altro giocatore si vede solo quello che vedresti tu: cosa hai in mano e addosso, come ti muovi, i blocchi che metti e rompi, l'elytra. Il tuo inventario e la griglia di crafting no: il crafting lo deduce dal banco e dall'oggetto nuovo in mano. I duelli partono solo se li chiedi («duelliamo»), con regole e conto alla rovescia; dopo ogni round sceglie la tattica (con Rizzo Flow se è il router) e ricorda cosa funziona contro di te.":
+      "Another player only sees what you would see: what you hold and wear, how you move, the blocks you place and break, the elytra. Not your inventory or the crafting grid: crafting is inferred from the table and the new item in your hand. Duels only start when you ask (\"let's duel\"), with rules and a countdown; after each round Alter Ego picks a tactic (with Rizzo Flow if it's the router) and remembers what works against you.",
+    "{n}: {w}×{h}×{l}, {b} blocchi": "{n}: {w}×{h}×{l}, {b} blocks", "Servono: {m}": "Needs: {m}", "Non si piazzano: {m}": "Not placeable: {m}",
+    "Anteprima parziale (costruzione molto grande)": "Partial preview (very large build)", "Mancano: {m}": "Missing: {m}",
+    "Da togliere: {n} blocchi ({t} alberi)": "To clear: {n} blocks ({t} trees)", "Punto: {x} {y} {z}": "Spot: {x} {y} {z}",
+    "Leggo la schematica…": "Reading the schematic…", "Schematica {f} pronta ✓": "Schematic {f} ready ✓", "Alter Ego controlla i blocchi e poi costruisce": "Alter Ego checks the blocks and then builds",
     // 1.15: Libreria LLM
     "Alter Ego – Libreria LLM": "Alter Ego – LLM Library", "LIBRERIA LLM": "LLM LIBRARY", "Sfoglia, cerca e gestisci i tuoi modelli locali": "Browse, search and manage your local models",
     "Stato di Ollama (clic per aggiornare)": "Ollama status (click to refresh)", "Ollama: online · v{v}": "Ollama: online · v{v}", "Ollama: spento": "Ollama: stopped", "Ollama: non installato": "Ollama: not installed",

@@ -3,6 +3,7 @@
 //! - lo stile dell'avversario (distanza, strafe, critici, w-tap, scudo, arco…) si aggiorna con una media mobile;
 //! - la tattica usata prende il suo premio (vittoria + differenza di danno): tasso di successo per tattica;
 //! - se l'avversario ha vinto, Alter Ego copia la sua distanza e il suo strafe (`mimic`).
+//!
 //! La tattica del round dopo: UCB1 (sfruttamento + esplorazione, tipo bandit) + counter sullo stile;
 //! con Rizzo Flow una sola chiamata decide tattica, se copiare e se chiedere al giocatore.
 

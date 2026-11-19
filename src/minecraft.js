@@ -8,7 +8,8 @@
   let mc = null; // copia di config.minecraft
   let saveTimer = null;
 
-  const CHECKS = { "mc-follow": "follow", "mc-gather": "gather", "mc-build": "build", "mc-explore": "explore", "mc-fly": "fly", "mc-learn": "learn", "mc-csl": "csl", "mc-slim": "slim" };
+  const CHECKS = { "mc-follow": "follow", "mc-gather": "gather", "mc-build": "build", "mc-explore": "explore", "mc-fly": "fly", "mc-learn": "learn", "mc-csl": "csl", "mc-slim": "slim",
+    "mc-observe": "observe", "mc-duels": "duels", "mc-ask": "ask", "mc-tidy": "tidy", "mc-rizzo": "rizzo" };
   const TEXTS = { "mc-host": "host", "mc-username": "username", "mc-player": "player", "mc-version": "version", "mc-skin-cmd": "skin_cmd" };
 
   function fill(m) {

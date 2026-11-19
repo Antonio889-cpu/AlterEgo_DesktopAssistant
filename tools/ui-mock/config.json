@@ -366,6 +366,11 @@
     "skin_cmd": "",
     "slim": false,
     "csl": true,
-    "node": ""
+    "node": "",
+    "observe": true,
+    "duels": true,
+    "ask": true,
+    "rizzo": true,
+    "tidy": true
   }
 }
