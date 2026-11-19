@@ -836,6 +836,135 @@ impl GmodLinkConfig {
     }
 }
 
+/// Collegamento parametro dell'avatar → senso del cervello di moscerino.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(default)]
+pub struct ContactMap {
+    pub param: String,
+    /// "touch", "pain", "loom_l", "loom_r", "sweet".
+    pub sense: String,
+}
+
+/// VRChat: Alter Ego gioca con un account dedicato in modalità desktop, guidato via OSC (vedi vrchat/).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct VrchatConfig {
+    /// Avviso sui Termini di VRChat già letto e accettato (senza, "Entra" non parte).
+    pub accepted_risk: bool,
+    /// OSC: indirizzo di VRChat, porta verso VRChat e porta da VRChat.
+    pub host: String,
+    pub send_port: u16,
+    pub recv_port: u16,
+    /// Cartella `OSC` di VRChat (vuota = trovata da sola).
+    pub osc_dir: String,
+    /// Avatar scelto nell'elenco (vuoto = quello che indossa).
+    pub avatar: String,
+    /// Vista: "off", "local" (modello di visione di Ollama) o "cloud" (provider predefinito).
+    pub vision: String,
+    pub vision_model: String,
+    /// Al massimo un'occhiata ogni tanti secondi.
+    pub look_secs: u32,
+    /// Sente chi parla vicino (audio di VRChat → trascrizione).
+    pub hearing: bool,
+    /// Uscita audio da ascoltare (vuota = predefinita).
+    pub hearing_device: String,
+    /// Scrive anche nella chatbox.
+    pub chatbox: bool,
+    /// Microfono in VRChat: "open" (sempre aperto) o "ptt" (tiene premuto /input/Voice mentre parla).
+    pub mic_mode: String,
+    pub follow: bool,
+    pub answer: bool,
+    pub gestures: bool,
+    pub explore: bool,
+    pub talk_others: bool,
+    /// Commenti spontanei: "off", "low", "normal", "often".
+    pub chatter: String,
+    /// Contatti → sensi (vuoto = automatico dai nomi dei parametri).
+    pub contacts: Vec<ContactMap>,
+    /// Parametro per le emote e valori ("wave=1, clap=2…").
+    pub emote_param: String,
+    pub emotes: String,
+    /// Parametro per le espressioni (vuoto = spento) e valori per emozione.
+    pub expr_param: String,
+    pub expressions: String,
+    /// Cervello di moscerino: riflessi ed emozioni dai contatti.
+    pub fly: bool,
+    pub reflexes: bool,
+    /// Accesso all'API web di VRChat solo per cambiare avatar (spento di default, a rischio dell'utente).
+    pub login: bool,
+    /// Nome mostrato dell'account collegato (non segreto).
+    pub account: String,
+}
+
+impl Default for VrchatConfig {
+    fn default() -> Self {
+        Self {
+            accepted_risk: false,
+            host: "127.0.0.1".into(),
+            send_port: 9000,
+            recv_port: 9001,
+            osc_dir: String::new(),
+            avatar: String::new(),
+            vision: "off".into(),
+            vision_model: String::new(),
+            look_secs: 8,
+            hearing: true,
+            hearing_device: String::new(),
+            chatbox: true,
+            mic_mode: "open".into(),
+            follow: true,
+            answer: true,
+            gestures: true,
+            explore: false,
+            talk_others: false,
+            chatter: "low".into(),
+            contacts: Vec::new(),
+            emote_param: "VRCEmote".into(),
+            emotes: "wave=1, clap=2, point=3, cheer=4, dance=5, backflip=6, sad=7, die=8".into(),
+            expr_param: String::new(),
+            expressions: "happy=1, sad=2, surprised=3, embarrassed=4, worried=5, thinking=6".into(),
+            fly: true,
+            reflexes: true,
+            login: false,
+            account: String::new(),
+        }
+    }
+}
+
+impl VrchatConfig {
+    pub fn normalize(&mut self) {
+        let d = Self::default();
+        if !["off", "local", "cloud"].contains(&self.vision.as_str()) {
+            self.vision = "off".into();
+        }
+        if !["open", "ptt"].contains(&self.mic_mode.as_str()) {
+            self.mic_mode = "open".into();
+        }
+        if !["off", "low", "normal", "often"].contains(&self.chatter.as_str()) {
+            self.chatter = "low".into();
+        }
+        // OSC solo verso questo PC (VRChat gira qui)
+        let h = self.host.trim();
+        self.host = if ["127.0.0.1", "localhost", "::1"].contains(&h) { h.to_string() } else { d.host };
+        if self.send_port < 1024 {
+            self.send_port = d.send_port;
+        }
+        if self.recv_port < 1024 || self.recv_port == self.send_port {
+            self.recv_port = if self.send_port == d.recv_port { d.send_port } else { d.recv_port };
+        }
+        self.look_secs = self.look_secs.clamp(3, 120);
+        self.contacts.retain(|c| !c.param.trim().is_empty() && ["touch", "pain", "loom_l", "loom_r", "sweet"].contains(&c.sense.as_str()));
+        self.contacts.truncate(32);
+        for s in [&mut self.emote_param, &mut self.expr_param] {
+            *s = s.trim().chars().filter(|c| c.is_ascii_alphanumeric() || "_-/".contains(*c)).take(64).collect();
+        }
+        if !self.avatar.is_empty() && !self.avatar.starts_with("avtr_") {
+            self.avatar.clear();
+        }
+        self.account = self.account.trim().chars().take(64).collect();
+    }
+}
+
 /// Pet: Alter Ego esce dalla TV e gira per il desktop nei momenti di calma (vedi pet/).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
@@ -933,6 +1062,7 @@ pub struct Config {
     pub local: LocalConfig,
     pub pet: PetConfig,
     pub gmodlink: GmodLinkConfig,
+    pub vrchat: VrchatConfig,
     pub extras: ExtrasConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
@@ -978,6 +1108,7 @@ impl Default for Config {
             local: LocalConfig::default(),
             pet: PetConfig::default(),
             gmodlink: GmodLinkConfig::default(),
+            vrchat: VrchatConfig::default(),
             extras: ExtrasConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
@@ -1057,6 +1188,7 @@ pub fn load(path: &Path) -> Config {
             cfg.normalize_voice();
             cfg.pet.normalize();
             cfg.gmodlink.normalize();
+            cfg.vrchat.normalize();
             cfg.auto_advance_secs = cfg.auto_advance_secs.clamp(0.5, 30.0);
             cfg.music.player_width = cfg.music.player_width.clamp(crate::music::PLAYER_MIN_W, crate::music::PLAYER_MAX_W);
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {

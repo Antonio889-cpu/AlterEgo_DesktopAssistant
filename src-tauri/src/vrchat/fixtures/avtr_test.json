@@ -1,0 +1,19 @@
+﻿{
+  "id": "avtr_c38a1615-5bf5-42b4-84eb-a8b6c37cbd11",
+  "name": "Alter Ego (Chihiro)",
+  "parameters": [
+    { "name": "VelocityZ", "output": { "address": "/avatar/parameters/VelocityZ", "type": "Float" } },
+    { "name": "VelocityX", "output": { "address": "/avatar/parameters/VelocityX", "type": "Float" } },
+    { "name": "Grounded", "output": { "address": "/avatar/parameters/Grounded", "type": "Bool" } },
+    { "name": "GestureLeft", "output": { "address": "/avatar/parameters/GestureLeft", "type": "Int" } },
+    { "name": "VRCEmote", "input": { "address": "/avatar/parameters/VRCEmote", "type": "Int" }, "output": { "address": "/avatar/parameters/VRCEmote", "type": "Int" } },
+    { "name": "HeadPat", "input": { "address": "/avatar/parameters/HeadPat", "type": "Bool" }, "output": { "address": "/avatar/parameters/HeadPat", "type": "Bool" } },
+    { "name": "Contact_Boop", "input": { "address": "/avatar/parameters/Contact_Boop", "type": "Float" }, "output": { "address": "/avatar/parameters/Contact_Boop", "type": "Float" } },
+    { "name": "Proximity_L", "input": { "address": "/avatar/parameters/Proximity_L", "type": "Float" }, "output": { "address": "/avatar/parameters/Proximity_L", "type": "Float" } },
+    { "name": "Proximity_R", "input": { "address": "/avatar/parameters/Proximity_R", "type": "Float" }, "output": { "address": "/avatar/parameters/Proximity_R", "type": "Float" } },
+    { "name": "Hit_Slap", "input": { "address": "/avatar/parameters/Hit_Slap", "type": "Bool" }, "output": { "address": "/avatar/parameters/Hit_Slap", "type": "Bool" } },
+    { "name": "Expression", "input": { "address": "/avatar/parameters/Expression", "type": "Int" }, "output": { "address": "/avatar/parameters/Expression", "type": "Int" } },
+    { "name": "Tail_IsGrabbed", "output": { "address": "/avatar/parameters/Tail_IsGrabbed", "type": "Bool" } },
+    { "name": "Tail_Stretch", "output": { "address": "/avatar/parameters/Tail_Stretch", "type": "Float" } }
+  ]
+}

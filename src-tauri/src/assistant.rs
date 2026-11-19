@@ -80,6 +80,11 @@ pub async fn chat(
         let r = crate::gmodlink::handle(&app, "", &text, None).await?;
         return Ok(providers::ChatResult { text: r, provider: "gmod".into(), model: "gmod".into(), tool_calls: vec![] });
     }
+    // in VRChat: risponde il "cervello di VRChat" (prompt corto, azioni nel mondo)
+    if crate::vrchat::wants(&app, &text) {
+        let r = crate::vrchat::handle(&app, cfg.user_name.trim(), &text, false).await?;
+        return Ok(providers::ChatResult { text: r, provider: "vrchat".into(), model: "vrchat".into(), tool_calls: vec![] });
+    }
     // comandi dell'app (apri music venue, chiudi il lettore…): subito, senza modello
     if cfg.permissions.app_control {
         if let Some(r) = crate::appctl::quick(&app, &text).await {

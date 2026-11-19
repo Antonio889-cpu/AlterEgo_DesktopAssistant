@@ -71,7 +71,7 @@
   hero.innerHTML = `<h2>Integrazioni</h2><div class="w-games">
     <button class="w-game gm on" data-game="gmod"><span class="w-game-art"></span><b>Garry's Mod</b><small id="w-gm-state">…</small></button>
     <button class="w-game mc" data-game="minecraft"><span class="w-game-art"></span><b>Minecraft</b><small>Anteprima · in arrivo</small></button>
-    <button class="w-game vrc" data-game="vrchat"><span class="w-game-art"></span><b>VRChat</b><small>Anteprima · in arrivo</small></button></div>`;
+    <button class="w-game vrc" data-game="vrchat"><span class="w-game-art"></span><b>VRChat</b><small id="w-vrc-state">Account dedicato via OSC</small></button></div>`;
   const firstGame = document.querySelector('main section[data-tab="games"]');
   firstGame.parentNode.insertBefore(hero, firstGame);
   let game = "gmod";
@@ -184,7 +184,7 @@
     cards.push(card("local", "Ollama", local?.running ? "● " + t("Online") : local?.installed ? t("Fermo") : t("Non installato"),
       local ? t("{n} modelli installati", { n: local.models?.length || 0 }) + (local.version ? " · v" + esc(local.version) : "") : "", !!local?.running));
     cards.push(card("games", "Garry's Mod", gm?.in_game ? "● " + t("In partita") : gm?.linked ? t("Collegato") : gm?.installed ? t("Addon pronto") : t("Non collegato"),
-      gm?.games ? t("{n} partite ricordate", { n: gm.games }) : t("Minecraft e VRChat in arrivo"), gm?.in_game ? true : undefined));
+      gm?.games ? t("{n} partite ricordate", { n: gm.games }) : t("Anche VRChat, via OSC"), gm?.in_game ? true : undefined));
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const rows = (costs || []).filter((r) => r.ts * 1000 >= today.getTime());
     const tok = rows.reduce((a, r) => a + (r.input || 0) + (r.cached || 0), 0);

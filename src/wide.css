@@ -31,6 +31,15 @@ section.game-vrc { border-radius: 14px; }
 section.game-vrc h2 { position: relative; padding-left: 34px; }
 section.game-vrc h2::before { content: "VR"; position: absolute; left: 0; top: -2px; font: 12px/20px "DotGothic16", monospace; color: #062006;
   background: var(--accent); padding: 0 4px; border-radius: 4px 4px 4px 0; }
+.vrc-warn { border: 1px solid var(--warn); border-radius: 10px; padding: 10px 12px; margin: 6px 0 10px; background: rgba(255,200,60,.06); }
+.vrc-warn b { color: var(--warn); }
+.vrc-warn p { margin: 6px 0; }
+.vrc-login { border-left: 2px solid var(--line); padding-left: 10px; margin-left: 4px; }
+.vrc-contact { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+.vrc-contact input { flex: 1 1 160px; min-width: 0; }
+.vrc-contact select { flex: 0 1 220px; min-width: 0; }
+.vrc-params, #vrc-detail, #vrc-miclink { overflow-wrap: anywhere; }
+section.game-vrc select { max-width: 100%; }
 
 /* ======================= modalità larga ======================= */
 body.wide { display: grid; grid-template-columns: 236px minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); height: var(--w-h, 100vh); overflow: hidden;
