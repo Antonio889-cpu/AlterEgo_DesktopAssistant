@@ -99,6 +99,9 @@ hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
       cam.Start3D2D(pos, Angle(0, me:EyeAngles().y - 90, 90), 0.12)
         local talking = b:GetNWFloat("AESpeakUntil", 0) > CurTime()
         draw.SimpleTextOutlined(b:GetNWString("AEName", "Alter Ego") .. (talking and " …" or ""), "DermaLarge", 0, 0, Color(150, 255, 170), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0, 200))
+        if b:GetNWBool("AETyping", false) then
+          draw.SimpleTextOutlined(T("sta scrivendo…", "typing…"), "DermaDefaultBold", 0, 26, Color(220, 220, 220), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 200))
+        end
       cam.End3D2D()
     end
     -- cervello di moscerino: attività dei neuroni sopra la testa (se attivata nell'app)
@@ -108,6 +111,33 @@ hook.Add("PostDrawTranslucentRenderables", "AELink", function(depth, sky)
     end
   end
 end)
+
+-- torcia: luce davanti ai suoi occhi quando la accende
+hook.Add("Think", "AELinkFlash", function()
+  for _, b in ipairs(bots()) do
+    if b:GetNWBool("AEFlash", false) then
+      local d = DynamicLight(b:EntIndex())
+      if d then
+        d.pos = b:GetPos() + Vector(0, 0, 60) + b:GetForward() * 90
+        d.r, d.g, d.b = 255, 250, 230
+        d.brightness = 2
+        d.decay = 1000
+        d.size = 320
+        d.dietime = CurTime() + 0.2
+      end
+    end
+  end
+end)
+
+-- chi parla in voce: lo dice al server (lei si gira e non parla sopra)
+local function voice(ply, on)
+  if ply ~= LocalPlayer() then return end
+  net.Start("alterego_voice")
+  net.WriteString(on and "1" or "0")
+  net.SendToServer()
+end
+hook.Add("PlayerStartVoice", "AELink", function(ply) voice(ply, true) end)
+hook.Add("PlayerEndVoice", "AELink", function(ply) voice(ply, false) end)
 
 -- ---------- menu "Alter Ego" nel menu contestuale (tieni premuto C) ----------
 -- Scegli il suo modello tra i playermodel installati (anteprima), il nome, entra/esci.

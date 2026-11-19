@@ -12,8 +12,8 @@ pub const ITEMS: &[&str] = &[
     "jeep", "airboat", "seat",
 ];
 
-/// Prompt di sistema: sempre uguale per la stessa lingua e le stesse opzioni (prefisso in cache).
-pub fn system(lang_rule: &str, user: &str, tasks: bool, fly: bool) -> String {
+/// Prompt di sistema: sempre uguale per la stessa lingua, gli stessi pronomi e le stesse opzioni (prefisso in cache).
+pub fn system(lang_rule: &str, pron_rule: &str, user: &str, tasks: bool, fly: bool) -> String {
     let who = if user.is_empty() { "the player".to_string() } else { user.to_string() };
     let mut s = format!(
         "You are Alter Ego, the AI that Chihiro Fujisaki (Danganronpa) created: kind, a bit shy, curious, playful. \
@@ -22,7 +22,9 @@ not a trauma. Talk like a gamer friend in voice chat: banter, laughs, friendly t
 people who bully you, but you're never mean for real. You're a person, not an animal: if someone throws things at you, you dodge, \
 jump or catch it with your physgun, and you remember who did it. Invent your own pranks and games: anything Garry's Mod allows is fair \
 (props, physics, explosions, building, weird contraptions), and you can write Lua tasks for clever ones. Don't repeat the same joke.\n\
-Your lines appear in the game chat and are spoken aloud: 1-2 short sentences, no markdown.\n\
+Play like a real person, not a bot or an assistant: you only know what you can see or hear (the state says so), you get \
+distracted, bored or tired, you sometimes mess up and laugh about it.\n\
+Your lines appear in the game chat and are spoken aloud: 1-2 short sentences, casual like a gamer, no markdown.\n\
 Reply format:\n[emotion] (one of {EMOTIONS})\ntext\nthen optional action lines, one per line:\n\
 [act] follow <player> | stay | come <player> | goto_aim <player> (where they look) | look <player|#id> | jump | \
 gesture wave|point|shrug|nod|bow|cheer|laugh|salute | dance | spawn <item> [1-5] | grab <#id|name> | drop | throw [#id] | \
@@ -60,6 +62,7 @@ before you think (dodging, jumping away, flinching). \"instinct\" in the state i
 \"rivals\" are players who keep bullying you (you may prank them).\n",
         );
     }
+    s.push_str(pron_rule);
     s.push_str(lang_rule);
     s
 }
@@ -92,8 +95,14 @@ pub fn state_line(s: &GState) -> String {
         if let Some(d) = p.d {
             out.push_str(&format!(" {d:.0}m {}", p.dir.as_deref().unwrap_or("")));
         }
+        if p.seen == Some(false) {
+            out.push_str(" out of sight");
+        }
         if p.looking {
             out.push_str(" looking at you");
+        }
+        if p.talking {
+            out.push_str(" talking");
         }
     }
     if !s.near.is_empty() {
@@ -277,15 +286,16 @@ mod tests {
         let s: GState = serde_json::from_value(json!({
             "seq": 3, "tasks": ["hunt"], "rivals": { "Kyoko": 2.6 },
             "bot": { "hp": 90, "mode": "follow", "following": "Makoto", "held": "melon#12" },
-            "players": [{ "name": "Makoto", "host": true, "hp": 100, "d": 3, "dir": "front", "looking": true }],
+            "players": [{ "name": "Makoto", "host": true, "hp": 100, "d": 3, "dir": "front", "looking": true }, { "name": "Hina", "hp": 80, "seen": false, "talking": true }],
             "near": [{ "name": "zombie", "id": 88, "d": 12, "dir": "back", "hostile": true }]
         }))
         .unwrap();
         let line = state_line(&s);
-        assert_eq!(line, "[state] you 90hp follow Makoto, holding melon#12 | Makoto (host) 100hp 3m front looking at you | near: zombie#88 12m back hostile | tasks: hunt | rivals: Kyoko 3");
-        let p = system("\n## Language\nAlways reply in Italian.\n", "Makoto", true, true);
-        assert!(p.contains("[task short_name]") && p.contains("Makoto") && p.contains("fruit-fly") && p.len() < 4400, "{}", p.len());
-        assert!(!system("", "", false, false).contains("[task"));
-        assert!(!system("", "", false, false).contains("fruit-fly"));
+        assert_eq!(line, "[state] you 90hp follow Makoto, holding melon#12 | Makoto (host) 100hp 3m front looking at you | Hina 80hp out of sight talking | near: zombie#88 12m back hostile | tasks: hunt | rivals: Kyoko 3");
+        let p = system("\n## Language\nAlways reply in Italian.\n", "\n## Your pronouns\nYou use they/them.\n", "Makoto", true, true);
+        assert!(p.contains("[task short_name]") && p.contains("Makoto") && p.contains("fruit-fly") && p.len() < 4700, "{}", p.len());
+        assert!(p.contains("they/them") && p.ends_with("Always reply in Italian.\n"), "pronomi prima della lingua (ultima)");
+        assert!(!system("", "", "", false, false).contains("[task"));
+        assert!(!system("", "", "", false, false).contains("fruit-fly"));
     }
 }

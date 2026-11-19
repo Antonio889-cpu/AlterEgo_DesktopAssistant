@@ -25,6 +25,8 @@ pub struct Mind {
     pub goal: Option<Goal>,
     /// Azioni nell'ultima risposta del modello (per capire se un passo ha fatto qualcosa).
     pub last_ops: usize,
+    /// Tentativi dal gioco (per salvare la pratica ogni tanto).
+    tries: u32,
     rng: Option<persona::Rng>,
 }
 
@@ -79,6 +81,26 @@ pub fn view(app: &AppHandle) -> Value {
     json!({ "traits": traits, "habits": top, "experiences": exp, "goal": goal })
 }
 
+/// Pratica nei gesti per l'addon (sbaglia meno quello che ha fatto tanto).
+pub fn skills(app: &AppHandle) -> std::collections::BTreeMap<String, f32> {
+    with_persona(app, |p| p.skills.clone())
+}
+
+/// Un tentativo dal gioco: pratica in più (si salva subito quando sbaglia, se no ogni tanto).
+pub fn practice(app: &AppHandle, what: &str, ok: bool) {
+    let n = with_persona(app, |p| {
+        p.practice(what, ok);
+        p.skills.len()
+    });
+    let mut m = mind(app);
+    m.tries += 1;
+    let save = !ok || m.tries.is_multiple_of(8);
+    drop(m);
+    if save && n > 0 {
+        save_persona(app);
+    }
+}
+
 pub fn forget(app: &AppHandle) {
     persona::forget(&data_dir(app));
     mind(app).persona = Some(Persona::default());
@@ -113,7 +135,7 @@ pub fn want(app: &AppHandle, kind: &str, who: &str, why: &str, recent: &str) {
         send(app, persona::ops_for(&h, &target));
         let it = !en(app);
         let line = match (kind, it) {
-            ("prank", true) => ["Ehehe, questa la conosco!", "Il mio classico!", "Pronto per un déjà-vu?"][(now() % 3) as usize],
+            ("prank", true) => ["Ehehe, questa la conosco!", "Il mio classico!", "Déjà-vu in arrivo!"][(now() % 3) as usize],
             ("prank", false) => ["Hehe, I know this one!", "My classic!", "Ready for a déjà vu?"][(now() % 3) as usize],
             (_, true) => ["Ho un'idea!", "Guarda qua!", "Rifacciamolo!"][(now() % 3) as usize],
             _ => ["I've got an idea!", "Watch this!", "Let's do it again!"][(now() % 3) as usize],

@@ -21,6 +21,7 @@ local Sandbox = include("alterego/sandbox.lua")
 L.sandbox = Sandbox
 util.AddNetworkString("alterego_chat")
 util.AddNetworkString("alterego_menu")
+util.AddNetworkString("alterego_voice")
 
 -- ---------- stato ----------
 L.bot = L.bot or nil
@@ -87,7 +88,10 @@ function L.eye(bot)
 end
 
 -- ---------- eventi per l'app ----------
+-- eventi che le tolgono la noia
+local POKE = { chat = true, hurt = true, thrown = true, spawned = true, kill = true, player_died = true, prank = true }
 function L.event(kind, data)
+  if POKE[kind] and L.human then L.human.poke() end
   L.seq = L.seq + 1
   data = data or {}
   data.seq = L.seq
@@ -217,6 +221,7 @@ function L.applyModel(bot, model)
 end
 local LB = include("alterego/body_lambda.lua")
 L.LB = LB
+local Human = include("alterego/human.lua")
 local Fly = include("alterego/fly.lua")
 local Sit = include("alterego/sit.lua")
 local Play = include("alterego/play.lua")
@@ -269,6 +274,7 @@ function L.join(model, name)
   L.target = h
   L.deadAt = nil
   Play.nextIdle = CurTime() + 30
+  Human.onJoin()
   local fx = EffectData()
   fx:SetOrigin(bot:GetPos())
   util.Effect("propspawn", fx)
@@ -311,19 +317,25 @@ end
 
 L.goTo, L.face, L.stand = goTo, face, stand
 
-function L.look(e)
+--- Guarda `e`. prio: 0 sguardo di riposo, 1 occhiata, 2 (predefinita) qualcosa di preciso, 3 ordine.
+-- Lo sguardo del cittadino gira morbido (human.lua); quello del Lambda lo gira già il Lambda.
+function L.look(e, prio, secs)
   if botOk() and IsValid(e) then
+    if not Human.look(e, prio, secs) then return end
     if isLambda() then return LB.look(L.bot, e) end
-    local p = e:IsPlayer() and e:EyePos() or e:WorldSpaceCenter()
-    pcall(L.bot.SetEyeTarget, L.bot, p)
-    face(p)
+    if Human.realism <= 0 then
+      local p = e:IsPlayer() and e:EyePos() or e:WorldSpaceCenter()
+      pcall(L.bot.SetEyeTarget, L.bot, p)
+      face(p)
+    end
   end
 end
 
-function L.jump()
+--- Salto (`weak`: le esce un saltello, ha sbagliato il tempo).
+function L.jump(weak)
   if isLambda() and botOk() then return LB.jump(L.bot) end
   if botOk() then
-    L.bot:SetVelocity(Vector(0, 0, 260))
+    L.bot:SetVelocity(Vector(0, 0, weak and 110 or 260))
     L.bot:EmitSound("player/pl_jump" .. math.random(1, 2) .. ".wav", 60, 120)
   end
 end
@@ -374,6 +386,13 @@ function L.attack(e)
   if not botOk() or not IsValid(e) or e == L.bot then return false end
   if isLambda() then LB.attack(L.bot, e) return true end
   if not IsValid(L.bot:GetActiveWeapon()) then L.bot:Give("weapon_pistol") end
+  -- la mira si assesta: i primi colpi vanno larghi
+  if Human.realism > 0 then
+    local b = L.bot
+    pcall(b.SetCurrentWeaponProficiency, b, WEAPON_PROFICIENCY_POOR or 0)
+    timer.Simple(0.35, function() if IsValid(b) then pcall(b.SetCurrentWeaponProficiency, b, WEAPON_PROFICIENCY_AVERAGE or 1) end end)
+    timer.Simple(0.9, function() if IsValid(b) then pcall(b.SetCurrentWeaponProficiency, b, WEAPON_PROFICIENCY_GOOD or 2) end end)
+  end
   pcall(L.bot.AddEntityRelationship, L.bot, e, D_HT, 99)
   L.bot:SetEnemy(e)
   L.bot:UpdateEnemyMemory(e, e:GetPos())
@@ -410,7 +429,12 @@ function L.throw(at)
   local e = L.held
   if not IsValid(e) or not botOk() then return false end
   local dir = L.bot:GetForward()
-  if IsValid(at) then dir = (at:WorldSpaceCenter() - e:WorldSpaceCenter()):GetNormalized() end
+  if IsValid(at) then
+    -- mira da persona: precisa solo se l'ha guardato un attimo prima
+    local to = at:WorldSpaceCenter()
+    to = to + Human.aimError(at, to:Distance(e:WorldSpaceCenter()))
+    dir = (to - e:WorldSpaceCenter()):GetNormalized()
+  end
   L.drop()
   local ph = e:GetPhysicsObject()
   if IsValid(ph) then ph:SetVelocity(dir * 1100 + Vector(0, 0, 180)) end
@@ -524,13 +548,19 @@ function L.spawn(what, n)
 end
 
 -- ---------- parla ----------
-function L.say(text, secs)
-  text = tostring(text or ""):sub(1, 400)
-  if text == "" then return end
+--- Riga nella chat del gioco, subito.
+function L.sendChat(text)
   net.Start("alterego_chat")
   net.WriteString(IsValid(L.bot) and L.bot:GetNWString("AEName", L.name) or L.name)
   net.WriteString(text)
   net.Broadcast()
+end
+
+--- Parla: la voce (dal PC) parte adesso, in chat la scrive come una giocatrice (human.lua).
+function L.say(text, secs)
+  text = tostring(text or ""):sub(1, 400)
+  if text == "" then return end
+  Human.chat(text)
   L.speakUntil = CurTime() + (tonumber(secs) or math.Clamp(#text * 0.06, 1.5, 12))
   if IsValid(L.bot) then L.bot:SetNWFloat("AESpeakUntil", L.speakUntil) end
 end
@@ -971,16 +1001,24 @@ local function snapshot()
     s.bot = { hp = b:Health(), mode = L.mode, weapon = weapon, body = L.kind, sitting = sitting,
       held = IsValid(L.held) and (friendly(L.held) .. "#" .. L.held:EntIndex()) or nil,
       following = IsValid(L.target) and L.target:IsPlayer() and L.target:Nick() or nil }
+    -- solo quello che una giocatrice saprebbe: i nomi dalla tabella dei punteggi, il resto se lo vede o lo sente
     local players = {}
     for _, p in ipairs(player.GetAll()) do
-      players[#players + 1] = { name = p:Nick(), host = p == h, hp = p:Alive() and p:Health() or 0,
-        d = math.Round(p:GetPos():Distance(b:GetPos()) / 52), dir = dirOf(b, p),
-        looking = p:GetEyeTrace().Entity == b }
+      local row = { name = p:Nick(), host = p == h, hp = p:Alive() and p:Health() or 0, talking = Human.talking(p) or nil }
+      if Human.perceives(p, 900) then
+        row.d = math.Round(p:GetPos():Distance(b:GetPos()) / 52)
+        row.dir = dirOf(b, p)
+        row.looking = p:GetEyeTrace().Entity == b
+      else
+        row.seen = false
+      end
+      players[#players + 1] = row
     end
     s.players = players
     local near = {}
     for _, e in ipairs(ents.FindInSphere(b:GetPos(), 1000)) do
-      if e ~= b and not e:IsPlayer() and not e:IsWeapon() and (e:IsNPC() or e:IsNextBot() or e:IsVehicle() or e:GetClass() == "prop_physics") then
+      if e ~= b and not e:IsPlayer() and not e:IsWeapon() and (e:IsNPC() or e:IsNextBot() or e:IsVehicle() or e:GetClass() == "prop_physics")
+          and Human.perceives(e, 600) then
         near[#near + 1] = e
       end
     end
@@ -1044,19 +1082,20 @@ local function brain()
     if not IsValid(t) or (t:IsPlayer() and not t:Alive()) then t = host() L.target = t end
     if not IsValid(t) then return end
     local d = t:GetPos():Distance(L.bot:GetPos())
-    if d > 170 then
+    -- sta "sfogliando il menu": si muove solo se resta troppo indietro
+    if d > (Human.paused() and 600 or 170) then
       local behind = t:GetPos() - t:GetForward() * 70
       goTo(behind, d > 380)
     elseif L.bot:IsCurrentSchedule(SCHED_FORCED_GO) or L.bot:IsCurrentSchedule(SCHED_FORCED_GO_RUN) then
       stand()
     else
-      L.look(t)
+      L.look(t, 0)
     end
   elseif L.mode == "goto" then
     if L.goal and isvector(L.goal) and L.goal:Distance(L.bot:GetPos()) < 90 then
       stand()
       L.mode = "stay"
-      if IsValid(L.target) then L.look(L.target) end
+      if IsValid(L.target) then L.look(L.target, 0) end
     end
   elseif L.mode == "attack" then
     local e = L.goal
@@ -1066,13 +1105,18 @@ local function brain()
     end
   elseif L.mode == "stay" then
     local h = host()
-    if IsValid(h) and h:GetPos():Distance(L.bot:GetPos()) < 500 then L.look(h) end
+    if IsValid(h) and h:GetPos():Distance(L.bot:GetPos()) < 500 then L.look(h, 0) end
   end
 end
 
 hook.Add("Think", "AELink", function()
   bridge()
   brain()
+  Human.chatTick()
+  if botOk() then
+    Human.gazeTick()
+    Human.tick()
+  end
   Fly.tick(botOk())
   Sit.tick()
   if botOk() then
@@ -1092,6 +1136,7 @@ end)
 hook.Add("PlayerSay", "AELink", function(ply, text)
   if not IsValid(ply) then return end
   local d = botOk() and math.Round(ply:GetPos():Distance(L.bot:GetPos()) / 52) or nil
+  if botOk() then Human.onChat(ply) end
   L.event("chat", { from = ply:Nick(), host = ply == host(), text = tostring(text):sub(1, 300), d = d })
 end)
 
@@ -1131,7 +1176,8 @@ hook.Add("OnNPCKilled", "AELink", function(npc, attacker)
     L.event("died", { by = IsValid(attacker) and friendly(attacker) or "world" })
     return
   end
-  if IsValid(L.bot) and npc:GetPos():Distance(L.bot:GetPos()) < 1500 then
+  -- solo se l'ha visto (o sentito) succedere
+  if IsValid(L.bot) and npc:GetPos():Distance(L.bot:GetPos()) < 1500 and (attacker == L.bot or Human.perceives(npc, 1200)) then
     L.event("kill", { who = friendly(npc), by = IsValid(attacker) and friendly(attacker) or "world" })
   end
 end)
@@ -1141,10 +1187,12 @@ hook.Add("PlayerDeath", "AELink", function(victim, _, attacker)
 end)
 
 hook.Add("PlayerSpawnedProp", "AELink", function(ply, model)
+  if botOk() and not Human.perceives(ply, 900) then return end
   local m = model:match("([^/]+)%.mdl$") or model
   L.event("spawned", { who = ply:Nick(), what = m:lower():gsub("%d+%a?$", ""):gsub("_", " ") })
 end)
 hook.Add("PlayerSpawnedNPC", "AELink", function(ply, npc)
+  if botOk() and not (Human.perceives(ply, 900) or Human.perceives(npc, 900)) then return end
   L.event("spawned", { who = ply:Nick(), what = friendly(npc) })
 end)
 
@@ -1153,7 +1201,10 @@ hook.Add("EntityEmitSound", "AELink", function(data)
   if IsValid(L.bot) and data.Entity == L.bot and data.SoundName and data.SoundName:find("^vo/") then return false end
   if data.Entity ~= L.bot then Fly.onSound(data) end
 end)
-hook.Add("PlayerSpawnedVehicle", "AELink", function(ply, v) L.event("spawned", { who = ply:Nick(), what = "vehicle" }) end)
+hook.Add("PlayerSpawnedVehicle", "AELink", function(ply, v)
+  if botOk() and not (Human.perceives(ply, 900) or Human.perceives(v, 900)) then return end
+  L.event("spawned", { who = ply:Nick(), what = "vehicle" })
+end)
 
 hook.Add("PlayerInitialSpawn", "AELink", function(ply)
   timer.Simple(1, function() if botOk() and IsValid(ply) then relate(L.bot) end end)
@@ -1181,6 +1232,15 @@ L.leave = function(...) L.left = true return leave(...) end
 L.join = function(...) L.left = false return join(...) end
 OPS.leave = function() L.leave() end
 OPS.join = function(c) L.join(c.model, c.name) end
+
+-- chi parla in voce (lo dice il suo client: il server non sempre lo sa)
+net.Receive("alterego_voice", function(_, ply)
+  if IsValid(ply) then
+    local on = net.ReadString() == "1"
+    if on ~= (ply.AEVoice == true) then L.dirty = true end
+    ply.AEVoice = on or nil
+  end
+end)
 
 -- menu "Alter Ego" nel menu contestuale (C): modello, nome, entra/esci
 net.Receive("alterego_menu", function(_, ply)

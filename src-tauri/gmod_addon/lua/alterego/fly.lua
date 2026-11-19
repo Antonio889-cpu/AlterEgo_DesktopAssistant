@@ -82,7 +82,8 @@ function F.sense()
       local rel = bp - ep
       local d = rel:Length()
       -- solo cose lanciate o guidate: un giocatore (o un NPC) che le viene vicino non è una minaccia
-      if d < 700 and e.GetVelocity and F.projectile(e) then
+      -- e solo se lo vede arrivare o lo sente fischiare vicino (alle spalle e lontano: niente)
+      if d < 700 and e.GetVelocity and F.projectile(e) and (d < 400 or not L.human or L.human.sees(e)) then
         local v = e:GetVelocity()
         local dirv = rel:GetNormalized()
         local closing = v.x * dirv.x + v.y * dirv.y + v.z * dirv.z
@@ -258,6 +259,7 @@ end
 
 -- ---------- eventi che diventano sensi ----------
 function F.onDamage(dmg)
+  if L.human then L.human.excite(0.6) end
   F.pulse("pain", 0.35 + dmg:GetDamage() / 40, 1.2)
   if dmg.IsExplosionDamage and dmg:IsExplosionDamage() then F.pulse("blast", 1, 2) end
 end
@@ -274,7 +276,7 @@ end)
 hook.Add("EntityFireBullets", "AELinkFly", function(e, data)
   if not F.on or not IsValid(L.bot) or e == L.bot or not IsValid(e) then return end
   local d = e:GetPos():Distance(L.bot:GetPos())
-  if d < 1500 then
+  if d < 1500 and (not L.human or L.human.hears(e:GetPos(), 1500)) then
     F.pulse("sound", 1 - d / 2000, 0.5)
     F.soundPos = e:GetPos()
   end
@@ -289,6 +291,9 @@ function F.onSound(data)
   if not pos then return end
   local d = pos:Distance(L.bot:GetPos())
   if d > 1500 then return end
+  -- dietro un muro i suoni arrivano attutiti (solo da metà distanza)
+  if L.human and not L.human.hears(pos, 1500) then return end
+  if L.human and lvl >= 100 then L.human.excite(math.Clamp((lvl - 90) / 40, 0.2, 1)) end
   F.pulse("sound", clamp01((lvl - 70) / 40) * (1 - d / 2000), 0.5)
   F.soundPos = pos
   if lvl >= 120 and d < 1000 then F.pulse("blast", 1, 2) F.blastPos = pos end

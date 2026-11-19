@@ -36,6 +36,8 @@ end
 -- Movimento fluido: un solo percorso verso l'entità da seguire (Lambda lo aggiorna da solo),
 -- isteresi larga tra "partire" e "fermarsi", corsa decisa strada facendo.
 local START_FOLLOW, STOP_FOLLOW = 230, 110
+-- sta guardando qualcos'altro (chi parla, un'occhiata): non si rigira verso chi segue
+local function busy() return L.human ~= nil and L.human.busyGaze() end
 function LB.control(self)
   if self ~= L.bot or (self.GetIsDead and self:GetIsDead()) then return end
   local mode = L.mode
@@ -52,7 +54,7 @@ function LB.control(self)
         if dd < STOP_FOLLOW then return false end
         if s.SetRun then s:SetRun(dd > 320) end
       end })
-    elseif (self.AELookAt or 0) < CurTime() then
+    elseif (self.AELookAt or 0) < CurTime() and not busy() then
       self.AELookAt = CurTime() + 1.2
       self:LookTo(t, 1.5)
     end
@@ -71,7 +73,7 @@ function LB.control(self)
     if IsValid(e) and e ~= self then self:AttackTarget(e, true) end
   else
     local h = L.host()
-    if IsValid(h) and h:GetPos():Distance(self:GetPos()) < 500 and (self.AELookAt or 0) < CurTime() then
+    if IsValid(h) and h:GetPos():Distance(self:GetPos()) < 500 and (self.AELookAt or 0) < CurTime() and not busy() then
       self.AELookAt = CurTime() + 1.2
       self:LookTo(h, 1.5)
     end
