@@ -44,6 +44,7 @@ label.inline > input[type=checkbox] { vertical-align: -2px; margin: 0 6px 0 0; }
 .result.ok { color: var(--accent); }
 .result.bad { color: var(--bad); }
 h3 { font: 14px "DotGothic16", monospace; color: var(--muted); margin: 12px 0 4px; }
+select { max-width: 100%; text-overflow: ellipsis; }
 select { background: #061206; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font: inherit; }
 code { color: var(--accent); }
 .facts { list-style: none; padding: 0; margin: 0 0 6px; max-height: 220px; overflow: auto; }
@@ -96,6 +97,9 @@ a { color: var(--accent); }
 .card b { display: block; font: 20px "DotGothic16", monospace; color: var(--accent); }
 .card small { color: var(--muted); }
 table.grid { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+/* nelle finestre strette le tabelle scorrono di lato invece di allargare la pagina */
+table.grid, #log-table { display: block; overflow-x: auto; max-width: 100%; }
+table.grid > thead, table.grid > tbody, #log-table > thead, #log-table > tbody { display: table; width: 100%; min-width: max-content; }
 table.grid th, table.grid td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #1d3d1f; white-space: nowrap; }
 table.grid td.num, table.grid th.num { text-align: right; font-variant-numeric: tabular-nums; }
 table.grid tr.total td { color: var(--accent); border-top: 1px solid var(--line); }

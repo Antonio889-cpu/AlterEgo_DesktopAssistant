@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Alter Ego – Impostazioni</title>
   <link rel="stylesheet" href="settings.css" />
+  <link rel="stylesheet" href="wide.css" />
 </head>
 <body>
   <header><h1>ALTER EGO · Impostazioni</h1></header>
@@ -15,6 +16,7 @@
     <button data-tab="memory">Memoria</button>
     <button data-tab="pet">Pet</button>
     <button data-tab="voice">Voce e audio</button>
+    <button data-tab="games">Giochi</button>
     <button data-tab="hotkeys">Tasti</button>
     <button data-tab="clip">Clip</button>
     <button data-tab="perms">Permessi</button>
@@ -340,7 +342,7 @@
       <div class="actions"><button id="dev-refresh">Aggiorna elenco</button> <span id="dev-status" class="result"></span></div>
     </section>
 
-    <section data-tab="voice">
+    <section data-tab="games" data-game="gmod">
       <h2>Garry's Mod (Shinri Trial)</h2>
       <p class="note">Mentre Garry's Mod è aperto, Alter Ego ascolta l'audio del PC e riconosce i suoni del gioco per reagire. Non tocca il gioco e non manda niente a nessuno: i suoni di riferimento vengono dall'addon Sounds @ ST del Workshop.</p>
       <label class="inline"><input type="checkbox" id="gmod-enabled" /> Reagisci ai suoni di Shinri Trial (corpo scoperto, indagine, processo…)</label>
@@ -348,7 +350,7 @@
       <div id="gmod-events" class="checks"></div>
     </section>
 
-    <section data-tab="voice">
+    <section data-tab="games" data-game="gmod">
       <h2>Garry's Mod: gioca con me (Sandbox)</h2>
       <p class="note">Alter Ego entra nel gioco come personaggio e gioca con te: ti segue, parla in chat e con la sua voce, crea e lancia oggetti, combatte al tuo fianco. Le parli con il push-to-talk o scrivendo nella chat del gioco (anche gli altri giocatori). Per i compiti lunghi («quando vedi una gallina sparale») scrive un piccolo script che gira nel gioco senza consumare altri token. Funziona in single player e nei server che ospiti tu; usa la modalità video «finestra senza bordi» per vedere Alter Ego sopra il gioco.</p>
       <label class="inline"><input type="checkbox" id="gl-enabled" /> Attiva (installa l'addon Alter Ego Link nella cartella di Garry's Mod)</label>
@@ -395,6 +397,56 @@
       <div id="gl-fly-live" class="fly-live"></div>
       <div class="actions"><button id="gl-monitor">Apri FruitFly Monitor</button></div>
       <label class="inline"><input type="checkbox" id="gl-monitor-auto" /> Apri il monitor quando entra in partita</label>
+    </section>
+
+    <section data-tab="games" data-game="minecraft" class="game-mc preview">
+      <h2>Minecraft: gioca con me <span class="soon">Anteprima · in arrivo</span></h2>
+      <div class="mc-grid">
+        <div class="mc-skin">
+          <canvas id="mc-skin-view" width="96" height="192" aria-label="Anteprima della skin"></canvas>
+          <select id="mc-skin" disabled><option>Alter Ego (Chihiro)</option><option>Skin da file PNG…</option></select>
+        </div>
+        <div class="mc-body">
+          <div class="status-line"><i class="dot"></i> <b>Non collegato</b> · Java Edition, mondo aperto in LAN</div>
+          <label>Iniziativa <input type="range" min="0" max="100" value="75" disabled /> <span class="note">più iniziativa, più sorprese</span></label>
+          <div class="checks">
+            <label class="inline"><input type="checkbox" checked disabled /> Seguimi</label>
+            <label class="inline"><input type="checkbox" disabled /> Raccogli risorse</label>
+            <label class="inline"><input type="checkbox" checked disabled /> Costruisci con me</label>
+            <label class="inline"><input type="checkbox" disabled /> Esplora per conto suo</label>
+          </div>
+          <p class="note">Entra nel tuo mondo, scrive e risponde nella chat di Minecraft, impara giocando. Riflessi ed emozioni dal cervello di moscerino; ragiona con il provider AI predefinito.</p>
+          <div class="actions"><button class="main" disabled>▶ Entra nel mondo</button><button disabled>■ Scollega</button></div>
+        </div>
+      </div>
+    </section>
+
+    <section data-tab="games" data-game="vrchat" class="game-vrc preview">
+      <h2>VRChat <span class="soon">Anteprima · in arrivo</span></h2>
+      <div class="vrc-grid">
+        <div>
+          <h3>Account e avatar</h3>
+          <div class="status-line"><i class="dot"></i> <b>Offline</b> · OSC su 127.0.0.1:9000</div>
+          <label>Avatar <select disabled><option>Letti dai file OSC di VRChat (senza login)</option></select></label>
+          <label class="inline"><input type="checkbox" disabled /> Accedi all'account per cambiare avatar da qui (facoltativo, a tuo rischio)</label>
+        </div>
+        <div>
+          <h3>Sensi</h3>
+          <label>Vista
+            <select disabled><option>Spenta: solo OSC (tatto e vicinanza dai contatti dell'avatar)</option><option>Modello di visione locale</option><option>Modello di visione cloud</option></select>
+          </label>
+          <label class="inline"><input type="checkbox" checked disabled /> Sente chi parla vicino (audio di VRChat → trascrizione)</label>
+          <div class="checks">
+            <label class="inline"><input type="checkbox" checked disabled /> Segue i miei movimenti</label>
+            <label class="inline"><input type="checkbox" checked disabled /> Risponde nelle conversazioni</label>
+            <label class="inline"><input type="checkbox" checked disabled /> Gesti ed espressioni</label>
+            <label class="inline"><input type="checkbox" disabled /> Esplora per conto suo</label>
+            <label class="inline"><input type="checkbox" disabled /> Parla con gli altri giocatori</label>
+          </div>
+        </div>
+      </div>
+      <p class="note">Gioca con un account dedicato in modalità desktop, guidato via OSC. VRChat non permette i bot nei suoi Termini: usalo solo se accetti il rischio per quell'account.</p>
+      <div class="actions"><button class="main" disabled>▶ Entra</button><button disabled>■ Scollega</button></div>
     </section>
 
     <section data-tab="voice">
@@ -718,5 +770,6 @@
 
   <script src="i18n.js"></script>
   <script src="settings.js"></script>
+  <script src="wide.js"></script>
 </body>
 </html>

@@ -315,6 +315,7 @@ function showTab(name) {
   if (name === "applog") refreshAppLog();
   if (name === "local") refreshLocal(true);
   if (name === "perms") { refreshSqlState(); refreshGraphState(); }
+  if (name === "games") gmodLinkStatus();
 }
 
 /** Token e cache dei provider da quando l'app è aperta (DeepSeek riporta la cache). */

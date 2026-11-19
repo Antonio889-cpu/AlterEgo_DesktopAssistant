@@ -1,0 +1,351 @@
+{
+  "opacity": 1.0,
+  "hotkeys": {
+    "toggle_visibility": "Ctrl+Alt+A",
+    "push_to_talk": "Ctrl+Alt+Space",
+    "text_input": "Ctrl+Alt+T",
+    "toggle_click_through": "Ctrl+Alt+C",
+    "test_event": ""
+  },
+  "autostart": false,
+  "start_hidden": true,
+  "always_on_top": true,
+  "apps_context": true,
+  "user_name": "",
+  "name_tag": "Alter Ego",
+  "ui_language": "auto",
+  "background": "both",
+  "bg_intensity": 0.6,
+  "dialog_style": "chiaro",
+  "effects": true,
+  "tv_animation": true,
+  "auto_advance": true,
+  "auto_advance_secs": 3.0,
+  "ai": {
+    "order": [
+      "gemini",
+      "openrouter",
+      "groq",
+      "deepseek",
+      "ollama"
+    ],
+    "providers": {
+      "deepseek": {
+        "enabled": false,
+        "keys": [],
+        "model": "deepseek-flash",
+        "base_url": "",
+        "vision": false
+      },
+      "gemini": {
+        "enabled": false,
+        "keys": [],
+        "model": "gemini-2.5-flash",
+        "base_url": "",
+        "vision": false
+      },
+      "groq": {
+        "enabled": false,
+        "keys": [],
+        "model": "llama-3.3-70b-versatile",
+        "base_url": "",
+        "vision": false
+      },
+      "ollama": {
+        "enabled": true,
+        "keys": [],
+        "model": "",
+        "base_url": "",
+        "vision": false
+      },
+      "openrouter": {
+        "enabled": false,
+        "keys": [],
+        "model": "openrouter/auto",
+        "base_url": "",
+        "vision": false
+      }
+    },
+    "temperature": 0.7,
+    "max_history": 12,
+    "thinking": "auto",
+    "max_tokens": 0,
+    "top_p": 1.0,
+    "timeout_secs": 45,
+    "tool_rounds": 12,
+    "ollama": {
+      "num_ctx": 0,
+      "keep_alive": "",
+      "num_gpu": -1,
+      "top_k": 0,
+      "repeat_penalty": 0.0
+    }
+  },
+  "language": "auto",
+  "personality": {
+    "confidence": 0.3,
+    "warmth": 0.7,
+    "imitate": "",
+    "unfiltered": false,
+    "pronouns": "she"
+  },
+  "memory_enabled": true,
+  "stt": {
+    "provider": "groq",
+    "model": "whisper-large-v3-turbo",
+    "base_url": "http://localhost:8000/v1",
+    "language": "",
+    "auto_lang": true,
+    "fallback": "gemini",
+    "gemini_model": "gemini-2.5-flash"
+  },
+  "permissions": {
+    "open": false,
+    "open_allowlist": [],
+    "files": false,
+    "folders": [],
+    "reminders": false,
+    "clipboard": false,
+    "screen": false,
+    "volume": false,
+    "shell": false,
+    "commands": [],
+    "auto_approve": false,
+    "terminal": false,
+    "terminal_autonomous": false,
+    "web": false,
+    "music": false,
+    "input": false,
+    "input_autonomous": false,
+    "app_control": true,
+    "files_all": false,
+    "input_feedback": true,
+    "input_grid": true,
+    "terminal_timeout": 120,
+    "sql": false,
+    "sql_write": false,
+    "graph": false,
+    "hermes": true
+  },
+  "clip": {
+    "enabled": true,
+    "phrases": [
+      "alter ego clip that",
+      "alter ego clippa",
+      "alter ego clip",
+      "alter ego salva la clip",
+      "clip that",
+      "clippa"
+    ],
+    "targets": [
+      {
+        "name": "AMD Adrenalin (Instant Replay)",
+        "hotkey": "Ctrl+Shift+S",
+        "enabled": false
+      },
+      {
+        "name": "NVIDIA App / ShadowPlay",
+        "hotkey": "Alt+F10",
+        "enabled": false
+      },
+      {
+        "name": "Medal",
+        "hotkey": "F8",
+        "enabled": false
+      }
+    ],
+    "reply": "Clip salvata!"
+  },
+  "audio": {
+    "blips": "dr",
+    "blip_volume": 0.35,
+    "tts": "off",
+    "tts_voice": "",
+    "tts_rate": 1.05,
+    "tts_volume": 0.9,
+    "tts_url": "http://localhost:8880/v1",
+    "tts_model": "tts-1",
+    "mute_blips_with_tts": true,
+    "kokoro_url": "http://127.0.0.1:8880/v1",
+    "kokoro_voice": "if_sara",
+    "kokoro_voice_en": "af_heart",
+    "kokoro_speed": 1.0,
+    "kokoro_autostart": true,
+    "voicestudio_autostart": true,
+    "output_device": "",
+    "input_device": "",
+    "mic_link": {
+      "enabled": false,
+      "mic_device": "",
+      "cable_device": "",
+      "mic_volume": 1.0,
+      "voice_volume": 0.9,
+      "include_blips": false,
+      "include_music": false,
+      "noise_suppression": false,
+      "ns_strength": 0.9,
+      "ns_gate": 0.3
+    }
+  },
+  "prices": [
+    {
+      "provider": "deepseek",
+      "model": "deepseek-flash",
+      "input": 0.3,
+      "cached": 0.006,
+      "output": 1.2,
+      "per_call": 0.0,
+      "per_hour": 0.0
+    },
+    {
+      "provider": "deepseek",
+      "model": "",
+      "input": 0.3,
+      "cached": 0.006,
+      "output": 1.2,
+      "per_call": 0.0,
+      "per_hour": 0.0
+    },
+    {
+      "provider": "deepseek",
+      "model": "search",
+      "input": 0.0,
+      "cached": 0.0,
+      "output": 0.0,
+      "per_call": 0.00075,
+      "per_hour": 0.0
+    },
+    {
+      "provider": "deepseek",
+      "model": "fetch",
+      "input": 0.0,
+      "cached": 0.0,
+      "output": 0.0,
+      "per_call": 0.00075,
+      "per_hour": 0.0
+    },
+    {
+      "provider": "groq",
+      "model": "whisper",
+      "input": 0.0,
+      "cached": 0.0,
+      "output": 0.0,
+      "per_call": 0.0,
+      "per_hour": 0.04
+    },
+    {
+      "provider": "ollama",
+      "model": "",
+      "input": 0.0,
+      "cached": 0.0,
+      "output": 0.0,
+      "per_call": 0.0,
+      "per_hour": 0.0
+    }
+  ],
+  "music": {
+    "volume": 0.6,
+    "shuffle": false,
+    "repeat": "off",
+    "lyrics": true,
+    "reactive_sprite": true,
+    "player_pos": null,
+    "compact": true,
+    "player_width": 600.0,
+    "venue_pos": null,
+    "music_sprite": true,
+    "venue_docked": true
+  },
+  "web": {
+    "provider": "deepseek",
+    "fallback": true,
+    "fetch": "auto",
+    "gemini_model": "gemini-2.5-flash"
+  },
+  "saving": {
+    "tools_on_demand": false,
+    "compact_tools": false,
+    "trim_history": true,
+    "facts_limit": 0,
+    "screenshot_width": 1280,
+    "page_chars": 8000,
+    "router": "heuristic",
+    "router_url": "http://127.0.0.1:8017",
+    "economy_provider": "",
+    "economy_model": "",
+    "tool_groups": true,
+    "loop_compact": true
+  },
+  "spotify": {
+    "enabled": false,
+    "client_id": "",
+    "connected": false,
+    "account": ""
+  },
+  "gmod": false,
+  "gmod_off": [],
+  "rizzo": {
+    "autostart": false,
+    "size": "4b",
+    "dir": ""
+  },
+  "hermes_brain": false,
+  "sql": {
+    "server": "localhost",
+    "database": "",
+    "auth": "sql",
+    "user": "",
+    "trust_cert": true,
+    "remember": false,
+    "show_window": true,
+    "max_rows": 50
+  },
+  "local": {
+    "backend": "auto",
+    "vk_device": "",
+    "flash_attention": true,
+    "kv_cache": "q8_0",
+    "hsa_override": "",
+    "autostart": true
+  },
+  "pet": {
+    "enabled": true,
+    "idle_minutes": 3,
+    "frequency": "normal",
+    "stay_minutes": 10,
+    "size": 1.0,
+    "skin": ""
+  },
+  "gmodlink": {
+    "enabled": false,
+    "auto_join": true,
+    "chatter": "low",
+    "tasks": true,
+    "model": "",
+    "name": "Alter Ego",
+    "dir": "",
+    "body": "auto",
+    "fly": {
+      "enabled": true,
+      "reflexes": true,
+      "mood": true,
+      "hud": false,
+      "senses": []
+    },
+    "mischief": "full",
+    "idle_play": true,
+    "memory": true,
+    "toughness": "high",
+    "unpredictability": 50,
+    "grow": true,
+    "goals": true,
+    "monitor_auto": false
+  },
+  "extras": {
+    "events": true,
+    "url": "",
+    "asked": false
+  },
+  "last_monitor": null,
+  "geometry": {}
+}

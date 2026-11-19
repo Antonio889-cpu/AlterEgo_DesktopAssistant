@@ -9,3 +9,4 @@ graphify-out/
 tools/flybrain/data/
 __pycache__/
 .claude/worktrees/
+tools/ui-mock/out/
