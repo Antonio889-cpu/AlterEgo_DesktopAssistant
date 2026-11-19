@@ -31,7 +31,8 @@ mod tests {
         let port = l.local_addr().unwrap().port();
         assert!(reachable(&format!("http://127.0.0.1:{port}/")));
         drop(l);
-        assert!(!reachable(&format!("http://127.0.0.1:{port}/")));
+        // porta 1: nessuno in ascolto (quella appena chiusa può riprenderla un altro test in parallelo)
+        assert!(!reachable("http://127.0.0.1:1/"));
         assert!(!reachable("http://nonexistent.invalid:8080/"));
     }
     #[test]
