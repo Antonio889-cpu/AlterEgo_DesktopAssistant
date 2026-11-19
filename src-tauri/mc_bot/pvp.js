@@ -147,12 +147,16 @@ function params(tactic, mimic) {
   return t;
 }
 
-/** Il round è finito? {over, won, why}. hp = vita sua, opp = vita dell'avversario (null se non si vede). */
-function roundOver(r, me, opp, secs, d) {
+/**
+ * Il round è finito? {over, won, why}. me = vita sua, opp = vita dell'avversario (null se non si vede).
+ * `start`: vita all'inizio del round; chi parte già sotto la soglia deve comunque perdere almeno 4 punti.
+ */
+function roundOver(r, me, opp, secs, d, start = { me: 20, opp: 20 }) {
   if (me <= 0) return { over: true, won: false, why: "ko" };
   if (opp != null && opp <= 0) return { over: true, won: true, why: "ko" };
-  if (r.endHp > 0 && me <= r.endHp) return { over: true, won: false, why: "hearts" };
-  if (r.endHp > 0 && opp != null && opp <= r.endHp) return { over: true, won: true, why: "hearts" };
+  const lim = (s) => Math.min(r.endHp, (s == null ? 20 : s) - 4);
+  if (r.endHp > 0 && me <= lim(start.me)) return { over: true, won: false, why: "hearts" };
+  if (r.endHp > 0 && opp != null && opp <= lim(start.opp)) return { over: true, won: true, why: "hearts" };
   if (d != null && d > 40) return { over: true, won: null, why: "left" };
   if (secs > (r.maxSecs || 150)) return { over: true, won: null, why: "time" };
   return { over: false };
@@ -209,12 +213,13 @@ function attach(ctx) {
     let dealt = 0;
     let lastHit = 0, lastSwingSeen = 0, strafeDir = 1, strafeUntil = 0, prevSprint = false, prevPos = e.position.clone();
     let oppPrev = oppHp(e);
+    const start = { me: b.health, opp: oppPrev };
     // il colpo si registra nel momento in cui arriva (a terra o in caduta: critico)
     let swingNow = null, lastY = e.position.y, myHp = b.health;
     const onSwing = (x) => {
       if (x !== e && !(x && x.username === duel.who)) return;
       lastSwingSeen = Date.now();
-      swingNow = { air: !x.onGround, falling: x.position.y < lastY - 0.02 };
+      swingNow = { air: !ctx.onGround(x), falling: x.position.y < lastY - 0.02 };
     };
     b.on("entitySwingArm", onSwing);
     const t0 = Date.now();
@@ -226,7 +231,8 @@ function attach(ctx) {
         if (!e.isValid) {
           // dopo un respawn le entità si rifanno: lo ricerca per nome
           e = ctx.playerEntity(duel.who);
-          if (!e) { res = { over: true, won: null, why: "left" }; break; }
+          // sparito con poca vita: è finito KO (respawn lontano)
+          if (!e) { res = oppPrev != null && oppPrev <= 4 ? { over: true, won: true, why: "ko" } : { over: true, won: null, why: "left" }; break; }
           prevPos = e.position.clone();
         }
         const now = Date.now();
@@ -254,7 +260,7 @@ function attach(ctx) {
         myHp = b.health;
         lastY = e.position.y;
         observe(p, {
-          t: (now - t0) / 1000, d, lat, vr, air: sw ? sw.air : !e.onGround, falling: sw ? sw.falling : vel.y < -0.5, swing: !!sw, sprintStart: sprint && !prevSprint, hitMe,
+          t: (now - t0) / 1000, d, lat, vr, air: sw ? sw.air : !ctx.onGround(e), falling: sw ? sw.falling : vel.y < -0.5, swing: !!sw, sprintStart: sprint && !prevSprint, hitMe,
           blocking: !!using && (held === "shield" || off === "shield"), bow: !!using && /bow/.test(held), rod: held === "fishing_rod" && now - lastSwingSeen < 120,
           eating: !!using && ctx.isFood(held), pearl: false, hp: hpo,
         });
@@ -299,7 +305,7 @@ function attach(ctx) {
           }
         }
         if (b.food < 8 && d > 6) await ctx.eat(true).catch(() => {});
-        res = roundOver(r, b.health, hpo, (now - t0) / 1000, d);
+        res = roundOver(r, b.health, hpo, (now - t0) / 1000, d, start);
         if (!res.over && r.firstHit && (dealt > 0 || b.health < hp0)) res = { over: true, won: dealt > 0 && b.health >= hp0 - 0.1, why: "first_hit" };
         await ctx.sleep(80);
       }
@@ -352,7 +358,19 @@ function attach(ctx) {
         ctx.ev("duel_round", { who: duel.who, round: duel.round, tactic: t.name, won: r.won, dealt: r.dealt, taken: r.taken, why: r.why, style: r.style, rules });
         bot().chat(r.won === true ? (en ? "got you! gg" : "presa! gg") : r.won === false ? (en ? "ok you win this one, gg" : "ok questa l'hai vinta tu, gg") : en ? "round over" : "round finito");
         if (r.why === "left") break;
-        if (duel.round < rules.bestOf && duel.wins < need && duel.losses < need) { await ctx.sleep(4000); await ctx.eat(true).catch(() => {}); }
+        if (duel.round < rules.bestOf && duel.wins < need && duel.losses < need) {
+          // pausa: si mangia e si aspetta che la vita risalga (al massimo 25 s)
+          await ctx.chat(en ? "short break, let's heal up" : "pausa, recuperiamo un po' di vita");
+          const tw = Date.now();
+          while (Date.now() - tw < 25000) {
+            ctx.checkCancel(c);
+            const e2 = ctx.playerEntity(duel.who);
+            const oh = e2 ? oppHp(e2) : null;
+            if (bot().health >= 18 && (oh == null || oh >= 16)) break;
+            if (bot().food < 20) await ctx.eat(true).catch(() => {});
+            await ctx.sleep(1000);
+          }
+        }
       }
       const res = { wins: duel.wins, losses: duel.losses, rounds: duel.round };
       ctx.ev("duel_end", { who: duel.who, ...res });

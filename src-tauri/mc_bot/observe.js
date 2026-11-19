@@ -174,7 +174,7 @@ function attach(ctx) {
 
   function others() {
     const b = ctx.bot();
-    return Object.values(b.players).filter((p) => p.username !== b.username && p.entity && p.entity.position.distanceTo(b.entity.position) < 48);
+    return Object.values(b.players).filter((p) => p.username !== b.username && p.entity && p.entity.position.distanceTo(b.entity.position) < 96);
   }
 
   function nearest(pos, maxD) {
@@ -234,10 +234,10 @@ function attach(ctx) {
       const nm = (i) => (eq[i] ? eq[i].name : null);
       const flags = (e.metadata && typeof e.metadata[0] === "number") ? e.metadata[0] : 0;
       const ev = sample(acc(p.username), track(p.username), {
-        t, pos: { x: e.position.x, y: e.position.y, z: e.position.z }, onGround: !!e.onGround, sneaking: !!e.crouching, sprinting: !!(flags & 0x08),
+        t, pos: { x: e.position.x, y: e.position.y, z: e.position.z }, onGround: ctx.onGround(e), sneaking: !!e.crouching, sprinting: !!(flags & 0x08),
         elytra: !!e.elytraFlying, held: nm(0), armor: { helmet: nm(5), chestplate: nm(4), leggings: nm(3), boots: nm(2) }, pitch: e.pitch, lookTable: lookingAtTable(e),
       });
-      for (const x of ev) if (x.kind === "crafted" || x.kind === "takeoff") ctx.ev("observed", { who: p.username, ...x });
+      for (const x of ev) if (x.kind === "crafted" || x.kind === "takeoff") ctx.ev("observed", { who: p.username, what: x.kind, item: x.item, how: x.how });
     }
     if (Date.now() - lastSend > 30000) {
       lastSend = Date.now();

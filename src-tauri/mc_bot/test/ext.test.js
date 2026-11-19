@@ -382,5 +382,8 @@ test("duelli: stile dell'avversario, counter, scelta della tattica", () => {
   assert.deepStrictEqual(P.roundOver({ endHp: 6 }, 5, 15, 10, 3), { over: true, won: false, why: "hearts" });
   assert.deepStrictEqual(P.roundOver({ endHp: 6 }, 12, 4, 10, 3), { over: true, won: true, why: "hearts" });
   assert.deepStrictEqual(P.roundOver({ endHp: 0 }, 5, 15, 10, 3), { over: false });
+  // partito già basso: deve perdere almeno 4 punti
+  assert.deepStrictEqual(P.roundOver({ endHp: 6 }, 20, 5, 1, 3, { me: 20, opp: 6 }), { over: false });
+  assert.strictEqual(P.roundOver({ endHp: 6 }, 20, 2, 1, 3, { me: 20, opp: 6 }).won, true);
   assert.strictEqual(P.roundOver({ endHp: 6 }, 20, null, 10, 50).why, "left");
 });

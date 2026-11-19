@@ -32,6 +32,16 @@ module.exports = function ext(core) {
     onSpawn: (f) => spawns.push(f),
     onOp: (name, f) => ops.set(name, f),
     isFood: (n) => Inv.FOOD.has(n),
+    /** Mineflayer non tiene "a terra" per le altre entità: blocco pieno appena sotto i piedi. */
+    onGround(e) {
+      const b = core.bot();
+      if (!b || !e || !e.position) return false;
+      const frac = e.position.y - Math.floor(e.position.y);
+      // piedi a filo di un blocco pieno, oppure su mezzo blocco (lastre, scalini)
+      if (frac < 0.05 || frac > 0.97) { const below = b.blockAt(e.position.offset(0, -0.1, 0)); return !!below && below.boundingBox === "block"; }
+      if (Math.abs(frac - 0.5) < 0.05) { const here = b.blockAt(e.position.offset(0, -0.1, 0)); return !!here && /slab|stairs/.test(here.name); }
+      return false;
+    },
     /**
      * Chiede all'app (che chiede al giocatore in chat, o risponde da quello che ricorda). Restituisce la
      * risposta (true/false o testo) o `def` se nessuno risponde entro `ms`.
