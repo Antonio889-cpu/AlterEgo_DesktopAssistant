@@ -609,6 +609,28 @@ Alter Ego joins your **Minecraft Java Edition** world and plays with you. *Setti
   back up, jump, flinch, eat.
 - **Learning while playing**: action sequences that work become named **skills** he/she can repeat without tokens; failures become **lessons**.
   Only the relevant ones (keyword match) reach the prompt. Stored in `minecraft_skills.json`.
+- **Inventory and recursive crafting**: he/she keeps the useful stuff (best tool per type, food, building blocks), drops or stores junk in a
+  nearby chest, picks the right tool for each block, puts on the best armor and remakes tools that are about to break. "craft iron_pickaxe"
+  is enough: the recipe tree (from minecraft-data) tells what to gather, mine, smelt and craft, with the crafting table and furnace when needed;
+  when something can't be made (wheat, leather…) the error says why.
+- **Mental schematic before building**: every build, even one asked in words ("build me a 5x5 house of stone"), first becomes a voxel grid
+  with materials. He/she picks the spot (flat, no water, not on you), counts blocks against the inventory and gathers what's missing, clears
+  what's in the way (whole trees, dirt, the corridor in front of the door; blocks someone built are only broken after asking), fills holes
+  under the floor, then builds foundations → walls → roof (doors and torches last), with scaffolds where he/she can't reach, removed at the end.
+  Schematic files work too (`.schem`, `.schematic`, `.litematic`, `.nbt`): pick one in the settings or say "build the schematic castle".
+  The settings show an isometric or layer-by-layer preview.
+- **Learning by watching you**: from another client only what's visible is recorded: held items and armor, movement (speed, jumps, sprint,
+  sneak, where you spend time), blocks placed and broken near you, crafting inferred from the table plus the new item in your hand, furnaces
+  lighting up, elytra flights (fall-flying flag: take-off, glide, rockets, landing). Your inventory and crafting grid are not visible. It turns
+  into habits he/she uses: armor like yours, your tools, gathering what you gather, your flight style. Per-player profiles in
+  `minecraft_players.json` and in the memory graph.
+- **Duels that learn**: only when you ask ("let's duel", "best of 3, first KO"): clear rules, countdown, ends at a few hearts unless you say
+  otherwise, no hits outside the duel. During a round he/she records your pattern (distance, strafing, jump crits, w-tap, shield, bow, rod,
+  eating, pearls, running away); between rounds a bandit (UCB) plus counters picks the next tactic (shield against crits, spacing against
+  spammers, rush against bows), copying what works for you. With Rizzo Flow as the router the choice, "copy the style?" and "ask?" go in one
+  batched call. Combat profiles in `minecraft_combat.json`.
+- **Asks when unsure**: before breaking someone's blocks, about duel rules, fighting style or where to build, one short question in chat (never
+  in a row), and the answer is remembered so he/she doesn't ask again.
 - **Skin**: the included "Alter Ego (Chihiro)" skin or your own 64x64/64x32 PNG, with a preview. Offline accounts show a custom skin only with
   [CustomSkinLoader](https://github.com/xfl03/MCCustomSkinLoader) (client mod: the app copies the skin to `.minecraft/CustomSkinLoader/LocalSkin/skins/`)
   or the [SkinsRestorer](https://skinsrestorer.net) server plugin (upload the PNG at skinsrestorer.net/upload and paste the `/skin url` command:
@@ -869,8 +891,8 @@ The version comes from `src-tauri/tauri.conf.json`.
 - **Lambda Players** by StarFrost: optional, not included; Alter Ego Link only uses its public hooks and functions.
 - **FlyWire connectome** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([data](https://zenodo.org/records/10676866), [annotations](https://github.com/flyconnectome/flywire_annotations)). Model parameters from Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` is a subset of the FlyWire data (active neurons only, synapse signs from the predicted neurotransmitters).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): written for this project; some ideas (NPC body, mouth movement, event log) come from [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) by SonnyTaylor (MIT).
-- **Minecraft bot** (`src-tauri/mc_bot/`): written for this project on top of [Mineflayer](https://github.com/PrismarineJS/mineflayer) and its plugins mineflayer-pathfinder, mineflayer-pvp, mineflayer-collectblock and mineflayer-tool (PrismarineJS and contributors, MIT); some ideas (small composable skills, always-on modes) come from [Mindcraft](https://github.com/mindcraft-bots/mindcraft) (MIT). The "Alter Ego (Chihiro)" skin is original pixel art made with `tools/make_mc_skin.py`. Minecraft is a trademark of Mojang/Microsoft; this project is not affiliated with them.
 - **ViaProxy bridge** (downloaded at runtime, not bundled): [ViaProxy](https://github.com/ViaVersion/ViaProxy) by RK_01 and the ViaVersion team, with [ViaVersion](https://github.com/ViaVersion/ViaVersion), [ViaBackwards](https://github.com/ViaVersion/ViaBackwards), [ViaRewind](https://github.com/ViaVersion/ViaRewind) and ViaLegacy (GPL-3.0). Portable Java: [Eclipse Temurin](https://adoptium.net) (GPL-2.0 with Classpath Exception).
+- **Minecraft bot** (`src-tauri/mc_bot/`): written for this project on top of [Mineflayer](https://github.com/PrismarineJS/mineflayer) and its plugins mineflayer-pathfinder, mineflayer-pvp, mineflayer-collectblock, mineflayer-tool and prismarine-nbt for schematic files (PrismarineJS and contributors, MIT); some ideas (small composable skills, always-on modes) come from [Mindcraft](https://github.com/mindcraft-bots/mindcraft) (MIT). The "Alter Ego (Chihiro)" skin is original pixel art made with `tools/make_mc_skin.py`. Minecraft is a trademark of Mojang/Microsoft; this project is not affiliated with them.
 - **VRChat integration** (`src-tauri/src/vrchat/`): written for this project (own small OSC encoder, no OSC crate). Ideas only — no code — from ProjectGabriel-Remastered (AGPL-3.0). VRChat is a trademark of VRChat Inc.; this project is not affiliated with it. OSC and chatbox addresses from VRChat's public OSC documentation; the web API endpoints from the community [vrchatapi](https://vrchatapi.github.io) documentation.
 - **Chihiro pet** sprite sheet: by **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - **Alter Ego with headphones** sprite: original artwork by **Ayari** ([@xxayariii on Instagram](https://www.instagram.com/xxayariii/)),

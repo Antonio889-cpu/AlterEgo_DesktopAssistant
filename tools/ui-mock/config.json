@@ -368,6 +368,11 @@
     "csl": true,
     "node": "",
     "version_mode": "auto",
-    "servers": []
+    "servers": [],
+    "observe": true,
+    "duels": true,
+    "ask": true,
+    "rizzo": true,
+    "tidy": true
   }
 }

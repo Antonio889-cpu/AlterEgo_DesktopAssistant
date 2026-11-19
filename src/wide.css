@@ -174,3 +174,14 @@ body.w-boot { animation: w-crt .6s cubic-bezier(.2,.8,.2,1) both; }
 @media (prefers-reduced-motion: reduce) {
   body.wide *, body.wide *::before, body.wide *::after, body.w-boot { animation: none !important; transition: none !important; }
 }
+
+/* 1.15: anteprima della schematica (Minecraft) */
+.mc-plan { display: grid; gap: 12px; grid-template-columns: 1fr; margin: 6px 0 10px; }
+@media (min-width: 760px) { .mc-plan { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); } }
+.mc-plan > * { min-width: 0; }
+.mc-plan canvas { width: 100%; max-width: 360px; aspect-ratio: 3 / 2; height: auto; background: #061206; border: 2px solid var(--line); image-rendering: pixelated; }
+.mc-plan-side label { display: block; }
+.mc-plan-side input[type=range] { width: 100%; max-width: 240px; }
+#mc-plan-info { overflow-wrap: anywhere; white-space: pre-line; }
+.mc-people { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+.mc-people li { overflow-wrap: anywhere; }

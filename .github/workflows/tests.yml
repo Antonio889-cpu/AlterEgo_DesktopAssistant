@@ -47,4 +47,4 @@ jobs:
 
       - name: Test bot Minecraft (logica pura, senza server)
         working-directory: src-tauri/mc_bot
-        run: node --test test/*.test.js
+        run: npm ci --no-audit --no-fund && node --test test/*.test.js

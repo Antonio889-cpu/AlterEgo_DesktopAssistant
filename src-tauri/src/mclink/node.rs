@@ -21,6 +21,13 @@ pub const BOT: &[(&str, &str)] = &[
     ("bot.js", include_str!("../../mc_bot/bot.js")),
     ("lib.js", include_str!("../../mc_bot/lib.js")),
     ("conn.js", include_str!("../../mc_bot/conn.js")),
+    ("ext.js", include_str!("../../mc_bot/ext.js")),
+    ("inventory.js", include_str!("../../mc_bot/inventory.js")),
+    ("craft.js", include_str!("../../mc_bot/craft.js")),
+    ("observe.js", include_str!("../../mc_bot/observe.js")),
+    ("schematic.js", include_str!("../../mc_bot/schematic.js")),
+    ("build.js", include_str!("../../mc_bot/build.js")),
+    ("pvp.js", include_str!("../../mc_bot/pvp.js")),
 ];
 
 /// Ramo LTS di Node scaricato se manca (Jod, supporto fino ad aprile 2027).

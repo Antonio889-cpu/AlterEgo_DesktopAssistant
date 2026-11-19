@@ -6,7 +6,7 @@
   "main": "bot.js",
   "license": "MIT",
   "scripts": {
-    "test": "node --test test/lib.test.js"
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
@@ -17,6 +17,7 @@
     "mineflayer-pathfinder": "2.4.5",
     "mineflayer-pvp": "1.3.2",
     "mineflayer-tool": "1.2.0",
+    "prismarine-nbt": "2.8.0",
     "vec3": "0.2.0"
   }
 }

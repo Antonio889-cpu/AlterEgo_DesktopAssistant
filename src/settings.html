@@ -485,6 +485,34 @@
       <label class="inline"><input type="checkbox" id="mc-slim" /> Braccia sottili (slim)</label>
       <p class="note sub">SkinsRestorer vuole un URL pubblico: salva il PNG, caricalo su <a href="#" id="mc-sr-link">skinsrestorer.net/upload</a> e incolla qui il comando che ti dà. Lo scrive in chat appena entra.</p>
       <div class="actions"><button id="mc-skin-export">Salva il PNG della skin</button></div>
+      <!-- 1.15: costruzioni, schematiche, impara dal giocatore, duelli -->
+      <h3>Costruzioni e schematiche</h3>
+      <p class="note sub">Prima di costruire Alter Ego immagina la costruzione (anche a parole: «fammi una casetta 5x5»), conta i blocchi, toglie quello che c'è in mezzo e poi costruisce dal basso. Puoi darle anche un file di schematica (.schem, .schematic, .litematic, .nbt): in chat «costruisci la schematica …».</p>
+      <div class="mc-row">
+        <button id="mc-schem-pick">Scegli un file…</button>
+        <label>Schematica <select id="mc-schem-list"></select></label>
+        <button id="mc-schem-build">Costruisci</button>
+      </div>
+      <input type="file" id="mc-schem-file" accept=".schem,.schematic,.litematic,.nbt" hidden />
+      <p id="mc-schem-msg" class="result"></p>
+      <div class="mc-plan">
+        <canvas id="mc-plan-view" width="360" height="240" aria-label="Anteprima della costruzione"></canvas>
+        <div class="mc-plan-side">
+          <label>Visuale <select id="mc-plan-mode"><option value="iso">Isometrica</option><option value="layer">Per piani</option></select></label>
+          <label>Piano <input type="range" id="mc-plan-layer" min="0" max="0" value="0" /> <span id="mc-plan-layer-val"></span></label>
+          <p id="mc-plan-info" class="note sub">Nessuna anteprima: scegli un file o chiedile una costruzione.</p>
+        </div>
+      </div>
+      <h3>Impara da te</h3>
+      <div class="checks">
+        <label class="inline"><input type="checkbox" id="mc-observe" /> Impara guardandoti</label>
+        <label class="inline"><input type="checkbox" id="mc-duels" /> Duelli su richiesta</label>
+        <label class="inline"><input type="checkbox" id="mc-ask" /> Chiede quando ha un dubbio</label>
+        <label class="inline"><input type="checkbox" id="mc-tidy" /> Inventario in ordine da sola</label>
+        <label class="inline"><input type="checkbox" id="mc-rizzo" /> Decisioni rapide con Rizzo Flow</label>
+      </div>
+      <p class="note sub">Da un altro giocatore si vede solo quello che vedresti tu: cosa hai in mano e addosso, come ti muovi, i blocchi che metti e rompi, l'elytra. Il tuo inventario e la griglia di crafting no: il crafting lo deduce dal banco e dall'oggetto nuovo in mano. I duelli partono solo se li chiedi («duelliamo»), con regole e conto alla rovescia; dopo ogni round sceglie la tattica (con Rizzo Flow se è il router) e ricorda cosa funziona contro di te.</p>
+      <ul id="mc-people" class="mc-people"></ul>
     </section>
 
     <section data-tab="games" data-game="vrchat" class="game-vrc">
@@ -883,5 +911,6 @@
   <script src="vrchat.js"></script>
   <script src="minecraft.js"></script>
   <script src="mc-net.js"></script>
+  <script src="minecraft-build.js"></script>
 </body>
 </html>

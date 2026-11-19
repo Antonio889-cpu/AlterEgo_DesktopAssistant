@@ -26,10 +26,12 @@ attack, dodges by reflex), so only act when it's useful.\n{KNOWLEDGE}\n\
 Reply format:\n[emotion] (one of {EMOTIONS})\ntext (1-2 short sentences, it goes in the game chat and is spoken aloud; may be empty)\n\
 then optional action lines, run in order:\n\
 [act] follow <player> | stay | come <player> | goto <x> <y> <z> | guard <player> | stop | look <player> | jump | \
-collect <block> [n] | craft <item> [n] | smelt <item> [n] | place <block> | build tower|wall|hut [block] [size] | \
-give <player> <item> [n] | equip <item> | eat | sleep | drop <item> [n] | explore [blocks] | attack <mob|player> | skill <name>\n\
-Use real Minecraft ids (oak_log, cobblestone, iron_ingot…); \"wood\" and \"stone\" are fine for collect. Plan the whole chain \
-(e.g. collect wood 3, craft oak_planks 12, craft stick 4, craft crafting_table, craft wooden_pickaxe). \
+collect <block> [n] | craft <item> [n] | smelt <item> [n] | place <block> | build house|hut|tower|wall|platform|bridge [WxL] [block] | \
+schematic <file name> | give <player> <item> [n] | equip <item> | armor | sort | eat | sleep | drop <item> [n] | explore [blocks] | \
+attack <mob|player> | duel <player> [rules] | fly | skill <name>\n\
+Use real Minecraft ids (oak_log, cobblestone, iron_ingot…); \"wood\" and \"stone\" are fine for collect. craft is recursive: \
+ask for the final item and your hands gather, smelt and craft the whole tree (craft iron_pickaxe is enough). build first plans a \
+schematic in your head, clears the spot and gathers missing blocks. duel only when your friend asks; no hits outside duels. \
 If a sequence works it becomes a skill: name it with a line [skill short_name] to reuse it later with [act] skill short_name. \
 Respect your lessons (things that failed before). Do what you're asked if it's possible, then say it briefly; if not, say why.\n"
     );
@@ -157,13 +159,31 @@ pub fn act(s: &str) -> Option<Value> {
         }
         "build" => {
             let shape = id(if first.is_empty() { "tower" } else { first });
-            if !["tower", "pillar", "wall", "hut", "house", "shelter"].contains(&shape.as_str()) {
+            if !["tower", "pillar", "wall", "hut", "house", "shelter", "platform", "bridge"].contains(&shape.as_str()) {
                 return None;
             }
-            let block = rest.get(1).filter(|x| x.parse::<u32>().is_err()).map(|x| id(x)).unwrap_or_default();
-            let size = rest.iter().skip(1).find_map(|x| x.parse::<u32>().ok()).unwrap_or(0).min(9);
-            json!({ "op": "build", "shape": shape, "block": block, "size": size })
+            // "5x7": larghezza e lunghezza
+            let wl = rest.iter().skip(1).find_map(|x| x.split_once('x').and_then(|(a, b)| Some((a.parse::<u32>().ok()?, b.parse::<u32>().ok()?))));
+            let block = rest.iter().skip(1).find(|x| x.parse::<u32>().is_err() && !x.contains(|c: char| c.is_ascii_digit())).map(|x| id(x)).unwrap_or_default();
+            let size = rest.iter().skip(1).find_map(|x| x.parse::<u32>().ok()).unwrap_or(0).min(15);
+            let mut o = json!({ "op": "build", "shape": shape, "block": block, "size": size });
+            if let Some((w, l)) = wl {
+                o["w"] = json!(w.clamp(2, 15));
+                o["l"] = json!(l.clamp(2, 15));
+            }
+            o
         }
+        "schematic" | "schem" => {
+            need(first)?;
+            json!({ "op": "build_file", "name": rest.join(" ") })
+        }
+        "duel" | "pvp" => {
+            need(first)?;
+            json!({ "op": "duel", "who": first, "text": rest[1..].join(" ") })
+        }
+        "armor" => json!({ "op": "armor" }),
+        "sort" | "tidy" => json!({ "op": "sort" }),
+        "fly" => json!({ "op": "fly" }),
         "give" => {
             let item = rest.get(1).map(|x| id(x)).unwrap_or_default();
             need(first)?;
@@ -209,7 +229,7 @@ mod tests {
 
     #[test]
     fn parses_reply_with_actions() {
-        let raw = "[happy]\nok ci penso io!\n[act] collect wood 3\n[act] craft oak_planks 12\n[act] fly away\n[act] build hut cobblestone 5\n[skill Make Planks!]\n[act] give Makoto bread";
+        let raw = "[happy]\nok ci penso io!\n[act] collect wood 3\n[act] craft oak_planks 12\n[act] teleport away\n[act] build hut cobblestone 5\n[skill Make Planks!]\n[act] give Makoto bread";
         let r = parse(raw);
         assert_eq!(r.emotion, "happy");
         assert_eq!(r.text, "ok ci penso io!");
@@ -225,6 +245,11 @@ mod tests {
         assert_eq!(act("goto 10, 64, -3"), Some(json!({ "op": "goto", "x": 10.0, "y": 64.0, "z": -3.0 })));
         assert_eq!(act("build tower 4"), Some(json!({ "op": "build", "shape": "tower", "block": "", "size": 4 })));
         assert_eq!(act("build castle"), None);
+        assert_eq!(act("build house 7x5 stone_bricks"), Some(json!({ "op": "build", "shape": "house", "block": "stone_bricks", "size": 0, "w": 7, "l": 5 })));
+        assert_eq!(act("schematic castello medievale"), Some(json!({ "op": "build_file", "name": "castello medievale" })));
+        assert_eq!(act("duel Makoto first ko"), Some(json!({ "op": "duel", "who": "Makoto", "text": "first ko" })));
+        assert_eq!(act("duel"), None);
+        assert_eq!(act("sort"), Some(json!({ "op": "sort" })));
         assert_eq!(act("collect minecraft:Oak Log 999"), Some(json!({ "op": "collect", "block": "oak", "n": 1 })), "ids con spazi: prima parola");
         assert_eq!(act("collect diamond_ore 999"), Some(json!({ "op": "collect", "block": "diamond_ore", "n": 64 })));
         assert_eq!(act("skill Make Planks"), Some(json!({ "op": "skill", "name": "make_planks" })));

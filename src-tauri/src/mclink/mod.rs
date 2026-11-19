@@ -14,12 +14,16 @@
 pub mod auth;
 pub mod console;
 pub mod node;
+pub mod observe;
+pub mod plan;
 pub mod prompt;
 pub mod proto;
+pub mod pvp;
 pub mod quick;
 pub mod quips;
 pub mod reflex;
 pub mod servers;
+pub mod rizzo;
 pub mod skills;
 pub mod skin;
 pub mod via;
@@ -215,6 +219,11 @@ fn bot_cfg(app: &AppHandle) -> Value {
         "fly": m.fly,
         "player": m.player.trim(),
         "quips": quips,
+        "observe": m.observe,
+        "tidy": m.tidy,
+        "duels": m.duels,
+        "ask": m.ask,
+        "schem_dir": plan::schem_dir(app).display().to_string(),
     })
 }
 
@@ -447,6 +456,10 @@ fn on_event(app: &AppHandle, e: Value) {
     match kind.as_str() {
         "chat" => {
             let (from, text, whisper) = (s("from"), s("text"), e["whisper"].as_bool().unwrap_or(false));
+            // risposta a una domanda di Alter Ego (zero token)
+            if plan::take_answer(app, &from, &text) {
+                return;
+            }
             if !addressed(app, &from, whisper, &text) {
                 let mut i = lock(app);
                 i.overheard.push_back(format!("{from}: {}", text.chars().take(160).collect::<String>()));
@@ -521,6 +534,7 @@ fn on_event(app: &AppHandle, e: Value) {
         "night" => remember(app, "[night is falling]", ""),
         "ate" => remember(app, &format!("[you ate {}]", s("what")), ""),
         "idea" => remember(app, &format!("[on your own you started: {}]", s("op")), ""),
+        "observe" | "observed" | "doubt" | "duel_need_tactic" | "duel_round" | "duel_end" | "plan" | "build_status" | "craft_plan" | "worn" => plan::on_event(app, &kind, &e),
         _ => {}
     }
 }
@@ -659,13 +673,13 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
     }
     // 1. comandi semplici: zero token
     if event.is_none() {
-        if let Some(q) = quick::find(text, &from, &cfg.minecraft.username, en) {
+        if let Some(q) = quick::find(text, &from, &cfg.minecraft.username, en).or_else(|| plan::find(text, &from, en, &plan::schem_dir(app), &cfg.minecraft)) {
             tokio::time::sleep(human_pause(200, 600)).await;
             let leave = q.ops.iter().any(|o| o["op"] == "leave");
             send(app, vec![json!({ "op": "say", "text": q.reply })]);
             if leave {
                 stop(app);
-            } else {
+            } else if !plan::ask_build_spot(app, &from, &q.ops) {
                 send(app, q.ops);
             }
             remember(app, &format!("{from}: {text}"), &q.reply);
@@ -692,6 +706,13 @@ pub async fn handle(app: &AppHandle, from: &str, text: &str, event: Option<&str>
         if !block.is_empty() {
             user.push('\n');
             user.push_str(&block);
+        }
+    }
+    if cfg.minecraft.observe || cfg.minecraft.duels {
+        let extra = plan::context(app, if event.is_none() { &from } else { &owner });
+        if !extra.is_empty() {
+            user.push('\n');
+            user.push_str(&extra);
         }
     }
     if !overheard.is_empty() {
@@ -997,5 +1018,6 @@ pub fn minecraft_skin_export(app: AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub fn minecraft_forget(app: AppHandle) {
     skills::forget(&data_dir(&app));
+    plan::forget(&data_dir(&app));
     *mc(&app).skills.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(skills::Store::default());
 }

@@ -453,6 +453,13 @@ async function eat(force) {
   }
 }
 
+// 1.15: inventario, crafting ricorsivo, osservazione, schematiche, costruzione e duelli (vedi ext.js)
+const EXT = require("./ext")({
+  SKILLS, cfg, bot: () => bot, mc: () => mc, ev, ack: (c, ok, err, info) => ack(c, ok, err, info), chat, quip, log, en, owner, playerEntity, countItem,
+  checkCancel, goNear, placeAt, placeNear, eat, sleep, busy: () => !!task || queue.length > 0 || running, queue: (cmd) => { queue.push(cmd); pump(); },
+  lastAct: () => { lastAct = Date.now(); },
+});
+
 /** Riprende il comportamento continuo (dopo un'azione o un riflesso). */
 function resume() {
   if (!bot || !bot.entity || task) return;
@@ -523,6 +530,7 @@ function handle(cmd) {
   if (cmd.op === "quips") { cfg.quips = cmd.lines || {}; return ack(cmd, true); }
   if (cmd.op === "reflex") { reflex(cmd.kind); return; }
   if (cmd.op === "leave") { ack(cmd, true); setTimeout(() => bot && bot.quit(), 300); return; }
+  if (EXT.op(cmd)) return;
   if (NOW.has(cmd.op)) return run(cmd);
   queue.push(cmd);
   pump();
@@ -612,6 +620,7 @@ async function connect(o) {
     setTimeout(() => { resume(); quip("greet", "happy", true); }, 1500);
     if (pendingSkin) setTimeout(() => SKILLS.skin({ cmd: pendingSkin }).catch(() => {}), 4000);
     timers();
+    EXT.spawned(bot);
   });
   bot.on("respawn", () => { hpPrev = 20; setTimeout(resume, 1000); });
   bot.on("chat", (username, message) => {
@@ -637,6 +646,7 @@ async function connect(o) {
     ev("left", { reason: String(reason || "") });
     bot = null;
     stopTimers();
+    EXT.stopped();
     // senza mondo il processo non serve più: l'app ne avvia uno nuovo per rientrare
     setTimeout(() => process.exit(0), 200);
   });
@@ -799,6 +809,7 @@ function life() {
   const ideas = [];
   if (cfg.gather) ideas.push({ op: "collect", block: Math.random() < 0.6 ? "wood" : "stone", n: 3 + Math.floor(Math.random() * 4) });
   if (cfg.explore && mode !== "follow") ideas.push({ op: "explore", dist: 25 });
+  ideas.push(...EXT.ideas());
   if (!ideas.length) { quip("bored", "thinking"); return; }
   const idea = ideas[Math.floor(Math.random() * ideas.length)];
   ev("idea", { op: idea.op });

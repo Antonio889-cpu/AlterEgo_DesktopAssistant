@@ -970,6 +970,16 @@ pub struct MinecraftConfig {
     pub version_mode: String,
     /// Impostazioni per server: login (AuthMe), inviti, warp, sottoserver (password nel portachiavi).
     pub servers: Vec<crate::mclink::servers::ServerProfile>,
+    /// 1.15: impara dal giocatore guardandolo (equipaggiamento, movimenti, blocchi, elytra).
+    pub observe: bool,
+    /// Accetta i duelli PvP (solo su richiesta, con regole e conto alla rovescia).
+    pub duels: bool,
+    /// Chiede in chat quando ha un dubbio (poche domande) e ricorda la risposta.
+    pub ask: bool,
+    /// Decisioni rapide con Rizzo Flow quando è il router (Impostazioni → Risparmio token).
+    pub rizzo: bool,
+    /// Tiene l'inventario in ordine da sola (armatura migliore, spazzatura via, attrezzi consumati rifatti).
+    pub tidy: bool,
 }
 
 impl Default for MinecraftConfig {
@@ -995,6 +1005,11 @@ impl Default for MinecraftConfig {
             node: String::new(),
             version_mode: "auto".into(),
             servers: Vec::new(),
+            observe: true,
+            duels: true,
+            ask: true,
+            rizzo: true,
+            tidy: true,
         }
     }
 }

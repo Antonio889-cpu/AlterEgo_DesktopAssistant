@@ -12,6 +12,18 @@
     if (p) { p.enabled = true; p.model = LONG ? "deepseek-chat-v3.1-terminus-extra-long-model-name-for-testing" : "deepseek-chat"; }
   }
   const long = (s) => (LONG ? s + " " + "lunghissimo-".repeat(12) : s);
+  // schematica finta per l'anteprima di Minecraft: casetta 5x5 (pavimento, pareti, tetto)
+  const mcSchem = () => {
+    const blocks = [];
+    for (let y = 0; y < 5; y++) for (let z = 0; z < 5; z++) for (let x = 0; x < 5; x++) {
+      const edge = x === 0 || z === 0 || x === 4 || z === 4;
+      if (y === 0) blocks.push([x, y, z, 0]);
+      else if (y === 4) blocks.push([x, y, z, 1]);
+      else if (edge) blocks.push([x, y, z, (x === 0 || x === 4) && (z === 0 || z === 4) ? 2 : y === 2 && x === 0 && z === 2 ? 3 : 1]);
+    }
+    return { ok: true, file: long("casetta.schem"), name: long("casetta"), size: [5, 5, 5], blocks: blocks.length, need: { cobblestone: 25, oak_planks: 56, oak_log: 12, glass_pane: 3 }, skipped: {},
+      preview: { w: 5, h: 5, l: 5, name: "casetta", palette: ["cobblestone", "oak_planks", "oak_log", "glass_pane"], blocks, truncated: false } };
+  };
   const n = MANY ? 400 : 6;
   const now = Math.floor(Date.now() / 1000);
   const models = Array.from({ length: n }, (_, i) => ({
@@ -94,6 +106,14 @@
     minecraft_console_clear: () => null,
     minecraft_console_send: ({ text }) => { fire("minecraft-console", { id: ++conId, ts: Date.now(), kind: text.startsWith("/") ? "cmd" : "cmd", text: (text.startsWith("/") ? "" : "» ") + text }); return null; },
     minecraft_console_list: () => conLines,
+    // 1.15: schematiche e cose imparate (anteprima di una casetta 5x5 generata qui)
+    minecraft_schematics: () => (MANY ? Array.from({ length: 60 }, (_, i) => long(`castello_${i}.schem`)) : ["casetta.schem", long("castello_medievale.litematic")]),
+    minecraft_schematic_load: () => mcSchem(),
+    minecraft_schematic_preview: () => mcSchem(),
+    minecraft_schematic_build: () => null,
+    minecraft_plan: () => ({ at: 1, plan: { name: "house 5x5", line: long("house 5x5: 98 blocchi, mi mancano 12 oak_log, taglio 1 albero"), missing: { oak_log: 12 }, clear: 60, trees: 1, at: { x: 990, y: 100, z: 1010 }, preview: mcSchem().preview },
+      people: MANY ? Array.from({ length: 30 }, (_, i) => long(`Giocatore${i} wears iron armor; flies with an elytra`)) : [long("Makoto wears iron armor; flies with an elytra (takes off with a jump, a rocket every 5s); often gathers stone, oak_log")],
+      duels: [long("duels with Makoto: you 2-1, they jump crits, strafes a lot; best tactic so far: shield")] }),
     memory_overview: () => ({ messages: MANY ? 98231 : 1240, facts: Array.from({ length: n }, (_, i) => ({ id: i, ts: now - i * 3600, content: long("Ama il caffè e programma in Rust " + i) })), summaries: [], db_path: "C:/Users/makoto/AppData/Roaming/AlterEgo/memory.db" }),
     costs_list: () => Array.from({ length: MANY ? 5000 : 40 }, (_, i) => ({ ts: now - i * 900, kind: "chat", provider: "deepseek", model: "deepseek-chat", input: 1800 + i, cached: 12000, output: 120, ms: 900, cost: 0.0004 })),
     ai_usage: () => ({ deepseek: { requests: 42, input: 51234, cached: 40100 } }),
