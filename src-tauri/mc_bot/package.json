@@ -1,0 +1,22 @@
+{
+  "name": "alterego-mc-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Corpo di Alter Ego in Minecraft (Mineflayer): sensi e mani, il cervello resta nell'app",
+  "main": "bot.js",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/lib.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mineflayer": "4.39.0",
+    "mineflayer-collectblock": "1.6.0",
+    "mineflayer-pathfinder": "2.4.5",
+    "mineflayer-pvp": "1.3.2",
+    "mineflayer-tool": "1.2.0",
+    "vec3": "0.2.0"
+  }
+}

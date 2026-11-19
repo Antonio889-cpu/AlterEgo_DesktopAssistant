@@ -832,6 +832,90 @@ impl GmodLinkConfig {
     }
 }
 
+/// Minecraft (Java Edition): Alter Ego entra nel tuo mondo con un bot Mineflayer (vedi mclink/).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(default)]
+pub struct MinecraftConfig {
+    pub enabled: bool,
+    /// Indirizzo del mondo (LAN o server tuo).
+    pub host: String,
+    /// Porta (0 = mondo aperto in LAN, trovata dall'annuncio UDP 4445).
+    pub port: u16,
+    /// Nome dell'account offline.
+    pub username: String,
+    /// Il tuo nome in Minecraft (vuoto = il giocatore più vicino).
+    pub player: String,
+    /// Versione di Minecraft (vuota = automatica).
+    pub version: String,
+    /// Quanto fa di testa sua (0-100).
+    pub initiative: u32,
+    pub follow: bool,
+    pub gather: bool,
+    pub build: bool,
+    pub explore: bool,
+    /// Riflessi ed emozioni dal cervello di moscerino.
+    pub fly: bool,
+    /// Impara abilità e lezioni giocando.
+    pub learn: bool,
+    /// Skin: "alterego" (inclusa) o "file" (PNG scelto).
+    pub skin: String,
+    /// Per SkinsRestorer: comando `/skin …`, URL o nome di un account premium.
+    pub skin_cmd: String,
+    /// Braccia sottili (modello "slim").
+    pub slim: bool,
+    /// Copia la skin per CustomSkinLoader quando entra.
+    pub csl: bool,
+    /// Node.js scelto a mano (vuoto = di sistema o scaricato dall'app).
+    pub node: String,
+}
+
+impl Default for MinecraftConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            host: "127.0.0.1".into(),
+            port: 0,
+            username: "AlterEgo".into(),
+            player: String::new(),
+            version: String::new(),
+            initiative: 60,
+            follow: true,
+            gather: false,
+            build: true,
+            explore: false,
+            fly: true,
+            learn: true,
+            skin: "alterego".into(),
+            skin_cmd: String::new(),
+            slim: false,
+            csl: true,
+            node: String::new(),
+        }
+    }
+}
+
+impl MinecraftConfig {
+    pub fn normalize(&mut self) {
+        self.host = self.host.trim().chars().take(253).collect();
+        if self.host.is_empty() {
+            self.host = "127.0.0.1".into();
+        }
+        // nomi offline: 3-16 caratteri, lettere, numeri e _
+        self.username = self.username.chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').take(16).collect();
+        if self.username.len() < 3 {
+            self.username = "AlterEgo".into();
+        }
+        self.player = self.player.trim().chars().take(16).collect();
+        self.version = self.version.trim().chars().filter(|c| c.is_ascii_alphanumeric() || *c == '.').take(12).collect();
+        self.initiative = self.initiative.min(100);
+        if !["alterego", "file"].contains(&self.skin.as_str()) {
+            self.skin = "alterego".into();
+        }
+        self.skin_cmd = self.skin_cmd.trim().chars().take(250).collect();
+        self.node = self.node.trim().trim_matches('"').to_string();
+    }
+}
+
 /// Pet: Alter Ego esce dalla TV e gira per il desktop nei momenti di calma (vedi pet/).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(default)]
@@ -929,6 +1013,8 @@ pub struct Config {
     pub local: LocalConfig,
     pub pet: PetConfig,
     pub gmodlink: GmodLinkConfig,
+    /// Minecraft: Alter Ego gioca nel tuo mondo (mclink/).
+    pub minecraft: MinecraftConfig,
     pub extras: ExtrasConfig,
     /// Ultimo monitor usato (nome di sistema, es. `\\.\DISPLAY1`).
     pub last_monitor: Option<String>,
@@ -974,6 +1060,7 @@ impl Default for Config {
             local: LocalConfig::default(),
             pet: PetConfig::default(),
             gmodlink: GmodLinkConfig::default(),
+            minecraft: MinecraftConfig::default(),
             extras: ExtrasConfig::default(),
             clip: ClipConfig::default(),
             audio: AudioConfig::default(),
@@ -1053,6 +1140,7 @@ pub fn load(path: &Path) -> Config {
             cfg.normalize_voice();
             cfg.pet.normalize();
             cfg.gmodlink.normalize();
+            cfg.minecraft.normalize();
             cfg.auto_advance_secs = cfg.auto_advance_secs.clamp(0.5, 30.0);
             cfg.music.player_width = cfg.music.player_width.clamp(crate::music::PLAYER_MIN_W, crate::music::PLAYER_MAX_W);
             if !["scanline", "circuit", "both"].contains(&cfg.background.as_str()) {

@@ -80,6 +80,11 @@ pub async fn chat(
         let r = crate::gmodlink::handle(&app, "", &text, None).await?;
         return Ok(providers::ChatResult { text: r, provider: "gmod".into(), model: "gmod".into(), tool_calls: vec![] });
     }
+    // in Minecraft: risponde il cervello di Minecraft (azioni del bot nel mondo)
+    if crate::mclink::wants(&app, &text) {
+        let r = crate::mclink::handle(&app, "", &text, None).await?;
+        return Ok(providers::ChatResult { text: r, provider: "minecraft".into(), model: "minecraft".into(), tool_calls: vec![] });
+    }
     // comandi dell'app (apri music venue, chiudi il lettore…): subito, senza modello
     if cfg.permissions.app_control {
         if let Some(r) = crate::appctl::quick(&app, &text).await {

@@ -14,6 +14,7 @@ mod extras;
 mod form;
 mod gmod;
 mod gmodlink;
+mod mclink;
 mod graphify;
 mod hermes;
 mod hotkeys;
@@ -116,6 +117,7 @@ pub struct FrontConfig {
     hermes_brain: bool,
     pet: config::PetConfig,
     gmodlink: config::GmodLinkConfig,
+    minecraft: config::MinecraftConfig,
     extras: config::ExtrasConfig,
 }
 
@@ -163,6 +165,7 @@ pub fn front_config(app: &AppHandle) -> FrontConfig {
         hermes_brain: cfg.hermes_brain,
         pet: cfg.pet.clone(),
         gmodlink: cfg.gmodlink.clone(),
+        minecraft: cfg.minecraft.clone(),
         extras: cfg.extras.clone(),
     }
 }
@@ -508,6 +511,7 @@ fn main() {
             app.manage(pet::PetRt::default());
             app.manage(extras::Extras::default());
             app.manage(gmodlink::Link::default());
+            app.manage(mclink::Mc::default());
             // cartella degli sprite importati dall'utente (vedi sprites.rs)
             let _ = std::fs::create_dir_all(data_dir.join("sprites"));
             app.manage(audio::kokoro::Kokoro::new(&data_dir));
@@ -548,7 +552,8 @@ fn main() {
             *app.state::<AppState>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
             *app.state::<assistant::Conversation>().ai_bg.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
             *app.state::<extras::Extras>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
-            *app.state::<gmodlink::Link>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
+            *app.state::<gmodlink::Link>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log.clone());
+            *app.state::<mclink::Mc>().ai.cost_log.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(cost_log);
             let handle = app.handle().clone();
             audio::commands::apply(&handle);
             voicestudio::autostart(&handle);
@@ -574,6 +579,7 @@ fn main() {
             music::spawn_analyzer(handle.clone());
             gmod::spawn(handle.clone());
             gmodlink::spawn(handle.clone());
+            mclink::spawn(handle.clone());
             pet::spawn(handle.clone());
             extras::spawn(handle.clone());
             window::spawn_handle_poller(handle);
@@ -686,6 +692,16 @@ fn main() {
             gmodlink::gmodlink_fly_view,
             gmodlink::gmodlink_monitor_open,
             gmodlink::gmodlink_persona_forget,
+            mclink::minecraft_status,
+            mclink::minecraft_settings,
+            mclink::minecraft_install,
+            mclink::minecraft_join,
+            mclink::minecraft_scan_lan,
+            mclink::minecraft_skin_set,
+            mclink::minecraft_skin_get,
+            mclink::minecraft_skin_csl,
+            mclink::minecraft_skin_export,
+            mclink::minecraft_forget,
             rizzo::rizzo_set_dir,
             localai::local_catalog_open,
             hermes::hermes_status,

@@ -55,6 +55,7 @@ Interfaccia in italiano e in inglese.
 - [Azioni sul PC e permessi](#azioni-sul-pc-e-permessi)
 - [Personalità e memoria](#personalità-e-memoria)
 - [Sprite](#sprite)
+- [Minecraft: giochiamo insieme](#minecraft-giochiamo-insieme)
 - [Pet](#pet)
 - [Privacy e sicurezza](#privacy-e-sicurezza)
 - [Dove stanno i dati](#dove-stanno-i-dati)
@@ -575,6 +576,32 @@ simulato sul PC in tempo reale con il modello leaky integrate-and-fire di Shiu e
   in corso e l'abitudine preferita. Si apre dalle impostazioni, dal menu nel gioco (C → Alter Ego → FruitFly Monitor) o da solo quando entra.
 - Come è stato estratto il circuito: [`tools/flybrain/`](tools/flybrain/).
 
+## Minecraft: giochiamo insieme
+
+Alter Ego entra nel tuo mondo di **Minecraft Java Edition** e gioca con te. *Impostazioni → Giochi → Minecraft*.
+
+- **Installazione**: premi *Installa / aggiorna*. L'app usa Node.js se è già sul PC (18 o più recente), altrimenti scarica Node.js LTS
+  portatile da nodejs.org (controllato con `SHASUMS256.txt`), poi installa [Mineflayer](https://github.com/PrismarineJS/mineflayer)
+  e i suoi plugin (pathfinder, pvp, collectblock, tool; MIT) con `npm ci` dal lockfile incluso. Tutto nella cartella dei dati locali dell'app.
+- **Entrare**: apri il mondo in LAN (*Esc → Apri in LAN*) e lascia la porta a 0: la trova dall'annuncio LAN (UDP 4445).
+  Oppure indica indirizzo e porta del tuo server. Usa un **account offline** (nome a scelta, predefinito `AlterEgo`): i mondi LAN vanilla
+  spesso chiedono online-mode, e se il server lo/la butta fuori le impostazioni spiegano le soluzioni (una mod per il LAN che spegne
+  online-mode, oppure un server Paper sul PC con `online-mode=false`).
+- **Chat e voce**: scrive e risponde nella chat di Minecraft e parla con la solita voce sul PC. Il push-to-talk va al cervello di Minecraft
+  mentre è nel mondo. I comandi semplici («seguimi», «fermati», «vieni qui», «proteggimi», «raccogli legna»…) non costano token.
+- **Corpo in Node, cervello nell'app** (`src-tauri/mc_bot/` ↔ `src-tauri/src/mclink/`): righe JSON su stdin/stdout. Seguire, guardare
+  gli amici, difendersi, mangiare, raccogliere ed esplorare girano nel bot a zero token; il modello si chiama solo quando qualcuno gli/le
+  parla o succede qualcosa di importante, con un prompt corto in cache (con le basi di Minecraft) e lo stato in una riga.
+- **Cervello di moscerino**: lo stesso connettoma FlyWire di Garry's Mod riceve i sensi di Minecraft (danni, mob e frecce in arrivo da un lato,
+  sibilo del creeper, esplosioni, cibo, colpi di un giocatore, caduta, acqua, luce) e i neuroni discendenti diventano riflessi: scappare,
+  scartare di lato, indietreggiare, saltare, sobbalzare, mangiare.
+- **Impara giocando**: le sequenze di azioni che funzionano diventano **abilità** con un nome, da rifare senza token; gli errori diventano **lezioni**.
+  Nel prompt vanno solo quelle pertinenti (parole chiave). Salvate in `minecraft_skills.json`.
+- **Skin**: quella inclusa «Alter Ego (Chihiro)» o un tuo PNG 64x64/64x32, con anteprima. Con un account offline la skin si vede solo con
+  [CustomSkinLoader](https://github.com/xfl03/MCCustomSkinLoader) (mod lato client: l'app copia la skin in `.minecraft/CustomSkinLoader/LocalSkin/skins/`)
+  o con il plugin [SkinsRestorer](https://skinsrestorer.net) sul server (carica il PNG su skinsrestorer.net/upload e incolla il comando `/skin url`:
+  lo scrive appena entra).
+
 ## Pet
 
 Quando non succede niente, Alter Ego esce a esplorare: la TV si spegne e lui/lei salta fuori
@@ -775,6 +802,7 @@ La versione è quella di `src-tauri/tauri.conf.json`.
 - **Lambda Players** di StarFrost: facoltativo, non incluso; Alter Ego Link usa solo i suoi hook e le sue funzioni pubbliche.
 - **Connettoma FlyWire** (v783, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/)): Dorkenwald et al., *Neuronal wiring diagram of an adult brain*, Nature 2024; Schlegel et al., *Whole-brain annotation and multi-connectome cell typing of Drosophila*, Nature 2024 ([dati](https://zenodo.org/records/10676866), [annotazioni](https://github.com/flyconnectome/flywire_annotations)). Parametri del modello da Shiu et al., *A Drosophila computational brain model reveals sensorimotor processing*, Nature 2024. `src-tauri/resources/flybrain.bin` è un sottoinsieme dei dati FlyWire (solo i neuroni attivi, segno delle sinapsi dai neurotrasmettitori previsti).
 - **Alter Ego Link** (`src-tauri/gmod_addon/`): scritto per questo progetto; alcune idee (corpo da NPC, movimento della bocca, diario degli eventi) vengono da [AI-NPCs-GMod](https://github.com/SonnyTaylor/AI-NPCs-GMod) di SonnyTaylor (MIT).
+- **Bot di Minecraft** (`src-tauri/mc_bot/`): scritto per questo progetto sopra [Mineflayer](https://github.com/PrismarineJS/mineflayer) e i plugin mineflayer-pathfinder, mineflayer-pvp, mineflayer-collectblock e mineflayer-tool (PrismarineJS e collaboratori, MIT); alcune idee (abilità piccole e componibili, modalità sempre attive) vengono da [Mindcraft](https://github.com/mindcraft-bots/mindcraft) (MIT). La skin «Alter Ego (Chihiro)» è pixel art originale fatta con `tools/make_mc_skin.py`. Minecraft è un marchio di Mojang/Microsoft; questo progetto non è affiliato.
 - Foglio sprite del **pet Chihiro**: di **Lucid On Bound** (`src/assets/pet/chihiro/`).
 - Sprite di **Alter Ego con le cuffie**: disegno originale di **Ayari** ([@xxayariii su Instagram](https://www.instagram.com/xxayariii/)),
   adattato per l'app (sfondo rimosso, tinta verde CRT). Grazie, Ayari! 💚
