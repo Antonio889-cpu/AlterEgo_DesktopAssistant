@@ -966,6 +966,16 @@ pub struct MinecraftConfig {
     pub csl: bool,
     /// Node.js scelto a mano (vuoto = di sistema o scaricato dall'app).
     pub node: String,
+    /// 1.15: impara dal giocatore guardandolo (equipaggiamento, movimenti, blocchi, elytra).
+    pub observe: bool,
+    /// Accetta i duelli PvP (solo su richiesta, con regole e conto alla rovescia).
+    pub duels: bool,
+    /// Chiede in chat quando ha un dubbio (poche domande) e ricorda la risposta.
+    pub ask: bool,
+    /// Decisioni rapide con Rizzo Flow quando è il router (Impostazioni → Risparmio token).
+    pub rizzo: bool,
+    /// Tiene l'inventario in ordine da sola (armatura migliore, spazzatura via, attrezzi consumati rifatti).
+    pub tidy: bool,
 }
 
 impl Default for MinecraftConfig {
@@ -989,6 +999,11 @@ impl Default for MinecraftConfig {
             slim: false,
             csl: true,
             node: String::new(),
+            observe: true,
+            duels: true,
+            ask: true,
+            rizzo: true,
+            tidy: true,
         }
     }
 }
