@@ -1,3 +1,10 @@
+## Alter Ego 1.15.0
+
+- Minecraft: joins any game version (ViaProxy bridge), server register/login, follows you through lobbies, warps and parties, live console.
+- Minecraft: smarter inventory and crafting, learns from watching you, plans builds and builds schematics, PvP duels that learn.
+
+`AlterEgo_1.15.0_setup.exe` / `AlterEgo_1.15.0_portable.zip` Windows · `AlterEgo_1.15.0_amd64.AppImage` / `AlterEgo_1.15.0_amd64.deb` Linux · `SHA256SUMS.txt`
+
 ## Alter Ego 1.14.0
 
 - Minecraft and VRChat: Alter Ego joins and plays with you.
